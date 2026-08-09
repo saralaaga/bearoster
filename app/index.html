@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>生日 · macOS 通讯录生日管理</title>
+<style>
+/* ============================================================
+   设计系统：macOS 原生生产力工具
+   清晰、克制、可信 —— 不做社交化 / 游戏化 / 营销化设计
+   ============================================================ */
+:root{
+  /* 系统强调色（macOS systemBlue） */
+  --accent:#007AFF;
+  --accent-press:#0062CC;
+
+  /* 历法语义色（macOS 系统色） */
+  --cal-gregorian:#007AFF;            /* 公历 · 系统蓝 */
+  --cal-gregorian-bg:rgba(0,122,255,.12);
+  --cal-lunar:#E0412E;                /* 农历 · 朱色 */
+  --cal-lunar-bg:rgba(224,65,46,.13);
+  --cal-hebrew:#5856D6;               /* 希伯来历 · 靛蓝 */
+  --cal-hebrew-bg:rgba(88,86,214,.13);
+  --cal-islamic:#2FA44F;              /* 伊斯兰历 · 绿 */
+  --cal-islamic-bg:rgba(47,164,79,.14);
+
+  /* 浅色模式表面 */
+  --window-bg:#ECECEE;
+  --content-bg:#FFFFFF;
+  --sidebar-bg:rgba(238,238,243,.72);
+  --toolbar-bg:rgba(246,246,248,.8);
+  --group-bg:#FFFFFF;
+  --fill-tertiary:rgba(118,118,128,.10);
+  --fill-quaternary:rgba(118,118,128,.07);
+  --text-primary:rgba(0,0,0,.85);
+  --text-secondary:rgba(0,0,0,.52);
+  --text-tertiary:rgba(0,0,0,.30);
+  --separator:rgba(0,0,0,.09);
+  --separator-strong:rgba(0,0,0,.14);
+  --control-bg:#FFFFFF;
+  --control-stroke:rgba(0,0,0,.12);
+  --hover-fill:rgba(0,0,0,.045);
+  --selected-nav:rgba(0,0,0,.08);
+  --shadow-window:0 22px 70px rgba(0,0,0,.28), 0 0 0 .5px rgba(0,0,0,.18);
+  --traffic-border:rgba(0,0,0,.12);
+}
+html[data-theme="dark"]{
+  --accent:#0A84FF;
+  --accent-press:#2E93FF;
+
+  --cal-gregorian:#0A84FF;
+  --cal-gregorian-bg:rgba(10,132,255,.22);
+  --cal-lunar:#FF6961;
+  --cal-lunar-bg:rgba(255,105,97,.20);
+  --cal-hebrew:#7D7AFF;
+  --cal-hebrew-bg:rgba(125,122,255,.22);
+  --cal-islamic:#30D158;
+  --cal-islamic-bg:rgba(48,209,88,.20);
+
+  --window-bg:#232325;
+  --content-bg:#1E1E20;
+  --sidebar-bg:rgba(38,38,42,.66);
+  --toolbar-bg:rgba(40,40,44,.72);
+  --group-bg:#2A2A2D;
+  --fill-tertiary:rgba(120,120,128,.18);
+  --fill-quaternary:rgba(120,120,128,.13);
+  --text-primary:rgba(255,255,255,.88);
+  --text-secondary:rgba(255,255,255,.55);
+  --text-tertiary:rgba(255,255,255,.32);
+  --separator:rgba(255,255,255,.10);
+  --separator-strong:rgba(255,255,255,.16);
+  --control-bg:#353538;
+  --control-stroke:rgba(255,255,255,.14);
+  --hover-fill:rgba(255,255,255,.06);
+  --selected-nav:rgba(255,255,255,.12);
+  --shadow-window:0 24px 76px rgba(0,0,0,.6), 0 0 0 .5px rgba(255,255,255,.12);
+  --traffic-border:rgba(0,0,0,.35);
+}
+
+*{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased;}
+html,body{height:100%;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro SC","PingFang SC","Helvetica Neue","Microsoft YaHei",sans-serif;
+  font-size:13px;
+  color:var(--text-primary);
+  background:
+    radial-gradient(1200px 700px at 18% -10%, rgba(96,140,220,.20), transparent 60%),
+    radial-gradient(1000px 760px at 108% 112%, rgba(150,120,200,.16), transparent 55%),
+    linear-gradient(160deg,#5a6472 0%,#3d444f 100%);
+  display:flex;align-items:center;justify-content:center;
+  padding:28px;
+  transition:color .25s;
+}
+html[data-theme="dark"] body{
+  background:
+    radial-gradient(1200px 700px at 18% -10%, rgba(40,60,96,.55), transparent 60%),
+    radial-gradient(1000px 760px at 108% 112%, rgba(52,40,80,.5), transparent 55%),
+    linear-gradient(160deg,#101318 0%,#05070a 100%);
+}
+
+/* ---------- macOS 窗口 ---------- */
+.window{
+  width:min(1180px,100%);
+  height:min(780px,calc(100vh - 56px));
+  background:var(--content-bg);
+  border-radius:11px;
+  box-shadow:var(--shadow-window);
+  overflow:hidden;
+  display:flex;
+  position:relative;
+  transition:background .25s;
+}
+
+/* ---------- 侧边栏（source list） ---------- */
+.sidebar{
+  width:216px;flex-shrink:0;
+  background:var(--sidebar-bg);
+  -webkit-backdrop-filter:saturate(1.6) blur(28px);
+  backdrop-filter:saturate(1.6) blur(28px);
+  border-right:.5px solid var(--separator);
+  display:flex;flex-direction:column;
+  transition:background .25s;
+}
+.titlebar{
+  height:52px;flex-shrink:0;
+  display:flex;align-items:center;
+  padding:0 14px;
+}
+.traffic{display:flex;gap:8px;}
+.tl{width:12px;height:12px;border-radius:50%;border:.5px solid var(--traffic-border);
+  display:flex;align-items:center;justify-content:center;}
+.tl svg{opacity:0;transition:opacity .15s;}
+.traffic:hover .tl svg{opacity:.6;}
+.tl.close{background:#FF5F57;} .tl.min{background:#FEBC2E;} .tl.max{background:#28C840;}
+
+.sidebar-scroll{flex:1;overflow-y:auto;padding:4px 8px 16px;}
+.nav-label{
+  font-size:11px;font-weight:600;color:var(--text-tertiary);
+  padding:14px 10px 4px;letter-spacing:.02em;
+}
+.nav-item{
+  display:flex;align-items:center;gap:7px;
+  padding:5px 10px;border-radius:6px;
+  font-size:13px;color:var(--text-primary);
+  cursor:pointer;user-select:none;
+  margin-bottom:1px;
+  transition:background .12s;
+}
+.nav-item:hover{background:var(--hover-fill);}
+.nav-item.active{background:var(--selected-nav);font-weight:500;}
+.nav-item .nicon{width:17px;height:17px;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.nav-item .nicon svg{width:15px;height:15px;}
+.nav-item.active .nicon{color:var(--accent);}
+.nav-item .count{margin-left:auto;font-size:11px;color:var(--text-tertiary);}
+
+.sidebar-foot{
+  padding:9px 12px;border-top:.5px solid var(--separator);
+  font-size:11px;color:var(--text-secondary);
+  display:flex;align-items:center;gap:7px;
+}
+.dot-sync{width:7px;height:7px;border-radius:50%;background:#30D158;flex-shrink:0;}
+
+/* ---------- 主列 ---------- */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--content-bg);transition:background .25s;}
+
+/* 工具栏 */
+.toolbar{
+  height:52px;flex-shrink:0;
+  display:flex;align-items:center;gap:8px;
+  padding:0 14px;
+  background:var(--toolbar-bg);
+  -webkit-backdrop-filter:saturate(1.6) blur(28px);
+  backdrop-filter:saturate(1.6) blur(28px);
+  border-bottom:.5px solid var(--separator);
+  transition:background .25s;
+}
+.tb-title{font-size:15px;font-weight:600;margin-right:6px;}
+.tb-spacer{flex:1;}
+
+.search{
+  display:flex;align-items:center;gap:5px;
+  background:var(--fill-tertiary);
+  border:.5px solid var(--control-stroke);
+  border-radius:7px;
+  padding:4px 8px;
+  width:190px;
+}
+.search svg{width:12px;height:12px;color:var(--text-secondary);flex-shrink:0;}
+.search input{
+  border:none;outline:none;background:transparent;
+  font-family:inherit;font-size:12px;color:var(--text-primary);width:100%;
+}
+.search input::placeholder{color:var(--text-tertiary);}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;
+  height:24px;padding:0 11px;
+  font-family:inherit;font-size:12px;font-weight:500;
+  color:var(--text-primary);
+  background:var(--control-bg);
+  border:.5px solid var(--control-stroke);
+  border-radius:6px;
+  box-shadow:0 .5px 1.5px rgba(0,0,0,.06);
+  cursor:pointer;user-select:none;
+  transition:background .12s, transform .05s;
+  white-space:nowrap;
+}
+.btn:hover{background:var(--hover-fill);}
+.btn:active{transform:scale(.97);}
+.btn.primary{background:var(--accent);border-color:transparent;color:#fff;box-shadow:0 .5px 2px rgba(0,122,255,.35);}
+.btn.primary:hover{background:var(--accent-press);}
+.btn svg{width:13px;height:13px;}
+.btn.icon{padding:0;width:26px;}
+
+/* 分段控件 */
+.segmented{
+  display:inline-flex;background:var(--fill-tertiary);
+  border-radius:7px;padding:1.5px;gap:1px;
+}
+.segmented button{
+  border:none;background:transparent;font-family:inherit;
+  font-size:11.5px;font-weight:500;color:var(--text-primary);
+  padding:3px 11px;border-radius:5.5px;cursor:pointer;
+  transition:background .12s;
+  white-space:nowrap;
+}
+.segmented button.on{background:var(--control-bg);box-shadow:0 1px 2px rgba(0,0,0,.12),0 0 0 .5px var(--control-stroke);}
+html[data-theme="dark"] .segmented button.on{background:#5a5a5e;box-shadow:0 1px 2px rgba(0,0,0,.3);}
+
+/* ---------- 视图容器 ---------- */
+.views{flex:1;position:relative;overflow:hidden;}
+.view{position:absolute;inset:0;display:none;flex-direction:column;overflow:hidden;}
+.view.on{display:flex;}
+.view-scroll{flex:1;overflow-y:auto;}
+</style>
+<style>
+/* ============================================================
+   日历视图
+   ============================================================ */
+.cal-wrap{flex:1;display:flex;min-height:0;}
+.cal-main{flex:1;display:flex;flex-direction:column;min-width:0;}
+.cal-week{
+  display:grid;grid-template-columns:repeat(7,1fr);
+  border-bottom:.5px solid var(--separator);
+  flex-shrink:0;
+}
+.cal-week div{
+  font-size:11px;font-weight:600;color:var(--text-secondary);
+  text-align:right;padding:7px 10px 5px;
+}
+.cal-week div:first-child{color:#E0412E;}
+.cal-grid{flex:1;display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:1fr;min-height:0;}
+.cal-cell{
+  border-right:.5px solid var(--separator);
+  border-bottom:.5px solid var(--separator);
+  padding:5px 6px 4px;
+  cursor:pointer;position:relative;
+  display:flex;flex-direction:column;gap:3px;
+  overflow:hidden;
+  transition:background .12s;
+}
+.cal-cell:nth-child(7n){border-right:none;}
+.cal-cell:hover{background:var(--hover-fill);}
+.cal-cell.dim{background:var(--fill-quaternary);}
+.cal-cell.selected{box-shadow:inset 0 0 0 1.5px var(--accent);}
+.cal-cell .dnum{
+  font-size:12px;font-weight:500;align-self:flex-end;
+  width:21px;height:21px;display:flex;align-items:center;justify-content:center;
+  border-radius:50%;color:var(--text-secondary);flex-shrink:0;
+}
+.cal-cell.dim .dnum{color:var(--text-tertiary);}
+.cal-cell.today .dnum{background:#E0412E;color:#fff;font-weight:600;}
+.pill{
+  display:flex;align-items:center;gap:4px;
+  font-size:10.5px;font-weight:500;line-height:1;
+  padding:3px 6px;border-radius:4px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  cursor:default;
+}
+.pill::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0;}
+.pill.gregorian{color:var(--cal-gregorian);background:var(--cal-gregorian-bg);}
+.pill.lunar{color:var(--cal-lunar);background:var(--cal-lunar-bg);}
+.pill.hebrew{color:var(--cal-hebrew);background:var(--cal-hebrew-bg);}
+.pill.islamic{color:var(--cal-islamic);background:var(--cal-islamic-bg);}
+.cal-more{font-size:10px;color:var(--text-tertiary);padding-left:4px;}
+
+/* 当天详情（右侧展开） */
+.day-detail{
+  width:264px;flex-shrink:0;border-left:.5px solid var(--separator);
+  overflow-y:auto;background:var(--content-bg);
+  animation:slideIn .18s ease;
+}
+@keyframes slideIn{from{opacity:0;transform:translateX(8px);}to{opacity:1;transform:none;}}
+.dd-head{padding:16px 16px 10px;border-bottom:.5px solid var(--separator);}
+.dd-date{font-size:17px;font-weight:600;}
+.dd-sub{font-size:12px;color:var(--text-secondary);margin-top:2px;}
+.dd-item{padding:13px 16px;border-bottom:.5px solid var(--separator);}
+.dd-name{font-size:14px;font-weight:600;display:flex;align-items:center;gap:7px;}
+.cal-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.cal-dot.gregorian{background:var(--cal-gregorian);} .cal-dot.lunar{background:var(--cal-lunar);}
+.cal-dot.hebrew{background:var(--cal-hebrew);} .cal-dot.islamic{background:var(--cal-islamic);}
+.dd-rows{margin-top:7px;display:flex;flex-direction:column;gap:4px;}
+.dd-row{display:flex;font-size:12px;}
+.dd-row .k{width:78px;color:var(--text-secondary);flex-shrink:0;}
+.dd-row .v{color:var(--text-primary);}
+.dd-empty{padding:40px 20px;text-align:center;color:var(--text-tertiary);font-size:12px;}
+
+/* ============================================================
+   生日列表视图
+   ============================================================ */
+.list-bar{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:11px 16px;border-bottom:.5px solid var(--separator);flex-shrink:0;
+}
+.list-bar .lbl{font-size:12px;color:var(--text-secondary);}
+.select{
+  height:24px;padding:0 8px;font-family:inherit;font-size:12px;
+  color:var(--text-primary);background:var(--control-bg);
+  border:.5px solid var(--control-stroke);border-radius:6px;outline:none;cursor:pointer;
+}
+table.records{width:100%;border-collapse:collapse;font-size:12.5px;}
+.records thead th{
+  position:sticky;top:0;z-index:2;
+  background:var(--toolbar-bg);
+  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);
+  text-align:left;font-size:11px;font-weight:600;color:var(--text-secondary);
+  padding:7px 14px;border-bottom:.5px solid var(--separator-strong);
+  white-space:nowrap;
+}
+.records tbody td{padding:9px 14px;border-bottom:.5px solid var(--separator);white-space:nowrap;vertical-align:middle;}
+.records tbody tr{cursor:pointer;transition:background .1s;}
+.records tbody tr:hover{background:var(--hover-fill);}
+.rec-name{font-weight:600;font-size:13px;}
+.rec-avatar{
+  display:inline-flex;width:24px;height:24px;border-radius:50%;
+  align-items:center;justify-content:center;
+  font-size:10.5px;font-weight:600;color:#fff;margin-right:9px;vertical-align:middle;
+}
+.tag{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:11px;font-weight:500;padding:2.5px 8px;border-radius:5px;
+}
+.tag.gregorian{color:var(--cal-gregorian);background:var(--cal-gregorian-bg);}
+.tag.lunar{color:var(--cal-lunar);background:var(--cal-lunar-bg);}
+.tag.hebrew{color:var(--cal-hebrew);background:var(--cal-hebrew-bg);}
+.tag.islamic{color:var(--cal-islamic);background:var(--cal-islamic-bg);}
+.soon{color:#E0412E;font-weight:600;}
+.passed{color:var(--text-tertiary);}
+.today-badge{
+  display:inline-block;background:#E0412E;color:#fff;
+  font-size:10px;font-weight:600;padding:1px 6px;border-radius:4px;margin-left:7px;vertical-align:1px;
+}
+
+/* ============================================================
+   通讯录视图
+   ============================================================ */
+.contacts-wrap{flex:1;display:flex;min-height:0;}
+.clist{
+  width:250px;flex-shrink:0;border-right:.5px solid var(--separator);
+  display:flex;flex-direction:column;min-height:0;background:var(--fill-quaternary);
+}
+.clist-search{padding:10px 10px 8px;border-bottom:.5px solid var(--separator);}
+.clist-scroll{flex:1;overflow-y:auto;padding:6px;}
+.citem{
+  display:flex;align-items:center;gap:9px;
+  padding:6px 8px;border-radius:7px;cursor:pointer;transition:background .1s;
+}
+.citem:hover{background:var(--hover-fill);}
+.citem.active{background:var(--accent);}
+.citem.active .cname,.citem.active .csub{color:#fff;}
+.citem.active .csub{opacity:.8;}
+.cavatar{width:30px;height:30px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11.5px;font-weight:600;color:#fff;}
+.cname{font-size:13px;font-weight:500;}
+.csub{font-size:11px;color:var(--text-secondary);margin-top:1px;}
+.citem.active .csub{color:rgba(255,255,255,.85);}
+
+.cdetail{flex:1;overflow-y:auto;min-width:0;}
+.cd-inner{max-width:520px;margin:0 auto;padding:26px 30px 60px;}
+.cd-head{display:flex;align-items:center;gap:15px;margin-bottom:22px;}
+.cd-avatar{width:62px;height:62px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:23px;font-weight:500;color:#fff;}
+.cd-name{font-size:21px;font-weight:600;}
+.cd-org{font-size:13px;color:var(--text-secondary);margin-top:3px;}
+.group{
+  background:var(--group-bg);border:.5px solid var(--separator);
+  border-radius:9px;overflow:hidden;margin-bottom:18px;
+  transition:background .25s;
+}
+.group-title{
+  font-size:11px;font-weight:600;color:var(--text-secondary);
+  padding:11px 14px 6px;letter-spacing:.02em;
+}
+.frow{
+  display:flex;align-items:center;gap:12px;
+  padding:9px 14px;border-top:.5px solid var(--separator);
+  min-height:38px;
+}
+.frow:first-of-type{border-top:none;}
+.frow .fk{width:110px;flex-shrink:0;font-size:12.5px;color:var(--text-secondary);text-align:right;}
+.frow .fv{flex:1;font-size:13px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.frow .fhint{font-size:11px;color:var(--text-tertiary);}
+input.field,select.field{
+  height:25px;padding:0 8px;font-family:inherit;font-size:12.5px;
+  color:var(--text-primary);background:var(--control-bg);
+  border:.5px solid var(--control-stroke);border-radius:6px;outline:none;
+}
+input.field:focus,select.field:focus{box-shadow:0 0 0 3px var(--cal-gregorian-bg);border-color:var(--accent);}
+input.field.w4{width:64px;} input.field.w2{width:48px;}
+.switch{position:relative;width:38px;height:22px;flex-shrink:0;cursor:pointer;}
+.switch input{opacity:0;width:0;height:0;}
+.sw-track{
+  position:absolute;inset:0;border-radius:11px;background:var(--fill-tertiary);
+  transition:background .2s;
+}
+.sw-track::after{
+  content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25),0 0 0 .5px rgba(0,0,0,.05);
+  transition:transform .2s;
+}
+.switch input:checked + .sw-track{background:#34C759;}
+.switch input:checked + .sw-track::after{transform:translateX(16px);}
+
+.save-state{
+  display:flex;align-items:center;gap:8px;
+  padding:4px 2px;font-size:12px;min-height:24px;
+}
+.save-ok{color:#28A745;display:none;align-items:center;gap:6px;}
+.save-err{color:#E0412E;display:none;align-items:center;gap:6px;}
+.save-ok.on,.save-err.on{display:inline-flex;animation:slideIn .2s ease;}
+
+/* ============================================================
+   权限与设置视图
+   ============================================================ */
+.perm-scroll{flex:1;overflow-y:auto;display:flex;flex-direction:column;}
+.perm-hero{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:40px 30px;text-align:center;
+}
+.perm-icon{
+  width:76px;height:76px;border-radius:19px;
+  background:linear-gradient(160deg,#4DA3FF,#0A5CFF);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 10px 26px rgba(10,92,255,.35);
+  margin-bottom:20px;
+}
+.perm-icon svg{width:38px;height:38px;color:#fff;}
+.perm-title{font-size:19px;font-weight:600;margin-bottom:12px;}
+.perm-points{list-style:none;text-align:left;margin:0 auto 24px;max-width:400px;
+  display:flex;flex-direction:column;gap:9px;}
+.perm-points li{display:flex;gap:9px;font-size:13px;color:var(--text-secondary);line-height:1.45;}
+.perm-points svg{width:15px;height:15px;color:var(--accent);flex-shrink:0;margin-top:1.5px;}
+.perm-actions{display:flex;flex-direction:column;gap:10px;align-items:center;}
+.btn.big{height:30px;padding:0 20px;font-size:13px;border-radius:8px;}
+.perm-note{font-size:11.5px;color:var(--text-tertiary);max-width:380px;line-height:1.5;}
+.perm-denied{display:none;flex-direction:column;gap:8px;align-items:center;margin-top:4px;}
+.perm-denied.on{display:flex;}
+.perm-denied .msg{font-size:12px;color:#E0412E;}
+
+/* 设置区块 */
+.settings-inner{max-width:560px;margin:0 auto;padding:26px 30px 60px;}
+.set-row{display:flex;align-items:center;padding:10px 14px;border-top:.5px solid var(--separator);font-size:13px;min-height:42px;}
+.set-row:first-of-type{border-top:none;}
+.set-row .sk{flex:1;}
+.set-row .sdesc{font-size:11px;color:var(--text-tertiary);margin-top:2px;}
+
+/* ============================================================
+   空状态 / Toast
+   ============================================================ */
+.empty{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:9px;padding:40px;color:var(--text-tertiary);text-align:center;
+}
+.empty svg{width:44px;height:44px;opacity:.5;}
+.empty .et{font-size:14px;font-weight:600;color:var(--text-secondary);}
+.empty .ed{font-size:12px;max-width:300px;line-height:1.5;}
+
+.toast{
+  position:absolute;left:50%;bottom:26px;transform:translateX(-50%) translateY(16px);
+  background:rgba(40,40,42,.92);color:#fff;
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  font-size:12.5px;font-weight:500;
+  padding:9px 16px;border-radius:9px;
+  box-shadow:0 6px 22px rgba(0,0,0,.3);
+  opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;
+  display:flex;align-items:center;gap:8px;z-index:50;
+}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
+.toast svg{width:14px;height:14px;color:#30D158;}
+
+::-webkit-scrollbar{width:9px;height:9px;}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.18);border-radius:5px;border:2px solid transparent;background-clip:content-box;}
+html[data-theme="dark"] ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border:2px solid transparent;background-clip:content-box;}
+::-webkit-scrollbar-track{background:transparent;}
+
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:4px;}
+</style>
+</head>
+<body>
+<div class="window" role="application" aria-label="生日">
+  <!-- ================= 侧边栏 ================= -->
+  <aside class="sidebar">
+    <div class="titlebar">
+      <div class="traffic">
+        <span class="tl close"><svg width="7" height="7" viewBox="0 0 8 8"><path d="M1 1l6 6M7 1L1 7" stroke="#5b0000" stroke-width="1.2"/></svg></span>
+        <span class="tl min"><svg width="7" height="7" viewBox="0 0 8 8"><path d="M1 4h6" stroke="#6d4b00" stroke-width="1.2"/></svg></span>
+        <span class="tl max"><svg width="7" height="7" viewBox="0 0 8 8"><path d="M1.5 6.5V1.5h5v5z" fill="none" stroke="#0f5b1e" stroke-width="1"/></svg></span>
+      </div>
+    </div>
+    <nav class="sidebar-scroll" aria-label="导航">
+      <div class="nav-label">生日</div>
+      <div class="nav-item active" data-view="calendar" tabindex="0" role="button" aria-label="日历">
+        <span class="nicon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1.5" y="2.5" width="13" height="12" rx="2"/><path d="M1.5 6h13M5 1v3M11 1v3"/></svg></span>
+        日历
+      </div>
+      <div class="nav-item" data-view="list" tabindex="0" role="button" aria-label="生日列表">
+        <span class="nicon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M5.5 4h9M5.5 8h9M5.5 12h9"/><circle cx="2.5" cy="4" r="1" fill="currentColor" stroke="none"/><circle cx="2.5" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="2.5" cy="12" r="1" fill="currentColor" stroke="none"/></svg></span>
+        生日列表
+        <span class="count" id="navCount">9</span>
+      </div>
+      <div class="nav-label">通讯录</div>
+      <div class="nav-item" data-view="contacts" tabindex="0" role="button" aria-label="通讯录">
+        <span class="nicon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2" y="1.5" width="12" height="13" rx="2"/><circle cx="8" cy="6.5" r="2.2"/><path d="M4.5 12.5c.7-1.8 2-2.7 3.5-2.7s2.8.9 3.5 2.7"/></svg></span>
+        通讯录
+      </div>
+      <div class="nav-label">通用</div>
+      <div class="nav-item" data-view="permissions" tabindex="0" role="button" aria-label="权限与设置">
+        <span class="nicon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5l.9 1.8 2-.3 1 1.7-.5 2 1.5 1.3-1.5 1.3.5 2-1 1.7-2-.3L8 14.5l-.9-1.8-2 .3-1-1.7.5-2L3.1 8l1.5-1.3-.5-2 1-1.7 2 .3z"/></svg></span>
+        权限与设置
+      </div>
+    </nav>
+    <div class="sidebar-foot">
+      <span class="dot-sync"></span>
+      <span id="syncLabel">已与 macOS 通讯录同步</span>
+    </div>
+  </aside>
+
+  <!-- ================= 主列 ================= -->
+  <div class="main">
+    <!-- 工具栏 -->
+    <div class="toolbar">
+      <span class="tb-title" id="tbTitle">日历</span>
+
+      <!-- 日历视图工具 -->
+      <span id="tb-cal" class="tbgroup" style="display:flex;align-items:center;gap:8px;">
+        <button class="btn" id="btnToday">今天</button>
+        <button class="btn icon" id="btnPrev" aria-label="上个月"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7.5 2.5L4 6l3.5 3.5"/></svg></button>
+        <button class="btn icon" id="btnNext" aria-label="下个月"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4.5 2.5L8 6l-3.5 3.5"/></svg></button>
+        <span style="font-size:13px;font-weight:600;min-width:86px;" id="calMonthLabel">2026年8月</span>
+      </span>
+
+      <!-- 列表视图工具 -->
+      <span id="tb-list" class="tbgroup" style="display:none;align-items:center;gap:8px;">
+        <span class="lbl" style="font-size:12px;color:var(--text-secondary);">筛选</span>
+        <span class="segmented" id="filterSeg" role="tablist">
+          <button class="on" data-f="all">全部</button>
+          <button data-f="gregorian">公历</button>
+          <button data-f="lunar">农历</button>
+          <button data-f="hebrew">希伯来历</button>
+          <button data-f="islamic">伊斯兰历</button>
+        </span>
+      </span>
+
+      <div class="tb-spacer"></div>
+
+      <!-- 搜索（日历/列表/通讯录共用） -->
+      <div class="search" id="tbSearch">
+        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="5" cy="5" r="3.5"/><path d="M7.8 7.8L11 11"/></svg>
+        <input id="searchInput" type="search" placeholder="搜索" aria-label="搜索联系人姓名">
+      </div>
+
+      <span id="tb-cal2" class="tbgroup" style="display:flex;align-items:center;gap:8px;">
+        <span class="segmented" id="viewSeg">
+          <button class="on" data-m="month">月</button>
+          <button data-m="upcoming">即将到来</button>
+        </span>
+      </span>
+
+      <button class="btn icon" id="btnRefresh" title="刷新通讯录" aria-label="刷新通讯录">
+        <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M11.5 6.5a5 5 0 1 1-1.4-3.4M11.5 1.5v2.6H8.9"/></svg>
+      </button>
+    </div>
+
+    <!-- 视图容器 -->
+    <div class="views">
+
+      <!-- ========== 日历视图 ========== -->
+      <section class="view on" id="view-calendar" aria-label="日历视图">
+        <div class="cal-wrap">
+          <div class="cal-main">
+            <div class="cal-week"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div>
+            <div class="cal-grid" id="calGrid"></div>
+          </div>
+          <aside class="day-detail" id="dayDetail" style="display:none;" aria-label="当天生日详情"></aside>
+        </div>
+        <!-- 即将到来 -->
+        <div class="view-scroll" id="upcomingPane" style="display:none;"></div>
+      </section>
+
+      <!-- ========== 生日列表视图 ========== -->
+      <section class="view" id="view-list" aria-label="生日列表视图">
+        <div class="list-bar">
+          <span class="lbl">排序</span>
+          <select class="select" id="sortSel" aria-label="排序方式">
+            <option value="next">最近生日</option>
+            <option value="name">姓名</option>
+            <option value="age">年龄</option>
+            <option value="cal">历法</option>
+          </select>
+          <div class="tb-spacer"></div>
+          <span class="lbl" id="listCount" style="font-size:12px;color:var(--text-tertiary);"></span>
+        </div>
+        <div class="view-scroll">
+          <table class="records" aria-label="生日记录">
+            <thead><tr>
+              <th>联系人</th><th>生日类型</th><th>原始日期</th>
+              <th>今年日期</th><th>年龄</th><th>下次生日</th>
+            </tr></thead>
+            <tbody id="recBody"></tbody>
+          </table>
+          <div class="empty" id="listEmpty" style="display:none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="11" cy="11" r="7"/><path d="M16 16l5 5"/></svg>
+            <div class="et">没有找到匹配的生日记录</div>
+            <div class="ed">试试更换搜索关键词，或清除筛选条件。</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== 通讯录视图 ========== -->
+      <section class="view" id="view-contacts" aria-label="通讯录视图">
+        <div class="contacts-wrap">
+          <div class="clist">
+            <div class="clist-search">
+              <div class="search" style="width:100%;">
+                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="5" cy="5" r="3.5"/><path d="M7.8 7.8L11 11"/></svg>
+                <input id="cSearch" type="search" placeholder="搜索联系人" aria-label="搜索联系人">
+              </div>
+            </div>
+            <div class="clist-scroll" id="cList"></div>
+          </div>
+          <div class="cdetail" id="cDetail"></div>
+        </div>
+      </section>
+
+      <!-- ========== 权限与设置视图 ========== -->
+      <section class="view" id="view-permissions" aria-label="权限与设置">
+        <div class="perm-scroll" id="permScroll">
+          <!-- 权限说明 -->
+          <div class="perm-hero" id="permHero">
+            <div class="perm-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="2.5" width="16" height="19" rx="3"/><circle cx="12" cy="9.5" r="3"/><path d="M7 18c1-3 2.8-4.4 5-4.4s4 1.4 5 4.4"/></svg>
+            </div>
+            <div class="perm-title">需要访问通讯录</div>
+            <ul class="perm-points">
+              <li><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 8.5l3.5 3.5 7-8"/></svg><span>用于读取和维护联系人生日。</span></li>
+              <li><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 8.5l3.5 3.5 7-8"/></svg><span>生日会直接写回 macOS 通讯录。</span></li>
+              <li><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 8.5l3.5 3.5 7-8"/></svg><span>不会上传联系人，也没有账号登录。</span></li>
+            </ul>
+            <div class="perm-actions">
+              <button class="btn primary big" id="btnAllow">允许访问通讯录</button>
+              <div class="perm-denied" id="permDenied">
+                <span class="msg">尚未获得通讯录权限。</span>
+                <button class="btn big" id="btnSysSettings">前往系统设置</button>
+                <span class="perm-note">请在“系统设置 &gt; 隐私与安全性 &gt; 通讯录”中为本 App 开启访问权限。</span>
+              </div>
+              <span class="perm-note" id="permGrantedNote" style="display:none;color:#28A745;">已获得通讯录访问权限，可直接读取并写回系统通讯录。</span>
+            </div>
+          </div>
+          <!-- 设置 -->
+          <div class="settings-inner">
+            <div class="group">
+              <div class="group-title">外观</div>
+              <div class="set-row">
+                <div class="sk">深色模式</div>
+                <span class="segmented" id="themeSeg">
+                  <button data-t="system" class="on">跟随系统</button>
+                  <button data-t="light">浅色</button>
+                  <button data-t="dark">深色</button>
+                </span>
+              </div>
+              <div class="set-row">
+                <div class="sk">默认视图<div class="sdesc">启动后首先显示的界面</div></div>
+                <select class="select" id="defViewSel">
+                  <option value="calendar">日历</option>
+                  <option value="list">生日列表</option>
+                  <option value="contacts">通讯录</option>
+                </select>
+              </div>
+            </div>
+            <div class="group">
+              <div class="group-title">生日</div>
+              <div class="set-row">
+                <div class="sk">“即将到来”范围<div class="sdesc">日历视图中提示的未来天数</div></div>
+                <select class="select"><option>未来 7 天</option><option selected>未来 30 天</option><option>未来 90 天</option></select>
+              </div>
+              <div class="set-row">
+                <div class="sk">在日历中显示年龄<div class="sdesc">仅当生日包含年份时显示</div></div>
+                <label class="switch"><input type="checkbox" checked><span class="sw-track"></span></label>
+              </div>
+            </div>
+            <div class="group">
+              <div class="group-title">关于</div>
+              <div class="set-row"><div class="sk">数据来源</div><span style="color:var(--text-secondary);font-size:12.5px;">macOS 通讯录</span></div>
+              <div class="set-row"><div class="sk">支持的历法</div>
+                <span style="display:flex;gap:5px;flex-wrap:wrap;">
+                  <span class="tag gregorian">公历</span><span class="tag lunar">农历</span>
+                  <span class="tag hebrew">希伯来历 / עברי</span><span class="tag islamic">伊斯兰历 / هجري</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /views -->
+
+    <div class="toast" id="toast" role="status">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.5 8.5l3.5 3.5 7-8"/></svg>
+      <span id="toastMsg">已写入通讯录</span>
+    </div>
+  </div>
+</div>
+<script>
+/* ============================================================
+   数据：全部来自 macOS 通讯录（原型演示数据）
+   设计基准“今天” = 2026-08-04
+   ============================================================ */
+const TODAY = new Date(2026,7,4);
+const DAY = 86400000;
+const addDays=(d,n)=>new Date(d.getTime()+n*DAY);
+const sameDay=(a,b)=>a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
+const daysUntil=(d)=>Math.round((new Date(d.getFullYear(),d.getMonth(),d.getDate())-new Date(TODAY.getFullYear(),TODAY.getMonth(),TODAY.getDate()))/DAY);
+
+const CALS={
+  gregorian:{name:'公历',cls:'gregorian'},
+  lunar:{name:'农历',cls:'lunar'},
+  hebrew:{name:'希伯来历 / עברי',cls:'hebrew'},
+  islamic:{name:'伊斯兰历 / هجري',cls:'islamic'},
+};
+const AVCOLORS=['#5E8CE6','#E0654F','#3FA66A','#8E6FD0','#D0953B','#4FA8C9','#C95F8B','#7A8B3F'];
+
+/* 每个生日记录：公历生日按每年 month/day 重复；非公历给出今年对应公历日期与下次生日 */
+function rec(cal,origLabel,year,gMonth,gDay,thisY,next,leap,nM,nD){
+  return {cal,origLabel,year,gMonth,gDay,leap:!!leap,
+    thisYear:thisY, next:next, nM:nM||null, nD:nD||null};
+}
+const D=(y,m,d)=>new Date(y,m-1,d);
+
+const PEOPLE=[
+ {id:'wxm',name:'王小明',org:'字节跳动 · 产品',color:AVCOLORS[0],birthdays:[
+   rec('lunar','六月初八',1994,8,21,D(2026,8,21),D(2026,8,21),false,6,8),
+   rec('gregorian','1994-07-12',1994,7,12,D(2026,7,12),D(2027,7,12)),
+ ]},
+ {id:'sarah',name:'Sarah Chen',org:'—',color:AVCOLORS[3],birthdays:[
+   rec('gregorian','03-05',null,3,5,D(2026,3,5),D(2027,3,5)),
+ ]},
+ {id:'ahmed',name:'Ahmed Hassan',org:'Cairo Univ.',color:AVCOLORS[2],birthdays:[
+   rec('islamic','رمضان 12',null,2,1,D(2026,2,1),D(2027,1,20),false,9,12),
+ ]},
+ {id:'csy',name:'陈思远',org:'自由职业',color:AVCOLORS[1],birthdays:[
+   rec('gregorian','1990-08-04',1990,8,4,D(2026,8,4),D(2026,8,4)),
+ ]},
+ {id:'lj',name:'李静',org:'妈妈',color:AVCOLORS[6],birthdays:[
+   rec('lunar','七月初一',1992,8,13,D(2026,8,13),D(2026,8,13),false,7,1),
+ ]},
+ {id:'david',name:'David Cohen',org:'—',color:AVCOLORS[4],birthdays:[
+   rec('hebrew','אלול א׳',null,8,14,D(2026,8,14),D(2026,8,14),false,12,1),
+ ]},
+ {id:'lzh',name:'林子涵',org:'腾讯 · 设计',color:AVCOLORS[5],birthdays:[
+   rec('gregorian','1988-08-21',1988,8,21,D(2026,8,21),D(2026,8,21)),
+ ]},
+ {id:'zw',name:'张伟',org:'大学同学',color:AVCOLORS[7],birthdays:[
+   rec('gregorian','08-30',null,8,30,D(2026,8,30),D(2026,8,30)),
+ ]},
+ {id:'zm',name:'赵敏',org:'姑姑',color:AVCOLORS[1],birthdays:[
+   rec('lunar','闰六月初五',1990,8,18,D(2026,8,18),D(2026,8,18),true,6,5),
+ ]},
+ {id:'kevin',name:'Kevin Wu',org:'—',color:AVCOLORS[0],birthdays:[
+   rec('gregorian','1995-08-08',1995,8,8,D(2026,8,8),D(2026,8,8)),
+ ]},
+ {id:'sy',name:'孙悦',org:'表姐',color:AVCOLORS[3],birthdays:[
+   rec('lunar','七月十五',null,8,27,D(2026,8,27),D(2026,8,27),false,7,15),
+ ]},
+ {id:'maria',name:'Maria Garcia',org:'—',color:AVCOLORS[5],birthdays:[
+   rec('gregorian','1985-09-02',1985,9,2,D(2026,9,2),D(2026,9,2)),
+ ]},
+];
+
+/* ============================================================
+   通用
+   ============================================================ */
+const $=s=>document.querySelector(s);
+const $$=s=>document.querySelectorAll(s);
+const fmtDate=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const fmtDateCN=d=>`${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+function toast(msg,ok=true){
+  const t=$('#toast');$('#toastMsg').textContent=msg;
+  t.querySelector('svg').style.color=ok?'#30D158':'#FF6961';
+  t.classList.add('on');clearTimeout(t._tm);
+  t._tm=setTimeout(()=>t.classList.remove('on'),2200);
+}
+function avatarHTML(name,color,size){
+  const ch=/[\u4e00-\u9fa5]/.test(name[0])?name[0]:name[0].toUpperCase();
+  return `<span class="cavatar" style="background:${color};${size?`width:${size}px;height:${size}px;font-size:${size*0.38}px;`:''}">${ch}</span>`;
+}
+
+/* 某公历日期命中的生日 */
+function birthdaysOn(date){
+  const out=[];
+  PEOPLE.forEach(p=>p.birthdays.forEach(b=>{
+    let hit=false;
+    if(b.cal==='gregorian'){
+      hit=(date.getMonth()+1===b.gMonth && date.getDate()===b.gDay);
+    }else{
+      hit=sameDay(date,b.thisYear)||sameDay(date,b.next);
+    }
+    if(hit)out.push({person:p,b});
+  }));
+  return out;
+}
+function ageOn(b,date){ return b.year? date.getFullYear()-b.year : null; }
+
+/* ============================================================
+   视图切换 + 工具栏
+   ============================================================ */
+const VIEW_TITLES={calendar:'日历',list:'生日列表',contacts:'通讯录',permissions:'权限与设置'};
+function switchView(v){
+  $$('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.view===v));
+  $$('.view').forEach(s=>s.classList.toggle('on',s.id==='view-'+v));
+  $('#tbTitle').textContent=VIEW_TITLES[v];
+  $('#tb-cal').style.display=(v==='calendar')?'flex':'none';
+  $('#tb-cal2').style.display=(v==='calendar')?'flex':'none';
+  $('#tb-list').style.display=(v==='list')?'flex':'none';
+  $('#tbSearch').style.display=(v==='list'||v==='calendar')?'flex':'none';
+  if(v==='list')renderList();
+  if(v==='contacts')renderContacts();
+  if(v==='calendar')renderCalendar();
+}
+$$('.nav-item').forEach(n=>{
+  n.addEventListener('click',()=>switchView(n.dataset.view));
+  n.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();switchView(n.dataset.view);}});
+});
+
+/* ============================================================
+   日历视图
+   ============================================================ */
+let calCursor=new Date(2026,7,1);   // 当前查看的月份
+let selectedDate=new Date(TODAY);
+let calMode='month';
+
+function renderCalendar(){
+  $('#calMonthLabel').textContent=`${calCursor.getFullYear()}年${calCursor.getMonth()+1}月`;
+  const grid=$('#calGrid');grid.innerHTML='';
+  const first=new Date(calCursor.getFullYear(),calCursor.getMonth(),1);
+  const startWeekday=first.getDay();
+  const startDate=addDays(first,-startWeekday);
+  const daysInMonth=new Date(calCursor.getFullYear(),calCursor.getMonth()+1,0).getDate();
+  const weeks=Math.ceil((startWeekday+daysInMonth)/7);
+  for(let i=0;i<weeks*7;i++){
+    const d=addDays(startDate,i);
+    const inMonth=d.getMonth()===calCursor.getMonth();
+    const cell=document.createElement('div');
+    cell.className='cal-cell'+(inMonth?'':' dim')+(sameDay(d,TODAY)?' today':'')+(sameDay(d,selectedDate)?' selected':'');
+    cell.setAttribute('role','button');
+    cell.setAttribute('aria-label',fmtDateCN(d)+(sameDay(d,TODAY)?'，今天':''));
+    let html=`<span class="dnum">${d.getDate()}</span>`;
+    if(inMonth){
+      const hits=birthdaysOn(d);
+      const max=3;
+      hits.slice(0,max).forEach(({person,b})=>{
+        html+=`<span class="pill ${CALS[b.cal].cls}">${person.name} · ${shortCal(b.cal)}</span>`;
+      });
+      if(hits.length>max)html+=`<span class="cal-more">还有 ${hits.length-max} 个…</span>`;
+    }
+    cell.innerHTML=html;
+    cell.addEventListener('click',()=>{selectedDate=d;renderCalendar();renderDayDetail(d);});
+    grid.appendChild(cell);
+  }
+}
+function shortCal(cal){
+  return {gregorian:'公历',lunar:'农历',hebrew:'עברי',islamic:'هجري'}[cal];
+}
+function renderDayDetail(d){
+  const panel=$('#dayDetail');panel.style.display='block';
+  const hits=birthdaysOn(d);
+  const wk=['周日','周一','周二','周三','周四','周五','周六'][d.getDay()];
+  let head=`<div class="dd-head"><div class="dd-date">${d.getMonth()+1}月${d.getDate()}日 ${wk}</div>
+    <div class="dd-sub">${sameDay(d,TODAY)?'今天 · ':''}${hits.length?hits.length+' 个生日':'没有生日'}</div></div>`;
+  if(!hits.length){
+    panel.innerHTML=head+`<div class="dd-empty">这一天没有联系人生日。</div>`;
+    return;
+  }
+  panel.innerHTML=head+hits.map(({person,b})=>{
+    const age=ageOn(b,d);
+    return `<div class="dd-item">
+      <div class="dd-name"><span class="cal-dot ${CALS[b.cal].cls}"></span>${person.name}</div>
+      <div class="dd-rows">
+        <div class="dd-row"><span class="k">${CALS[b.cal].name.split(' ')[0]}生日</span><span class="v">${b.origLabel}</span></div>
+        ${b.cal!=='gregorian'?`<div class="dd-row"><span class="k">今年对应</span><span class="v">${fmtDateCN(b.thisYear)}</span></div>`:''}
+        <div class="dd-row"><span class="k">年龄</span><span class="v">${age!==null?age+' 岁':'年龄未知'}</span></div>
+        <div class="dd-row"><span class="k">来源</span><span class="v" style="color:var(--text-tertiary);">macOS 通讯录</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+$('#btnPrev').addEventListener('click',()=>{calCursor=new Date(calCursor.getFullYear(),calCursor.getMonth()-1,1);renderCalendar();});
+$('#btnNext').addEventListener('click',()=>{calCursor=new Date(calCursor.getFullYear(),calCursor.getMonth()+1,1);renderCalendar();});
+$('#btnToday').addEventListener('click',()=>{calCursor=new Date(TODAY.getFullYear(),TODAY.getMonth(),1);selectedDate=new Date(TODAY);renderCalendar();renderDayDetail(TODAY);});
+
+/* 月 / 即将到来 切换 */
+$$('#viewSeg button').forEach(b=>b.addEventListener('click',()=>{
+  $$('#viewSeg button').forEach(x=>x.classList.toggle('on',x===b));
+  calMode=b.dataset.m;
+  $('.cal-wrap').style.display=calMode==='month'?'flex':'none';
+  $('#upcomingPane').style.display=calMode==='upcoming'?'block':'none';
+  if(calMode==='upcoming')renderUpcoming();
+}));
+function renderUpcoming(){
+  const pane=$('#upcomingPane');
+  const range=30,items=[];
+  for(let i=0;i<=range;i++){
+    const d=addDays(TODAY,i);
+    birthdaysOn(d).forEach(h=>items.push({d,...h}));
+  }
+  if(!items.length){pane.innerHTML=`<div class="empty"><div class="et">未来 ${range} 天没有生日</div></div>`;return;}
+  let html=`<div style="max-width:640px;margin:0 auto;padding:20px 26px;">
+    <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">未来 ${range} 天 · ${items.length} 个生日</div>`;
+  let lastDay=null;
+  items.forEach(({d,person,b})=>{
+    const key=fmtDate(d);
+    if(key!==lastDay){
+      lastDay=key;
+      const du=daysUntil(d);
+      html+=`<div style="font-size:12px;font-weight:600;color:var(--text-secondary);padding:12px 2px 5px;">${d.getMonth()+1}月${d.getDate()}日${du===0?' · 今天':du===1?' · 明天':''}</div>`;
+    }
+    const age=ageOn(b,d);
+    html+=`<div style="display:flex;align-items:center;gap:11px;background:var(--group-bg);border:.5px solid var(--separator);border-radius:9px;padding:9px 13px;margin-bottom:7px;">
+      ${avatarHTML(person.name,person.color,30)}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13.5px;font-weight:600;">${person.name}${age!==null?`<span style="font-weight:400;color:var(--text-secondary);font-size:12px;"> · 满 ${age} 岁</span>`:''}</div>
+        <div style="font-size:11.5px;color:var(--text-secondary);margin-top:1px;">${b.origLabel}${b.cal!=='gregorian'?' → '+fmtDateCN(b.thisYear):''}</div>
+      </div>
+      <span class="tag ${CALS[b.cal].cls}">${CALS[b.cal].name.split(' ')[0]}</span>
+      <span style="font-size:12px;color:var(--text-secondary);min-width:56px;text-align:right;">${daysUntil(d)===0?'<b style="color:#E0412E;">今天</b>':daysUntil(d)+' 天后'}</span>
+    </div>`;
+  });
+  pane.innerHTML=html+'</div>';
+}
+
+/* ============================================================
+   生日列表视图
+   ============================================================ */
+let filterCal='all',sortBy='next',searchQ='';
+function allRecords(){
+  const out=[];
+  PEOPLE.forEach(p=>p.birthdays.forEach(b=>out.push({person:p,b})));
+  return out;
+}
+function renderList(){
+  let rows=allRecords();
+  if(filterCal!=='all')rows=rows.filter(r=>r.b.cal===filterCal);
+  if(searchQ)rows=rows.filter(r=>r.person.name.toLowerCase().includes(searchQ.toLowerCase()));
+  const calOrder={gregorian:0,lunar:1,hebrew:2,islamic:3};
+  rows.sort((a,b)=>{
+    if(sortBy==='next')return a.b.next-b.b.next;
+    if(sortBy==='name')return a.person.name.localeCompare(b.person.name,'zh');
+    if(sortBy==='age'){const x=a.b.year??9999,y=b.b.year??9999;return x-y;}
+    if(sortBy==='cal')return calOrder[a.b.cal]-calOrder[b.b.cal];
+    return 0;
+  });
+  $('#listCount').textContent=`${rows.length} 条生日记录`;
+  const body=$('#recBody');
+  $('#listEmpty').style.display=rows.length?'none':'flex';
+  body.innerHTML=rows.map(({person,b})=>{
+    const du=daysUntil(b.next);
+    const passed=b.thisYear<TODAY && !sameDay(b.thisYear,TODAY);
+    const isToday=sameDay(b.next,TODAY)||sameDay(b.thisYear,TODAY);
+    const age=b.year?(TODAY.getFullYear()-b.year):null;
+    let nextTxt;
+    if(isToday)nextTxt=`<span class="soon">今天</span>`;
+    else nextTxt=`<span class="${du<=14?'soon':''}">${du} 天后</span>`;
+    return `<tr>
+      <td><span class="rec-avatar" style="background:${person.color};">${/[\u4e00-\u9fa5]/.test(person.name[0])?person.name[0]:person.name[0].toUpperCase()}</span><span class="rec-name">${person.name}</span></td>
+      <td><span class="tag ${CALS[b.cal].cls}">${CALS[b.cal].name}</span></td>
+      <td>${b.origLabel}</td>
+      <td>${fmtDate(b.thisYear)}${isToday?'<span class="today-badge">今天</span>':(passed?'<span class="passed" style="font-size:11px;"> · 已过</span>':'')}</td>
+      <td>${age!==null?age+' 岁':'<span class="passed">未知</span>'}</td>
+      <td>${nextTxt}</td>
+    </tr>`;
+  }).join('');
+}
+$$('#filterSeg button').forEach(b=>b.addEventListener('click',()=>{
+  $$('#filterSeg button').forEach(x=>x.classList.toggle('on',x===b));
+  filterCal=b.dataset.f;renderList();
+}));
+$('#sortSel').addEventListener('change',e=>{sortBy=e.target.value;renderList();});
+$('#searchInput').addEventListener('input',e=>{
+  searchQ=e.target.value;
+  if($('#view-list').classList.contains('on'))renderList();
+});
+
+/* ============================================================
+   通讯录视图
+   ============================================================ */
+let activeContact='wxm',cSearchQ='';
+function renderContacts(){
+  const list=$('#cList');
+  let people=PEOPLE;
+  if(cSearchQ)people=people.filter(p=>p.name.toLowerCase().includes(cSearchQ.toLowerCase()));
+  if(!people.length){
+    list.innerHTML=`<div class="empty" style="padding:30px 10px;"><div class="et">无结果</div><div class="ed">没有找到匹配的联系人。</div></div>`;
+  }else{
+    list.innerHTML=people.map(p=>{
+      const b=p.birthdays[0];
+      return `<div class="citem ${p.id===activeContact?'active':''}" data-id="${p.id}" tabindex="0" role="button" aria-label="${p.name}">
+        ${avatarHTML(p.name,p.color,30)}
+        <div style="min-width:0;"><div class="cname">${p.name}</div>
+        <div class="csub">${b?b.origLabel:'无生日'}</div></div>
+      </div>`;
+    }).join('');
+    list.querySelectorAll('.citem').forEach(it=>{
+      it.addEventListener('click',()=>{activeContact=it.dataset.id;renderContacts();});
+      it.addEventListener('keydown',e=>{if(e.key==='Enter'){activeContact=it.dataset.id;renderContacts();}});
+    });
+  }
+  renderContactDetail();
+}
+function renderContactDetail(){
+  const p=PEOPLE.find(x=>x.id===activeContact);
+  const det=$('#cDetail');
+  if(!p){det.innerHTML=`<div class="empty"><div class="et">未选择联系人</div></div>`;return;}
+  const g=p.birthdays.find(b=>b.cal==='gregorian');
+  const ng=p.birthdays.find(b=>b.cal!=='gregorian');
+  det.innerHTML=`<div class="cd-inner">
+    <div class="cd-head">
+      <div class="cd-avatar" style="background:${p.color};">${/[\u4e00-\u9fa5]/.test(p.name[0])?p.name[0]:p.name[0].toUpperCase()}</div>
+      <div><div class="cd-name">${p.name}</div><div class="cd-org">${p.org||''}</div></div>
+    </div>
+
+    <div class="group">
+      <div class="group-title">生日</div>
+      <div class="frow">
+        <span class="fk">公历生日</span>
+        <span class="fv">
+          <input class="field w4" id="gY" type="number" placeholder="年" value="${g&&g.year?g.year:''}" aria-label="公历年">
+          <span style="color:var(--text-tertiary);">年</span>
+          <input class="field w2" id="gM" type="number" min="1" max="12" placeholder="月" value="${g?g.gMonth:''}" aria-label="公历月">
+          <span style="color:var(--text-tertiary);">月</span>
+          <input class="field w2" id="gD" type="number" min="1" max="31" placeholder="日" value="${g?g.gDay:''}" aria-label="公历日">
+          <span style="color:var(--text-tertiary);">日</span>
+          <span class="fhint">年份可为空</span>
+        </span>
+      </div>
+      <div class="frow">
+        <span class="fk">非公历生日</span>
+        <span class="fv">
+          <select class="field" id="ngCal" aria-label="历法">
+            <option value="">无</option>
+            <option value="lunar" ${ng&&ng.cal==='lunar'?'selected':''}>农历 / Chinese</option>
+            <option value="hebrew" ${ng&&ng.cal==='hebrew'?'selected':''}>希伯来历 / Hebrew / עברי</option>
+            <option value="islamic" ${ng&&ng.cal==='islamic'?'selected':''}>伊斯兰历 / Islamic / هجري</option>
+          </select>
+          <input class="field w2" id="ngM" type="number" min="1" max="13" placeholder="月" value="${ng&&ng.nM?ng.nM:''}" aria-label="非公历月">
+          <span style="color:var(--text-tertiary);">月</span>
+          <input class="field w2" id="ngD" type="number" min="1" max="30" placeholder="日" value="${ng&&ng.nD?ng.nD:''}" aria-label="非公历日">
+          <span style="color:var(--text-tertiary);">日</span>
+        </span>
+      </div>
+      <div class="frow" id="ngMore" style="display:${ng?'flex':'none'};">
+        <span class="fk"></span>
+        <span class="fv">
+          <input class="field w4" id="ngY" type="number" placeholder="年（可选）" value="${ng&&ng.year?ng.year:''}" aria-label="非公历年（可选）">
+          <span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text-secondary);">闰月
+            <label class="switch"><input type="checkbox" id="ngLeap" ${ng&&ng.leap?'checked':''}><span class="sw-track"></span></label>
+          </span>
+        </span>
+      </div>
+      <div class="frow">
+        <span class="fk"></span>
+        <span class="fv"><button class="btn primary" id="btnSave">写回通讯录</button></span>
+      </div>
+    </div>
+
+    <div class="save-state">
+      <span class="save-ok" id="saveOk"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 8.5l3.5 3.5 7-8"/></svg>已写入通讯录</span>
+      <span class="save-err" id="saveErr"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6.5"/><path d="M8 4.5v4M8 11h.01"/></svg>无法保存到通讯录，请检查权限或该联系人账户是否允许编辑。</span>
+    </div>
+    <div style="font-size:11.5px;color:var(--text-tertiary);line-height:1.6;margin-top:4px;">
+      修改将在完成一个有效编辑动作后立即写回 macOS 通讯录，不会每次输入都保存。
+    </div>
+  </div>`;
+
+  $('#ngCal').addEventListener('change',e=>{
+    $('#ngMore').style.display=e.target.value?'flex':'none';
+  });
+  $('#btnSave').addEventListener('click',()=>{
+    $('#saveOk').classList.remove('on');$('#saveErr').classList.remove('on');
+    const ok=Math.random()>0.001;   // 原型：演示成功路径
+    if(ok){$('#saveOk').classList.add('on');toast('已写入通讯录');}
+    else $('#saveErr').classList.add('on');
+    setTimeout(()=>$('#saveOk').classList.remove('on'),2600);
+  });
+}
+$('#cSearch').addEventListener('input',e=>{cSearchQ=e.target.value;renderContacts();});
+
+/* ============================================================
+   权限与设置
+   ============================================================ */
+let granted=false;
+$('#btnAllow').addEventListener('click',()=>{
+  granted=true;
+  $('#permGrantedNote').style.display='block';
+  $('#permDenied').classList.remove('on');
+  $('#btnAllow').textContent='已获得通讯录权限';
+  $('#btnAllow').disabled=true;
+  $('#btnAllow').style.opacity='.55';
+  $('#syncLabel').textContent='已与 macOS 通讯录同步';
+  toast('已获得通讯录访问权限');
+  setTimeout(()=>switchView('calendar'),650);
+});
+$('#btnSysSettings').addEventListener('click',()=>toast('正在打开“系统设置 > 隐私与安全性 > 通讯录”…'));
+
+/* 主题 */
+function applyTheme(t){
+  if(t==='system'){
+    const dark=window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.dataset.theme=dark?'dark':'light';
+  }else document.documentElement.dataset.theme=t;
+  $$('#themeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+}
+$$('#themeSeg button').forEach(b=>b.addEventListener('click',()=>applyTheme(b.dataset.t)));
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{
+  if($('#themeSeg button.on').dataset.t==='system')applyTheme('system');
+});
+
+/* 其它 */
+$('#btnRefresh').addEventListener('click',()=>{
+  $('#syncLabel').textContent='正在从通讯录刷新…';
+  setTimeout(()=>{$('#syncLabel').textContent='已与 macOS 通讯录同步';toast('已从 macOS 通讯录刷新');},800);
+});
+$('#defViewSel').addEventListener('change',e=>toast('默认视图已设为「'+VIEW_TITLES[e.target.value]+'」'));
+document.addEventListener('keydown',e=>{
+  if(e.key==='/'&&document.activeElement.tagName!=='INPUT'){e.preventDefault();
+    const s=$('#view-contacts').classList.contains('on')?$('#cSearch'):$('#searchInput');
+    if(s&&s.offsetParent)s.focus();}
+});
+
+/* 初始化 */
+applyTheme('system');
+renderCalendar();
+renderDayDetail(TODAY);
+renderList();
+renderContacts();
+$('#navCount').textContent=allRecords().length;
+/* 首次启动：未授权 → 进入权限说明页；也可用 #日历 视图名直接定位预览 */
+const initView=(location.hash||'').replace('#','');
+if(VIEW_TITLES[initView])switchView(initView);else switchView('permissions');
+</script>
+</body>
+</html>

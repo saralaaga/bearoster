@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>生日 · 奶油橘温暖风格 Redesign Demo</title>
+<style>
+/* ============================================================
+   设计系统：奶油橘 · Cream & Coral
+   感受目标：阳光晒在贺卡纸上 —— 温暖、圆润、克制
+   规格来源：docs/superpowers/specs/2026-08-09-warm-redesign-design.md
+   ============================================================ */
+:root{
+  --accent:#E8683C;
+  --accent-press:#C94F27;
+  --apricot:#F2A65A;
+
+  --cal-gregorian:#E8883C;
+  --cal-gregorian-bg:rgba(232,136,60,.13);
+  --cal-lunar:#D64541;
+  --cal-lunar-bg:rgba(214,69,65,.12);
+  --cal-hebrew:#A06CD5;
+  --cal-hebrew-bg:rgba(160,108,213,.13);
+  --cal-islamic:#7A9E4E;
+  --cal-islamic-bg:rgba(122,158,78,.14);
+
+  --page-bg:#F3E9DC;
+  --window-bg:#FAF6EF;
+  --content-bg:#FAF6EF;
+  --card-bg:#FFFDF8;
+  --sidebar-bg:rgba(245,238,228,.78);
+  --toolbar-bg:rgba(250,246,239,.85);
+  --text-primary:#3E2F27;
+  --text-secondary:#8A7466;
+  --text-tertiary:#B4A294;
+  --separator:rgba(120,90,60,.12);
+  --hover-fill:rgba(120,90,60,.06);
+  --selected-nav:rgba(232,104,60,.12);
+  --control-bg:#FFFDF8;
+  --control-stroke:rgba(120,90,60,.18);
+  --shadow-card:0 1px 2px rgba(180,120,80,.08), 0 8px 24px rgba(180,120,80,.10);
+  --shadow-window:0 24px 80px rgba(120,70,30,.30), 0 0 0 .5px rgba(120,70,30,.18);
+  --glow:radial-gradient(600px 400px at 85% 0%, rgba(242,166,90,.10), transparent 70%);
+  --ok:#7A9E4E;
+}
+html[data-theme="dark"]{
+  --accent:#FF8A5C;
+  --accent-press:#E8683C;
+  --apricot:#F2A65A;
+
+  --cal-gregorian:#FFAB6B;
+  --cal-gregorian-bg:rgba(255,171,107,.20);
+  --cal-lunar:#FF6F6B;
+  --cal-lunar-bg:rgba(255,111,107,.20);
+  --cal-hebrew:#BE9AEE;
+  --cal-hebrew-bg:rgba(190,154,238,.22);
+  --cal-islamic:#A3C26E;
+  --cal-islamic-bg:rgba(163,194,110,.22);
+
+  --page-bg:#1A1410;
+  --window-bg:#241D19;
+  --content-bg:#241D19;
+  --card-bg:#2F2620;
+  --sidebar-bg:rgba(38,30,25,.78);
+  --toolbar-bg:rgba(36,29,25,.85);
+  --text-primary:#F2E8DD;
+  --text-secondary:#B09C8C;
+  --text-tertiary:#7A6A5C;
+  --separator:rgba(255,220,190,.12);
+  --hover-fill:rgba(255,220,190,.07);
+  --selected-nav:rgba(255,138,92,.18);
+  --control-bg:#332922;
+  --control-stroke:rgba(255,220,190,.20);
+  --shadow-card:0 1px 2px rgba(0,0,0,.30), 0 8px 24px rgba(0,0,0,.28);
+  --shadow-window:0 24px 80px rgba(0,0,0,.55), 0 0 0 .5px rgba(255,220,190,.14);
+  --glow:radial-gradient(600px 400px at 85% 0%, rgba(242,166,90,.07), transparent 70%);
+  --ok:#A3C26E;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC",system-ui,sans-serif;
+  background:var(--page-bg);
+  color:var(--text-primary);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:18px;padding:28px;min-height:100vh;
+  transition:background .2s ease,color .2s ease;
+}
+.rounded{font-family:ui-rounded,"SF Pro Rounded",-apple-system,"PingFang SC",system-ui,sans-serif}
+
+/* ---------- demo 控制条（不属于应用本身） ---------- */
+.demo-bar{
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:center;
+}
+.demo-bar .label{font-size:12px;color:var(--text-secondary);letter-spacing:.02em}
+.seg{
+  display:inline-flex;background:var(--hover-fill);border-radius:999px;padding:3px;gap:2px;
+  border:1px solid var(--separator);
+}
+.seg button{
+  border:0;background:transparent;color:var(--text-secondary);font:inherit;font-size:13px;
+  padding:5px 14px;border-radius:999px;cursor:pointer;transition:all .15s ease;white-space:nowrap;
+}
+.seg button.active{background:var(--accent);color:#fff;font-weight:600;box-shadow:0 1px 3px rgba(180,80,40,.35)}
+.seg button:not(.active):hover{color:var(--text-primary)}
+
+/* ---------- macOS 窗口模拟 ---------- */
+.window{
+  width:min(1180px,96vw);height:min(780px,86vh);
+  background:var(--window-bg);border-radius:14px;overflow:hidden;
+  box-shadow:var(--shadow-window);
+  display:flex;flex-direction:column;
+}
+.titlebar{
+  height:44px;flex:none;display:flex;align-items:center;padding:0 16px;gap:8px;
+  background:var(--toolbar-bg);border-bottom:1px solid var(--separator);
+  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);
+}
+.tl{width:12px;height:12px;border-radius:50%;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)}
+.tl.r{background:#FF5F57}.tl.y{background:#FEBC2E}.tl.g{background:#28C840}
+.titlebar .doc-title{margin-left:10px;font-size:13px;font-weight:600;color:var(--text-secondary)}
+.window-body{flex:1;display:flex;min-height:0}
+
+/* ---------- 侧边栏 ---------- */
+.sidebar{
+  width:224px;flex:none;background:var(--sidebar-bg);border-right:1px solid var(--separator);
+  -webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);
+  display:flex;flex-direction:column;padding:14px 10px 10px;
+}
+.side-section{font-size:11px;font-weight:600;color:var(--text-tertiary);padding:10px 10px 4px;letter-spacing:.04em}
+.side-item{
+  display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;
+  font-size:13.5px;color:var(--text-primary);cursor:pointer;transition:background .15s ease;
+  border:0;background:transparent;width:100%;text-align:left;font-family:inherit;
+}
+.side-item:hover{background:var(--hover-fill)}
+.side-item.active{background:var(--selected-nav);font-weight:600}
+.side-item.active .ico{color:var(--accent)}
+.side-item .ico{width:18px;text-align:center;color:var(--text-secondary);font-size:13px}
+.side-item .badge{margin-left:auto;font-size:11px;color:var(--text-secondary);background:var(--hover-fill);border-radius:999px;padding:1px 7px}
+.side-spacer{flex:1}
+.next-card{
+  margin:6px 4px 4px;border-radius:14px;padding:12px;color:#fff;
+  background:linear-gradient(135deg,var(--apricot),var(--accent));
+  box-shadow:0 6px 18px rgba(220,110,50,.35);
+}
+.next-card .nc-label{font-size:11px;font-weight:700;opacity:.92;display:flex;align-items:center;gap:5px;letter-spacing:.03em}
+.next-card .nc-row{display:flex;align-items:center;gap:9px;margin-top:9px}
+.next-card .nc-name{font-size:13.5px;font-weight:700;line-height:1.2}
+.next-card .nc-date{font-size:11.5px;opacity:.88;margin-top:1px}
+.next-card .nc-chip{margin-left:auto;font-size:11px;font-weight:700;background:rgba(255,255,255,.28);border-radius:999px;padding:3px 9px;white-space:nowrap}
+.avatar{
+  border-radius:50%;color:#fff;display:flex;align-items:center;justify-content:center;
+  font-weight:600;flex:none;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.08);
+}
+.av-gregorian{background:linear-gradient(135deg,color-mix(in srgb,var(--cal-gregorian) 82%,#fff),var(--cal-gregorian))}
+.av-lunar{background:linear-gradient(135deg,color-mix(in srgb,var(--cal-lunar) 82%,#fff),var(--cal-lunar))}
+.av-hebrew{background:linear-gradient(135deg,color-mix(in srgb,var(--cal-hebrew) 82%,#fff),var(--cal-hebrew))}
+.av-islamic{background:linear-gradient(135deg,color-mix(in srgb,var(--cal-islamic) 82%,#fff),var(--cal-islamic))}
+
+/* ---------- 内容区通用 ---------- */
+.content{flex:1;min-width:0;position:relative;display:flex;flex-direction:column;background:var(--content-bg)}
+.content::before{content:"";position:absolute;inset:0;background:var(--glow);pointer-events:none}
+.page{display:none;flex:1;min-height:0;flex-direction:column;position:relative}
+.page.active{display:flex}
+.toolbar{
+  flex:none;display:flex;align-items:center;gap:12px;padding:12px 18px;
+  border-bottom:1px solid var(--separator);background:var(--toolbar-bg);
+  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);
+}
+.toolbar h1{font-size:17px;font-weight:700}
+.tb-spacer{flex:1}
+.btn{
+  font:inherit;font-size:13px;border-radius:999px;cursor:pointer;transition:all .15s ease;
+  border:1px solid var(--control-stroke);background:var(--control-bg);color:var(--text-primary);
+  padding:5px 13px;
+}
+.btn:hover{background:var(--hover-fill)}
+.btn-primary{background:var(--accent);border-color:transparent;color:#fff;font-weight:600;box-shadow:0 1px 4px rgba(220,110,50,.35)}
+.btn-primary:hover{background:var(--accent-press)}
+.btn-icon{width:26px;height:26px;padding:0;display:inline-flex;align-items:center;justify-content:center;color:var(--text-secondary)}
+.search{
+  display:flex;align-items:center;gap:6px;background:var(--hover-fill);border:1px solid var(--separator);
+  border-radius:999px;padding:4px 12px;font-size:13px;color:var(--text-tertiary);width:180px;
+}
+.badge-kind{font-size:10.5px;font-weight:700;border-radius:999px;padding:2px 8px;white-space:nowrap}
+.bk-gregorian{color:var(--cal-gregorian);background:var(--cal-gregorian-bg)}
+.bk-lunar{color:var(--cal-lunar);background:var(--cal-lunar-bg)}
+.bk-hebrew{color:var(--cal-hebrew);background:var(--cal-hebrew-bg)}
+.bk-islamic{color:var(--cal-islamic);background:var(--cal-islamic-bg)}
+.chip{
+  font-size:12px;font-weight:600;border-radius:999px;padding:4px 11px;white-space:nowrap;
+  color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);
+}
+.chip.today{background:var(--accent);color:#fff;box-shadow:0 2px 6px rgba(220,110,50,.4)}
+.card{background:var(--card-bg);border-radius:16px;box-shadow:var(--shadow-card);border:1px solid var(--separator)}
+
+/* ---------- 日历页 ---------- */
+.cal-body{flex:1;display:flex;min-height:0}
+.cal-grid-wrap{flex:1;min-width:0;padding:16px 18px;display:flex;flex-direction:column;overflow:auto}
+.cal-week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px}
+.cal-week div{text-align:center;font-size:11px;font-weight:600;color:var(--text-tertiary);padding:2px 0}
+.cal-grid{flex:1;display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:1fr;gap:6px;min-height:0}
+.cell{
+  background:var(--card-bg);border:1px solid var(--separator);border-radius:12px;
+  padding:6px 8px;display:flex;flex-direction:column;gap:4px;min-height:74px;
+  transition:border-color .15s ease,background .15s ease;
+}
+.cell.dim{opacity:.45}
+.cell .dnum{font-size:12.5px;font-weight:600;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:50%}
+.cell.is-today .dnum{background:var(--accent);color:#fff;box-shadow:0 1px 4px rgba(220,110,50,.4)}
+.cell.selected{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--card-bg))}
+.cell .marks{display:flex;flex-wrap:wrap;gap:3px;align-items:center}
+.dot{width:6px;height:6px;border-radius:50%}
+.mini{width:16px;height:16px;font-size:8.5px;border-radius:50%;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600}
+.more{font-size:9.5px;color:var(--text-tertiary);font-weight:600}
+.day-detail{
+  width:296px;flex:none;border-left:1px solid var(--separator);padding:16px;overflow:auto;
+  display:flex;flex-direction:column;gap:12px;
+}
+.day-detail h2{font-size:19px;font-weight:700}
+.day-detail .sub{font-size:12.5px;color:var(--text-secondary);margin-top:2px}
+.bday-card{padding:13px 14px;display:flex;align-items:center;gap:11px}
+.bday-card.celebrate{border-color:color-mix(in srgb,var(--accent) 30%,transparent)}
+.bday-card .nm{font-size:14px;font-weight:600}
+.bday-card .meta{font-size:12px;color:var(--text-secondary);margin-top:2px;display:flex;gap:6px;align-items:center}
+.empty-hint{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  color:var(--text-tertiary);font-size:13px;text-align:center;padding:24px;
+}
+.empty-hint .big{font-size:30px}
+
+/* ---------- 列表页 ---------- */
+.list-scroll{flex:1;overflow:auto;padding:8px 18px 24px}
+.group-title{
+  font-size:15px;font-weight:700;padding:18px 4px 8px;display:flex;align-items:baseline;gap:8px;
+}
+.group-title .cnt{font-size:11.5px;font-weight:600;color:var(--text-tertiary)}
+.row{
+  display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;
+  transition:background .15s ease;cursor:default;
+}
+.row:hover{background:var(--hover-fill)}
+.row + .row{margin-top:2px}
+.row .nm{font-size:14px;font-weight:600}
+.row .meta{font-size:12px;color:var(--text-secondary);margin-top:2px;display:flex;gap:6px;align-items:center}
+.row .chip{margin-left:auto}
+.row.celebrate{background:color-mix(in srgb,var(--accent) 7%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 25%,transparent)}
+
+/* ---------- 联系人编辑页 ---------- */
+.ed-body{flex:1;display:flex;min-height:0}
+.ed-list{
+  width:260px;flex:none;border-right:1px solid var(--separator);display:flex;flex-direction:column;
+}
+.ed-list .search{margin:12px 12px 8px;width:auto}
+.ed-items{flex:1;overflow:auto;padding:4px 8px 12px}
+.ed-item{
+  display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;cursor:pointer;
+  transition:background .15s ease;border:0;background:transparent;width:100%;text-align:left;font:inherit;color:inherit;
+}
+.ed-item:hover{background:var(--hover-fill)}
+.ed-item.active{background:var(--selected-nav)}
+.ed-item .nm{font-size:13.5px;font-weight:600}
+.ed-item .sub2{font-size:11.5px;color:var(--text-secondary);margin-top:1px}
+.ed-item .fill-dot{margin-left:auto;width:7px;height:7px;border-radius:50%;background:var(--ok)}
+.ed-item .fill-dot.empty{background:var(--control-stroke)}
+.ed-form{flex:1;overflow:auto;padding:22px 26px;display:flex;flex-direction:column;gap:16px}
+.ed-form h2{font-size:19px;font-weight:700;display:flex;align-items:center;gap:10px}
+.form-card{padding:18px;display:flex;flex-direction:column;gap:14px}
+.form-label{font-size:12px;font-weight:600;color:var(--text-secondary)}
+.field-row{display:flex;gap:10px}
+.field{
+  flex:1;display:flex;flex-direction:column;gap:5px;
+}
+.field .box{
+  background:var(--control-bg);border:1px solid var(--control-stroke);border-radius:10px;
+  padding:7px 11px;font-size:13.5px;color:var(--text-primary);display:flex;justify-content:space-between;align-items:center;
+}
+.field .box .chev{color:var(--text-tertiary);font-size:10px}
+.toggle-row{display:flex;align-items:center;gap:9px;font-size:13px}
+.toggle{width:36px;height:21px;border-radius:999px;background:var(--accent);position:relative;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.08)}
+.toggle::after{content:"";position:absolute;top:2px;right:2px;width:17px;height:17px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.form-actions{display:flex;align-items:center;gap:12px}
+.link-danger{border:0;background:none;font:inherit;font-size:13px;color:var(--cal-lunar);cursor:pointer;padding:5px 4px}
+
+/* ---------- 设置页 ---------- */
+.set-scroll{flex:1;overflow:auto;padding:22px 26px;display:flex;flex-direction:column;gap:16px;max-width:640px}
+.set-card{padding:18px;display:flex;flex-direction:column;gap:12px}
+.set-card h3{font-size:14.5px;font-weight:700}
+.set-card p{font-size:12.5px;color:var(--text-secondary);line-height:1.55}
+.status-row{display:flex;align-items:center;gap:9px;font-size:13.5px;font-weight:600}
+.status-dot{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 22%,transparent)}
+.set-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-top:1px solid var(--separator)}
+.set-row:first-of-type{border-top:0}
+.set-row .t{font-size:13.5px;font-weight:600}
+.set-row .d{font-size:11.5px;color:var(--text-secondary);margin-top:1px}
+.set-row .seg{margin-left:auto}
+.about{font-size:12px;color:var(--text-tertiary);line-height:1.7}
+
+/* ---------- 日期选择器组件页 ---------- */
+.pk-wrap{flex:1;overflow:auto;padding:22px 26px;display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}
+.pk-group{display:flex;flex-direction:column;gap:10px}
+.pk-group .pk-title{font-size:13px;font-weight:700}
+.pk-group .pk-desc{font-size:11.5px;color:var(--text-secondary)}
+.pk-pop{
+  width:272px;border-radius:14px;padding:12px;background:var(--card-bg);
+  border:1px solid var(--separator);box-shadow:var(--shadow-card);
+  display:flex;flex-direction:column;gap:8px;
+}
+.pk-head{display:flex;align-items:center;gap:6px}
+.pk-head .t{font-size:13px;font-weight:700;flex:1;text-align:center}
+.pk-head button{border:0;background:transparent;color:var(--text-secondary);font-size:14px;cursor:pointer;width:24px;height:24px;border-radius:6px}
+.pk-head button:hover{background:var(--hover-fill);color:var(--text-primary)}
+.pk-week{display:grid;grid-template-columns:repeat(7,1fr);font-size:10px;font-weight:600;color:var(--text-tertiary);text-align:center}
+.pk-days{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.pk-day{
+  height:30px;display:flex;align-items:center;justify-content:center;font-size:12.5px;
+  border-radius:50%;cursor:default;transition:background .12s ease;
+}
+.pk-day:hover{background:var(--hover-fill)}
+.pk-day.dim{color:var(--text-tertiary);opacity:.55}
+.pk-day.today{box-shadow:inset 0 0 0 1.5px var(--accent);color:var(--accent);font-weight:700}
+.pk-day.sel{background:var(--accent);color:#fff;font-weight:700;box-shadow:0 1px 4px rgba(220,110,50,.4)}
+.pk-foot{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--separator);padding-top:8px}
+.pk-foot .lnk{border:0;background:none;font:inherit;font-size:12px;color:var(--accent);cursor:pointer;font-weight:600}
+.pk-foot .lnk.mute{color:var(--text-tertiary);font-weight:400}
+.pk-months{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.pk-m{
+  padding:8px 0;text-align:center;font-size:12.5px;border-radius:9px;cursor:default;
+  transition:background .12s ease;
+}
+.pk-m:hover{background:var(--hover-fill)}
+.pk-m.sel{background:var(--selected-nav);color:var(--accent);font-weight:700}
+.pk-years{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.pk-cols{display:flex;gap:8px}
+.pk-col{
+  flex:1;display:flex;flex-direction:column;gap:1px;max-height:196px;overflow:hidden;
+  background:var(--hover-fill);border-radius:10px;padding:4px;
+}
+.pk-col .cap{text-align:center;font-size:10px;font-weight:600;color:var(--text-tertiary);padding:2px 0 4px}
+.pk-opt{padding:4.5px 4px;text-align:center;font-size:12.5px;border-radius:7px;color:var(--text-primary)}
+.pk-opt.sel{background:var(--card-bg);color:var(--accent);font-weight:700;box-shadow:0 1px 3px rgba(120,70,30,.15)}
+.pk-opt.dim{color:var(--text-tertiary)}
+.pk-note{font-size:11.5px;color:var(--text-secondary);background:var(--hover-fill);border-radius:9px;padding:7px 10px;line-height:1.5}
+.pk-note b{color:var(--text-primary)}
+</style>
+</head>
+<body>
+
+<!-- demo 控制条（非应用 UI） -->
+<div class="demo-bar">
+  <span class="label">页面</span>
+  <div class="seg" id="pageSeg">
+    <button class="active" data-page="calendar">日历</button>
+    <button data-page="list">生日列表</button>
+    <button data-page="contacts">联系人</button>
+    <button data-page="settings">设置</button>
+    <button data-page="pickers">日期选择器</button>
+  </div>
+  <span class="label">外观</span>
+  <div class="seg" id="themeSeg">
+    <button data-theme-val="light" class="active">浅色</button>
+    <button data-theme-val="dark">深色</button>
+  </div>
+</div>
+
+<div class="window">
+  <div class="titlebar">
+    <span class="tl r"></span><span class="tl y"></span><span class="tl g"></span>
+    <span class="doc-title">Birthday</span>
+  </div>
+  <div class="window-body">
+
+    <!-- 侧边栏 -->
+    <aside class="sidebar">
+      <div class="side-section">浏览</div>
+      <button class="side-item active" data-page="calendar"><span class="ico">📅</span>日历</button>
+      <button class="side-item" data-page="list"><span class="ico">🎁</span>生日列表<span class="badge">9</span></button>
+      <div class="side-section">管理</div>
+      <button class="side-item" data-page="contacts"><span class="ico">👥</span>联系人<span class="badge">9</span></button>
+      <div class="side-section">设置</div>
+      <button class="side-item" data-page="settings"><span class="ico">⚙️</span>权限与设置</button>
+      <div class="side-spacer"></div>
+      <div class="next-card">
+        <div class="nc-label">🎉 即将到来</div>
+        <div class="nc-row">
+          <span class="avatar av-gregorian" style="width:32px;height:32px;font-size:12px;background:rgba(255,255,255,.25)">林</span>
+          <span>
+            <div class="nc-name">林晓雨</div>
+            <div class="nc-date">8月9日 星期日</div>
+          </span>
+          <span class="nc-chip">今天</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 内容区 -->
+    <main class="content">
+
+      <!-- ========== 页面 1：日历仪表盘 ========== -->
+      <section class="page active" data-page="calendar">
+        <div class="toolbar">
+          <h1 class="rounded">2026年8月</h1>
+          <button class="btn btn-icon">‹</button>
+          <button class="btn btn-icon">›</button>
+          <button class="btn">今天</button>
+          <div class="tb-spacer"></div>
+          <div class="seg">
+            <button class="active">月视图</button>
+            <button>近期</button>
+          </div>
+          <button class="btn btn-icon" title="刷新">⟳</button>
+          <div class="search">🔍 搜索联系人</div>
+        </div>
+        <div class="cal-body">
+          <div class="cal-grid-wrap">
+            <div class="cal-week"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div>
+            <div class="cal-grid">
+              <div class="cell dim"><span class="dnum">26</span></div>
+              <div class="cell dim"><span class="dnum">27</span></div>
+              <div class="cell dim"><span class="dnum">28</span></div>
+              <div class="cell dim"><span class="dnum">29</span></div>
+              <div class="cell dim"><span class="dnum">30</span></div>
+              <div class="cell dim"><span class="dnum">31</span></div>
+              <div class="cell"><span class="dnum">1</span></div>
+              <div class="cell"><span class="dnum">2</span></div>
+              <div class="cell"><span class="dnum">3</span></div>
+              <div class="cell"><span class="dnum">4</span></div>
+              <div class="cell"><span class="dnum">5</span></div>
+              <div class="cell"><span class="dnum">6</span></div>
+              <div class="cell"><span class="dnum">7</span></div>
+              <div class="cell"><span class="dnum">8</span></div>
+              <div class="cell is-today selected">
+                <span class="dnum">9</span>
+                <span class="marks"><span class="mini av-gregorian">林</span></span>
+              </div>
+              <div class="cell">
+                <span class="dnum">10</span>
+                <span class="marks"><span class="mini av-lunar">陈</span></span>
+              </div>
+              <div class="cell"><span class="dnum">11</span></div>
+              <div class="cell"><span class="dnum">12</span></div>
+              <div class="cell"><span class="dnum">13</span></div>
+              <div class="cell">
+                <span class="dnum">14</span>
+                <span class="marks"><span class="mini av-hebrew">S</span></span>
+              </div>
+              <div class="cell"><span class="dnum">15</span></div>
+              <div class="cell"><span class="dnum">16</span></div>
+              <div class="cell"><span class="dnum">17</span></div>
+              <div class="cell"><span class="dnum">18</span></div>
+              <div class="cell"><span class="dnum">19</span></div>
+              <div class="cell"><span class="dnum">20</span></div>
+              <div class="cell">
+                <span class="dnum">21</span>
+                <span class="marks"><span class="mini av-gregorian">王</span></span>
+              </div>
+              <div class="cell"><span class="dnum">22</span></div>
+              <div class="cell"><span class="dnum">23</span></div>
+              <div class="cell"><span class="dnum">24</span></div>
+              <div class="cell"><span class="dnum">25</span></div>
+              <div class="cell"><span class="dnum">26</span></div>
+              <div class="cell">
+                <span class="dnum">27</span>
+                <span class="marks"><span class="mini av-islamic">F</span></span>
+              </div>
+              <div class="cell"><span class="dnum">28</span></div>
+              <div class="cell"><span class="dnum">29</span></div>
+              <div class="cell"><span class="dnum">30</span></div>
+              <div class="cell"><span class="dnum">31</span></div>
+              <div class="cell dim"><span class="dnum">1</span></div>
+              <div class="cell dim"><span class="dnum">2</span></div>
+              <div class="cell dim">
+                <span class="dnum">3</span>
+                <span class="marks"><span class="mini av-gregorian">李</span></span>
+              </div>
+              <div class="cell dim"><span class="dnum">4</span></div>
+              <div class="cell dim"><span class="dnum">5</span></div>
+            </div>
+          </div>
+          <div class="day-detail">
+            <div>
+              <h2 class="rounded">8月9日</h2>
+              <div class="sub">星期日 · 今天</div>
+            </div>
+            <div class="card bday-card celebrate">
+              <span class="avatar av-gregorian" style="width:38px;height:38px;font-size:14px">林</span>
+              <span>
+                <div class="nm">林晓雨</div>
+                <div class="meta"><span class="badge-kind bk-gregorian">公历</span>1998年8月9日 · 28岁</div>
+              </span>
+            </div>
+            <div class="card" style="padding:13px 14px">
+              <div style="font-size:12.5px;color:var(--text-secondary);line-height:1.6">
+                🎂 今天是林晓雨的生日，记得送上祝福。
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== 页面 2：生日列表 ========== -->
+      <section class="page" data-page="list">
+        <div class="toolbar">
+          <h1 class="rounded">生日列表</h1>
+          <div class="tb-spacer"></div>
+          <div class="search">🔍 搜索联系人</div>
+        </div>
+        <div class="list-scroll">
+          <div class="group-title rounded">2026年8月 <span class="cnt">5 个生日</span></div>
+
+          <div class="row celebrate">
+            <span class="avatar av-gregorian" style="width:38px;height:38px;font-size:14px">林</span>
+            <span>
+              <div class="nm">林晓雨</div>
+              <div class="meta"><span class="badge-kind bk-gregorian">公历</span>8月9日 · 28岁</div>
+            </span>
+            <span class="chip today">🎂 今天</span>
+          </div>
+          <div class="row">
+            <span class="avatar av-lunar" style="width:38px;height:38px;font-size:14px">陈</span>
+            <span>
+              <div class="nm">陈默</div>
+              <div class="meta"><span class="badge-kind bk-lunar">农历</span>六月廿七 · 8月10日</div>
+            </span>
+            <span class="chip">明天</span>
+          </div>
+          <div class="row">
+            <span class="avatar av-hebrew" style="width:38px;height:38px;font-size:12px">SC</span>
+            <span>
+              <div class="nm">Sarah Cohen</div>
+              <div class="meta"><span class="badge-kind bk-hebrew">希伯来历</span>1 Elul · 8月14日</div>
+            </span>
+            <span class="chip">5 天后</span>
+          </div>
+          <div class="row">
+            <span class="avatar av-gregorian" style="width:38px;height:38px;font-size:14px">王</span>
+            <span>
+              <div class="nm">王雅琴</div>
+              <div class="meta"><span class="badge-kind bk-gregorian">公历</span>8月21日 · 54岁</div>
+            </span>
+            <span class="chip">12 天后</span>
+          </div>
+          <div class="row">
+            <span class="avatar av-islamic" style="width:38px;height:38px;font-size:12px">FA</span>
+            <span>
+              <div class="nm">Fatima Al-Rashid</div>
+              <div class="meta"><span class="badge-kind bk-islamic">伊斯兰历</span>13 Rabiʻ I · 8月27日</div>
+            </span>
+            <span class="chip">18 天后</span>
+          </div>
+
+          <div class="group-title rounded">2026年9月 <span class="cnt">2 个生日</span></div>
+          <div class="row">
+            <span class="avatar av-gregorian" style="width:38px;height:38px;font-size:14px">李</span>
+            <span>
+              <div class="nm">李国强</div>
+              <div class="meta"><span class="badge-kind bk-gregorian">公历</span>9月3日 · 61岁</div>
+            </span>
+            <span class="chip">25 天后</span>
+          </div>
+          <div class="row">
+            <span class="avatar av-lunar" style="width:38px;height:38px;font-size:14px">周</span>
+            <span>
+              <div class="nm">周婷</div>
+              <div class="meta"><span class="badge-kind bk-lunar">农历</span>八月初八 · 9月18日</div>
+            </span>
+            <span class="chip">40 天后</span>
+          </div>
+
+          <div class="group-title rounded">2026年10月 <span class="cnt">2 个生日</span></div>
+          <div class="row">
+            <span class="avatar av-gregorian" style="width:38px;height:38px;font-size:14px">张</span>
+            <span>
+              <div class="nm">张伟</div>
+              <div class="meta"><span class="badge-kind bk-gregorian">公历</span>10月2日 · 35岁</div>
+            </span>
+            <span class="chip">54 天后</span>
+          </div>
+          <div class="row">
+            <span class="avatar av-hebrew" style="width:38px;height:38px;font-size:14px">刘</span>
+            <span>
+              <div class="nm">刘洋</div>
+              <div class="meta"><span class="badge-kind bk-hebrew">希伯来历</span>15 Tishrei · 10月26日</div>
+            </span>
+            <span class="chip">78 天后</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== 页面 3：联系人编辑 ========== -->
+      <section class="page" data-page="contacts">
+        <div class="toolbar">
+          <h1 class="rounded">联系人</h1>
+          <div class="tb-spacer"></div>
+          <button class="btn btn-icon" title="刷新">⟳</button>
+        </div>
+        <div class="ed-body">
+          <div class="ed-list">
+            <div class="search">🔍 搜索</div>
+            <div class="ed-items">
+              <button class="ed-item"><span class="avatar av-gregorian" style="width:30px;height:30px;font-size:11px">林</span><span><div class="nm">林晓雨</div><div class="sub2">公历 · 8月9日</div></span><span class="fill-dot"></span></button>
+              <button class="ed-item active"><span class="avatar av-lunar" style="width:30px;height:30px;font-size:11px">陈</span><span><div class="nm">陈默</div><div class="sub2">农历 · 六月廿七</div></span><span class="fill-dot"></span></button>
+              <button class="ed-item"><span class="avatar av-hebrew" style="width:30px;height:30px;font-size:10px">SC</span><span><div class="nm">Sarah Cohen</div><div class="sub2">希伯来历 · 1 Elul</div></span><span class="fill-dot"></span></button>
+              <button class="ed-item"><span class="avatar av-gregorian" style="width:30px;height:30px;font-size:11px">王</span><span><div class="nm">王雅琴</div><div class="sub2">公历 · 8月21日</div></span><span class="fill-dot"></span></button>
+              <button class="ed-item"><span class="avatar av-islamic" style="width:30px;height:30px;font-size:10px">FA</span><span><div class="nm">Fatima Al-Rashid</div><div class="sub2">伊斯兰历 · 13 Rabiʻ I</div></span><span class="fill-dot"></span></button>
+              <button class="ed-item"><span class="avatar av-gregorian" style="width:30px;height:30px;font-size:11px">李</span><span><div class="nm">李国强</div><div class="sub2">公历 · 9月3日</div></span><span class="fill-dot"></span></button>
+              <button class="ed-item"><span class="avatar av-lunar" style="width:30px;height:30px;font-size:11px">周</span><span><div class="nm">周婷</div><div class="sub2">农历 · 八月初八</div></span><span class="fill-dot"></span></button>
+              <button class="ed-item"><span class="avatar av-gregorian" style="width:30px;height:30px;font-size:11px">张</span><span><div class="nm">张伟</div><div class="sub2">公历 · 10月2日</div></span><span class="fill-dot"></span></button>
+              <button class="ed-item"><span class="avatar av-hebrew" style="width:30px;height:30px;font-size:11px">刘</span><span><div class="nm">刘洋</div><div class="sub2">未填年份</div></span><span class="fill-dot empty"></span></button>
+            </div>
+          </div>
+          <div class="ed-form">
+            <h2 class="rounded"><span class="avatar av-lunar" style="width:34px;height:34px;font-size:13px">陈</span>陈默</h2>
+            <div class="card form-card">
+              <span class="form-label">生日类型</span>
+              <div class="seg" style="align-self:flex-start">
+                <button>公历</button>
+                <button class="active">农历</button>
+                <button>希伯来历</button>
+                <button>伊斯兰历</button>
+              </div>
+              <span class="form-label">生日日期</span>
+              <div class="field-row">
+                <div class="field"><span class="form-label" style="font-weight:500">年</span><div class="box">1992 <span class="chev">▾</span></div></div>
+                <div class="field"><span class="form-label" style="font-weight:500">月</span><div class="box">六月 <span class="chev">▾</span></div></div>
+                <div class="field"><span class="form-label" style="font-weight:500">日</span><div class="box">廿七 <span class="chev">▾</span></div></div>
+              </div>
+              <div class="toggle-row"><span class="toggle"></span>闰月</div>
+              <div style="font-size:12px;color:var(--text-secondary);background:var(--hover-fill);border-radius:10px;padding:9px 12px">
+                对应的公历日期：<b style="color:var(--text-primary)">2026年8月10日</b>（明天）
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" style="padding:7px 22px">存储</button>
+              <button class="link-danger">清除生日</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== 页面 4：权限与设置 ========== -->
+      <section class="page" data-page="settings">
+        <div class="toolbar">
+          <h1 class="rounded">权限与设置</h1>
+        </div>
+        <div class="set-scroll">
+          <div class="card set-card">
+            <h3>通讯录访问</h3>
+            <div class="status-row"><span class="status-dot"></span>已授权 · 可读取和修改联系人生日</div>
+            <p>Birthday 直接读写 macOS 系统通讯录，所有数据保留在本机。如需变更权限，请前往「系统设置 › 隐私与安全性 › 通讯录」。</p>
+            <div><button class="btn">打开系统设置</button></div>
+          </div>
+          <div class="card set-card">
+            <h3>偏好</h3>
+            <div class="set-row">
+              <span><div class="t">界面语言</div><div class="d">影响日期与历法名称的显示</div></span>
+              <div class="seg"><button class="active">简体中文</button><button>繁體中文</button><button>English</button></div>
+            </div>
+            <div class="set-row">
+              <span><div class="t">外观</div><div class="d">浅色 / 深色模式</div></span>
+              <div class="seg"><button class="active">跟随系统</button><button>浅色</button><button>深色</button></div>
+            </div>
+          </div>
+          <div class="card set-card">
+            <h3>关于</h3>
+            <div class="about">
+              Birthday 0.2.0<br>
+              本地优先的通讯录生日管理工具，支持公历、农历、希伯来历与伊斯兰历。<br>
+              通讯录始终是数据的唯一来源。
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== 页面 5：日期选择器组件（demo 专属） ========== -->
+      <section class="page" data-page="pickers">
+        <div class="toolbar">
+          <h1 class="rounded">日期选择器</h1>
+          <div class="tb-spacer"></div>
+          <span style="font-size:12px;color:var(--text-tertiary)">demo 组件页 · 非应用界面</span>
+        </div>
+        <div class="pk-wrap">
+
+          <!-- 公历迷你日历 -->
+          <div class="pk-group">
+            <div class="pk-title">公历日期选择器</div>
+            <div class="pk-pop">
+              <div class="pk-head"><button>‹</button><span class="t rounded">2026年8月</span><button>›</button></div>
+              <div class="pk-week"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div>
+              <div class="pk-days">
+                <span class="pk-day dim">26</span><span class="pk-day dim">27</span><span class="pk-day dim">28</span><span class="pk-day dim">29</span><span class="pk-day dim">30</span><span class="pk-day dim">31</span><span class="pk-day">1</span>
+                <span class="pk-day">2</span><span class="pk-day">3</span><span class="pk-day">4</span><span class="pk-day">5</span><span class="pk-day">6</span><span class="pk-day">7</span><span class="pk-day">8</span>
+                <span class="pk-day today">9</span><span class="pk-day sel">10</span><span class="pk-day">11</span><span class="pk-day">12</span><span class="pk-day">13</span><span class="pk-day">14</span><span class="pk-day">15</span>
+                <span class="pk-day">16</span><span class="pk-day">17</span><span class="pk-day">18</span><span class="pk-day">19</span><span class="pk-day">20</span><span class="pk-day">21</span><span class="pk-day">22</span>
+                <span class="pk-day">23</span><span class="pk-day">24</span><span class="pk-day">25</span><span class="pk-day">26</span><span class="pk-day">27</span><span class="pk-day">28</span><span class="pk-day">29</span>
+                <span class="pk-day">30</span><span class="pk-day">31</span><span class="pk-day dim">1</span><span class="pk-day dim">2</span><span class="pk-day dim">3</span><span class="pk-day dim">4</span><span class="pk-day dim">5</span>
+              </div>
+              <div class="pk-foot"><button class="lnk mute">清除</button><button class="lnk">回到今天</button></div>
+            </div>
+            <div class="pk-desc">用于联系人编辑中选择公历生日；今天 = 珊瑚描边，选中 = 珊瑚实底。</div>
+          </div>
+
+          <!-- 月/年跳转 -->
+          <div class="pk-group">
+            <div class="pk-title">月份 / 年份跳转</div>
+            <div class="pk-pop">
+              <div class="pk-head"><button>‹</button><span class="t rounded">2026</span><button>›</button></div>
+              <div class="pk-months">
+                <span class="pk-m">1月</span><span class="pk-m">2月</span><span class="pk-m">3月</span>
+                <span class="pk-m">4月</span><span class="pk-m">5月</span><span class="pk-m">6月</span>
+                <span class="pk-m">7月</span><span class="pk-m sel">8月</span><span class="pk-m">9月</span>
+                <span class="pk-m">10月</span><span class="pk-m">11月</span><span class="pk-m">12月</span>
+              </div>
+            </div>
+            <div class="pk-pop">
+              <div class="pk-head"><button>‹</button><span class="t rounded">2020 – 2029</span><button>›</button></div>
+              <div class="pk-years">
+                <span class="pk-m">2020</span><span class="pk-m">2021</span><span class="pk-m">2022</span><span class="pk-m">2023</span>
+                <span class="pk-m">2024</span><span class="pk-m">2025</span><span class="pk-m sel">2026</span><span class="pk-m">2027</span>
+                <span class="pk-m">2028</span><span class="pk-m">2029</span><span class="pk-m dim">2030</span><span class="pk-m dim">2031</span>
+              </div>
+            </div>
+            <div class="pk-desc">主日历工具栏点击「2026年8月」时弹出，两级钻取：年 → 月。</div>
+          </div>
+
+          <!-- 农历选择器 -->
+          <div class="pk-group">
+            <div class="pk-title">农历日期选择器</div>
+            <div class="pk-pop" style="width:304px">
+              <div class="pk-cols">
+                <div class="pk-col">
+                  <div class="cap">年</div>
+                  <span class="pk-opt dim">1990</span><span class="pk-opt dim">1991</span><span class="pk-opt sel">1992</span><span class="pk-opt">1993</span><span class="pk-opt">1994</span><span class="pk-opt dim">1995</span>
+                </div>
+                <div class="pk-col">
+                  <div class="cap">月</div>
+                  <span class="pk-opt">四月</span><span class="pk-opt">五月</span><span class="pk-opt sel">六月</span><span class="pk-opt">七月</span><span class="pk-opt">八月</span><span class="pk-opt">九月</span>
+                </div>
+                <div class="pk-col">
+                  <div class="cap">日</div>
+                  <span class="pk-opt">廿五</span><span class="pk-opt">廿六</span><span class="pk-opt sel">廿七</span><span class="pk-opt">廿八</span><span class="pk-opt">廿九</span><span class="pk-opt">三十</span>
+                </div>
+              </div>
+              <div class="toggle-row" style="font-size:12.5px"><span class="toggle" style="width:32px;height:19px"></span>闰月</div>
+              <div class="pk-note">对应公历：<b>2026年8月10日</b>（明天）<br>月份列表含「闰×月」条目（如 闰五月），随年份动态出现。</div>
+            </div>
+            <div class="pk-desc">三列滚轮式选择（落地 SwiftUI 时为 .wheel 样式 Picker）。</div>
+          </div>
+
+          <!-- 希伯来历 / 伊斯兰历 -->
+          <div class="pk-group">
+            <div class="pk-title">希伯来历 / 伊斯兰历选择器</div>
+            <div class="pk-pop" style="width:304px">
+              <div class="pk-note" style="background:none;padding:0 0 2px"><b>希伯来历</b></div>
+              <div class="pk-cols">
+                <div class="pk-col">
+                  <div class="cap">年</div>
+                  <span class="pk-opt dim">5785</span><span class="pk-opt sel">5786</span><span class="pk-opt">5787</span>
+                </div>
+                <div class="pk-col">
+                  <div class="cap">月</div>
+                  <span class="pk-opt">Av</span><span class="pk-opt sel">Elul</span><span class="pk-opt">Tishrei</span>
+                </div>
+                <div class="pk-col">
+                  <div class="cap">日</div>
+                  <span class="pk-opt dim">29</span><span class="pk-opt sel">1</span><span class="pk-opt">2</span>
+                </div>
+              </div>
+            </div>
+            <div class="pk-pop" style="width:304px">
+              <div class="pk-note" style="background:none;padding:0 0 2px"><b>伊斯兰历</b></div>
+              <div class="pk-cols">
+                <div class="pk-col">
+                  <div class="cap">年</div>
+                  <span class="pk-opt dim">1447</span><span class="pk-opt sel">1448</span><span class="pk-opt">1449</span>
+                </div>
+                <div class="pk-col">
+                  <div class="cap">月</div>
+                  <span class="pk-opt">Safar</span><span class="pk-opt sel">Rabiʻ I</span><span class="pk-opt">Rabiʻ II</span>
+                </div>
+                <div class="pk-col">
+                  <div class="cap">日</div>
+                  <span class="pk-opt dim">12</span><span class="pk-opt sel">13</span><span class="pk-opt">14</span>
+                </div>
+              </div>
+            </div>
+            <div class="pk-desc">与农历选择器同构，月份名随界面语言本地化。</div>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script>
+(function () {
+  var pages = document.querySelectorAll('.page');
+  var pageBtns = document.querySelectorAll('#pageSeg button, .side-item');
+  function showPage(name) {
+    pages.forEach(function (p) { p.classList.toggle('active', p.dataset.page === name); });
+    pageBtns.forEach(function (b) { b.classList.toggle('active', b.dataset.page === name); });
+  }
+  pageBtns.forEach(function (b) {
+    b.addEventListener('click', function () { showPage(b.dataset.page); });
+  });
+
+  var themeBtns = document.querySelectorAll('#themeSeg button');
+  function setTheme(t) {
+    document.documentElement.dataset.theme = t;
+    themeBtns.forEach(function (b) { b.classList.toggle('active', b.dataset.themeVal === t); });
+  }
+  themeBtns.forEach(function (b) {
+    b.addEventListener('click', function () { setTheme(b.dataset.themeVal); });
+  });
+  if (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) setTheme('dark');
+})();
+</script>
+</body>
+</html>

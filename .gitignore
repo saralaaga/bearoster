@@ -1,0 +1,25 @@
+.DS_Store
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Local caches and temporary artifacts
+.tmp-*/
+.tmp-swift-cache/
+.tmp-screenshots/
+.tmp-shots/
+.omx/
+
+# Release/build outputs
+dist/
+
+# Generated iconset; source icon and packaged AppIcon.icns are tracked.
+Packaging/AppIcon.iconset/
+
+# Xcode/user state
+DerivedData/
+*.xcuserdata/
+*.xcuserstate
+*.moved-aside
+
