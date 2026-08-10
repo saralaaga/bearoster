@@ -3,96 +3,50 @@ import SwiftUI
 
 // MARK: - Records list
 
-private struct BirthdayMonthGroup: Identifiable {
-    let id: String
-    let title: String
-    let occurrences: [BirthdayOccurrence]
-}
-
 struct BirthdayRecordsView: View {
     @Environment(BirthdayAppModel.self) private var model
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        @Bindable var model = model
+        let locale = model.language.coreLocale
+        let openContactText = model.l10n(.openContact)
+        let todayText = model.l10n(.today)
 
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Text(model.l10n(.list))
-                    .font(.system(size: 19, weight: .black))
-                    .tracking(0.4)
-
-                Spacer()
-
-                Picker(model.l10n(.calendarKind), selection: $model.filter) {
-                    Text(model.l10n(.all)).tag(BirthdayCalendarKind?.none)
-                    ForEach(BirthdayCalendarKind.allCases) { kind in
-                        Text(model.formatter.calendarName(kind, locale: model.language.coreLocale)).tag(Optional(kind))
-                    }
-                }
-                .pickerStyle(.menu)
-                .fixedSize()
-
-                Picker(model.l10n(.sort), selection: $model.sort) {
-                    Text(model.l10n(.nearest)).tag(BirthdaySort.next)
-                    Text(model.l10n(.name)).tag(BirthdaySort.name)
-                    Text(model.l10n(.age)).tag(BirthdaySort.age)
-                    Text(model.l10n(.calendarKind)).tag(BirthdaySort.calendar)
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 330)
-
-                TextField(model.l10n(.search), text: $model.searchText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 12.5, weight: .medium))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .frame(width: 180)
-                    .background(BirthdayTheme.controlBackground(colorScheme), in: RoundedRectangle(cornerRadius: BirthdayTheme.controlCorner))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: BirthdayTheme.controlCorner)
-                            .strokeBorder(BirthdayTheme.separator(colorScheme))
-                    )
-
-                Text("\(model.filteredRecords.count)")
-                    .font(.callout.weight(.medium))
-                    .foregroundStyle(BirthdayTheme.inkSecondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(BirthdayTheme.hoverFill(colorScheme), in: RoundedRectangle(cornerRadius: 6))
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 13)
-
-            Rectangle()
-                .fill(BirthdayTheme.separator(colorScheme))
-                .frame(height: 1)
-
             if model.filteredRecords.isEmpty {
                 ContentUnavailableView(model.l10n(.noBirthdays), systemImage: "magnifyingglass")
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(groupedOccurrences) { group in
+                        ForEach(model.filteredRecordGroups) { group in
                             HStack(alignment: .firstTextBaseline, spacing: 9) {
                                 Text(group.title)
-                                    .font(.system(size: 15, weight: .black))
+                                    .font(.system(size: 15, weight: .semibold))
                                 Text("\(group.occurrences.count)")
-                                    .font(.system(size: 10.5, weight: .bold))
-                                    .tracking(1.2)
-                                    .textCase(.uppercase)
-                                    .foregroundStyle(BirthdayTheme.inkTertiary)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(.secondary)
                             }
-                            .padding(.horizontal, 4)
+                            .padding(.horizontal, 16)
                             .padding(.top, 20)
                             .padding(.bottom, 9)
 
                             ForEach(group.occurrences) { occurrence in
-                                BirthdayOccurrenceListRow(occurrence: occurrence)
+                                let daysUntil = model.resolver.daysUntil(occurrence.date)
+                                BirthdayOccurrenceListRow(
+                                    contactName: occurrence.record.contactName,
+                                    kind: occurrence.record.kind,
+                                    kindTitle: shortKindName(occurrence.record.kind, model: model),
+                                    metaText: metaText(for: occurrence, locale: locale),
+                                    daysUntil: daysUntil,
+                                    daysUntilText: daysUntil == 0 ? todayText : daysLeftText(daysUntil, locale: locale),
+                                    isToday: Calendar.current.isDateInToday(occurrence.date),
+                                    accessibilityLabel: "\(openContactText): \(occurrence.record.contactName)"
+                                ) {
+                                    model.focusContact(occurrence.record.contactID)
+                                }
                             }
                         }
                     }
-                    .padding(.horizontal, 20)
                     .padding(.bottom, 24)
                 }
                 .background(BirthdayTheme.windowBackground(colorScheme))
@@ -101,87 +55,65 @@ struct BirthdayRecordsView: View {
         .background(BirthdayTheme.windowBackground(colorScheme))
     }
 
-    private var groupedOccurrences: [BirthdayMonthGroup] {
-        let occurrences = model.filteredRecordOccurrences
-        let calendar = Calendar.current
-        let grouped = Dictionary(grouping: occurrences) { occurrence in
-            let components = calendar.dateComponents([.year, .month], from: occurrence.date)
-            guard let year = components.year, let month = components.month else {
-                return "unknown"
-            }
-            return String(format: "%04d-%02d", year, month)
-        }
-        return grouped.keys.sorted().compactMap { key in
-            guard let items = grouped[key], let first = items.first else { return nil }
-            return BirthdayMonthGroup(
-                id: key,
-                title: monthGroupTitle(for: first.date),
-                occurrences: items
-            )
-        }
-    }
-
-    private func monthGroupTitle(for date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: model.language.coreLocale.rawValue)
-        formatter.dateFormat = model.language.coreLocale == .english ? "MMMM yyyy" : "yyyy年M月"
-        return formatter.string(from: date)
-    }
-}
-
-struct BirthdayOccurrenceListRow: View {
-    @Environment(BirthdayAppModel.self) private var model
-    @Environment(\.colorScheme) private var colorScheme
-    let occurrence: BirthdayOccurrence
-
-    private var isToday: Bool { Calendar.current.isDateInToday(occurrence.date) }
-
-    var body: some View {
-        Button {
-            model.focusContact(occurrence.record.contactID)
-        } label: {
-            HStack(spacing: 12) {
-                AvatarView(name: occurrence.record.contactName, color: color(for: occurrence.record.kind), size: 38)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(occurrence.record.contactName)
-                        .font(.system(size: 14, weight: .bold))
-                    HStack(spacing: 7) {
-                        KindBadge(kind: occurrence.record.kind)
-                        Text(metaText)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(BirthdayTheme.inkSecondary)
-                            .lineLimit(1)
-                    }
-                }
-
-                Spacer(minLength: 0)
-                CountdownChip(days: model.resolver.daysUntil(occurrence.date))
-            }
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .background(isToday ? BirthdayTheme.accent.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: BirthdayTheme.cardCorner))
-        .overlay(
-            RoundedRectangle(cornerRadius: BirthdayTheme.cardCorner)
-                .strokeBorder(isToday ? BirthdayTheme.accent : Color.clear, lineWidth: 1.4)
-        )
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(model.l10n(.openContact)): \(occurrence.record.contactName)")
-    }
-
-    private var metaText: String {
+    private func metaText(for occurrence: BirthdayOccurrence, locale: CalendarFormattingService.AppLocale) -> String {
         var parts = [
-            model.formatter.originalDate(occurrence.record, locale: model.language.coreLocale),
-            model.formatter.occurrenceDate(occurrence.date, locale: model.language.coreLocale)
+            model.formatter.originalDate(occurrence.record, locale: locale),
+            model.formatter.occurrenceDate(occurrence.date, locale: locale)
         ]
         if model.showAge, let age = occurrence.age {
             parts.append("\(age)")
         }
         return parts.joined(separator: " · ")
+    }
+}
+
+struct BirthdayOccurrenceListRow: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let contactName: String
+    let kind: BirthdayCalendarKind
+    let kindTitle: String
+    let metaText: String
+    let daysUntil: Int
+    let daysUntilText: String
+    let isToday: Bool
+    let accessibilityLabel: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                AvatarView(name: contactName, color: color(for: kind), size: 34)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(contactName)
+                        .font(.system(size: 13.5, weight: .medium))
+                        .lineLimit(1)
+                    HStack(spacing: 7) {
+                        StaticKindBadge(kind: kind, title: kindTitle)
+                        Text(metaText)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+
+                Spacer(minLength: 0)
+                StaticCountdownChip(days: daysUntil, title: daysUntilText)
+            }
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background(isToday ? BirthdayTheme.accent.opacity(0.10) : Color.clear)
+        .overlay(alignment: .bottom) {
+            BirthdayTheme.separator(colorScheme)
+                .frame(height: 0.5)
+                .padding(.leading, 62)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel)
     }
 }
 

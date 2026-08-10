@@ -1,7 +1,7 @@
 import BirthdayCore
 import Foundation
 
-enum AppLanguage: String, CaseIterable, Identifiable {
+enum AppLanguage: String, CaseIterable, Identifiable, Sendable {
     case system
     case zhHans
     case zhHant
@@ -58,10 +58,29 @@ struct L10n {
     static let month = Key(zhHans: "月", zhHant: "月", en: "Month")
     static let search = Key(zhHans: "搜索", zhHant: "搜尋", en: "Search")
     static let all = Key(zhHans: "全部", zhHant: "全部", en: "All")
+    static let library = Key(zhHans: "资料库", zhHant: "資料庫", en: "Library")
+    static let groups = Key(zhHans: "分组", zhHant: "分組", en: "Groups")
     static let sort = Key(zhHans: "排序", zhHant: "排序", en: "Sort")
     static let nearest = Key(zhHans: "最近生日", zhHant: "最近生日", en: "Next birthday")
     static let name = Key(zhHans: "姓名", zhHant: "姓名", en: "Name")
     static let age = Key(zhHans: "年龄", zhHant: "年齡", en: "Age")
+    static let birthday = Key(zhHans: "生日", zhHant: "生日", en: "Birthday")
+    static let group = Key(zhHans: "分组", zhHant: "分組", en: "Group")
+    static let edit = Key(zhHans: "编辑", zhHant: "編輯", en: "Edit")
+    static let done = Key(zhHans: "完成", zhHant: "完成", en: "Done")
+    static let cancel = Key(zhHans: "取消", zhHant: "取消", en: "Cancel")
+    static let editContact = Key(zhHans: "编辑联系人", zhHant: "編輯聯絡人", en: "Edit Contact")
+    static let contactInfo = Key(zhHans: "联系信息", zhHant: "聯絡資訊", en: "Contact Info")
+    static let phone = Key(zhHans: "电话", zhHant: "電話", en: "Phone")
+    static let email = Key(zhHans: "邮箱", zhHant: "電子郵件", en: "Email")
+    static let address = Key(zhHans: "地址", zhHant: "地址", en: "Address")
+    static let links = Key(zhHans: "链接", zhHant: "連結", en: "Links")
+    static let dates = Key(zhHans: "日期", zhHant: "日期", en: "Dates")
+    static let relations = Key(zhHans: "关系", zhHant: "關係", en: "Relations")
+    static let work = Key(zhHans: "工作", zhHant: "工作", en: "Work")
+    static let notes = Key(zhHans: "备注", zhHant: "備註", en: "Notes")
+    static let notFilled = Key(zhHans: "未填写", zhHant: "未填寫", en: "Not filled")
+    static let readOnlyExtendedFields = Key(zhHans: "扩展字段当前只从 Apple 通讯录读取；生日字段可在这里编辑并写回。", zhHant: "延伸欄位目前只從 Apple 通訊錄讀取；生日欄位可在這裡編輯並寫回。", en: "Extended fields are currently read from Apple Contacts. Birthday fields can be edited here and written back.")
     static let calendarKind = Key(zhHans: "历法", zhHant: "曆法", en: "Calendar")
     static let originalDate = Key(zhHans: "原始日期", zhHant: "原始日期", en: "Original date")
     static let thisYearDate = Key(zhHans: "今年日期", zhHant: "今年日期", en: "This year")
@@ -78,6 +97,11 @@ struct L10n {
     static let saveFailed = Key(zhHans: "无法保存到通讯录，请检查权限或该联系人账户是否允许编辑。", zhHant: "無法儲存到通訊錄，請檢查權限或該聯絡人帳戶是否允許編輯。", en: "Could not save to Contacts. Check permissions or whether this account allows editing.")
     static let dataSource = Key(zhHans: "数据来源", zhHant: "資料來源", en: "Data source")
     static let contactsSource = Key(zhHans: "macOS 通讯录", zhHant: "macOS 通訊錄", en: "macOS Contacts")
+    static let contactFieldAccess = Key(zhHans: "联系人字段访问", zhHant: "聯絡人欄位存取", en: "Contact field access")
+    static let extendedContactFields = Key(zhHans: "读取扩展字段", zhHant: "讀取延伸欄位", en: "Read extended fields")
+    static let extendedContactFieldsBody = Key(zhHans: "开启后会读取电话、邮箱、地址、网址、社交账号、职位等字段。关闭时只读取生日所需字段。", zhHant: "開啟後會讀取電話、電子郵件、地址、網址、社群帳號、職稱等欄位。關閉時只讀取生日所需欄位。", en: "When enabled, Birthday reads phone numbers, email addresses, addresses, URLs, social profiles, and job fields. When disabled, it only reads birthday fields.")
+    static let basicContactFields = Key(zhHans: "仅生日必要字段", zhHant: "僅生日必要欄位", en: "Birthday fields only")
+    static let extendedContactFieldsEnabled = Key(zhHans: "扩展字段已开启", zhHant: "延伸欄位已開啟", en: "Extended fields enabled")
     static let supportedCalendars = Key(zhHans: "支持的历法", zhHant: "支援的曆法", en: "Supported calendars")
     static let appLanguage = Key(zhHans: "界面语言", zhHant: "介面語言", en: "App language")
     static let displayAge = Key(zhHans: "显示年龄", zhHant: "顯示年齡", en: "Show age")
@@ -95,6 +119,7 @@ struct L10n {
     static let navigateToNextMonth = Key(zhHans: "切换到下一个月份", zhHant: "切換到下一個月份", en: "Navigate to the next month")
     static let refreshContacts = Key(zhHans: "刷新通讯录", zhHant: "重新整理通訊錄", en: "Refresh Contacts")
     static let openContact = Key(zhHans: "打开联系人", zhHant: "打開聯絡人", en: "Open contact")
+    static let calculatingBirthdays = Key(zhHans: "正在计算生日数据", zhHant: "正在計算生日資料", en: "Calculating birthday data")
 }
 
 extension L10n.Key {
@@ -111,10 +136,29 @@ extension L10n.Key {
     static let month = L10n.month
     static let search = L10n.search
     static let all = L10n.all
+    static let library = L10n.library
+    static let groups = L10n.groups
     static let sort = L10n.sort
     static let nearest = L10n.nearest
     static let name = L10n.name
     static let age = L10n.age
+    static let birthday = L10n.birthday
+    static let group = L10n.group
+    static let edit = L10n.edit
+    static let done = L10n.done
+    static let cancel = L10n.cancel
+    static let editContact = L10n.editContact
+    static let contactInfo = L10n.contactInfo
+    static let phone = L10n.phone
+    static let email = L10n.email
+    static let address = L10n.address
+    static let links = L10n.links
+    static let dates = L10n.dates
+    static let relations = L10n.relations
+    static let work = L10n.work
+    static let notes = L10n.notes
+    static let notFilled = L10n.notFilled
+    static let readOnlyExtendedFields = L10n.readOnlyExtendedFields
     static let calendarKind = L10n.calendarKind
     static let originalDate = L10n.originalDate
     static let thisYearDate = L10n.thisYearDate
@@ -131,6 +175,11 @@ extension L10n.Key {
     static let saveFailed = L10n.saveFailed
     static let dataSource = L10n.dataSource
     static let contactsSource = L10n.contactsSource
+    static let contactFieldAccess = L10n.contactFieldAccess
+    static let extendedContactFields = L10n.extendedContactFields
+    static let extendedContactFieldsBody = L10n.extendedContactFieldsBody
+    static let basicContactFields = L10n.basicContactFields
+    static let extendedContactFieldsEnabled = L10n.extendedContactFieldsEnabled
     static let supportedCalendars = L10n.supportedCalendars
     static let appLanguage = L10n.appLanguage
     static let displayAge = L10n.displayAge
@@ -148,4 +197,5 @@ extension L10n.Key {
     static let navigateToNextMonth = L10n.navigateToNextMonth
     static let refreshContacts = L10n.refreshContacts
     static let openContact = L10n.openContact
+    static let calculatingBirthdays = L10n.calculatingBirthdays
 }

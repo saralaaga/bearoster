@@ -43,13 +43,21 @@ struct KindBadge: View {
     let kind: BirthdayCalendarKind
 
     var body: some View {
-        Text(shortKindName(kind, model: model))
-            .font(.system(size: 10, weight: .bold))
-            .textCase(.uppercase)
+        StaticKindBadge(kind: kind, title: shortKindName(kind, model: model))
+    }
+}
+
+struct StaticKindBadge: View {
+    let kind: BirthdayCalendarKind
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 11, weight: .semibold))
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
             .foregroundStyle(color(for: kind))
-            .background(color(for: kind).opacity(0.18), in: RoundedRectangle(cornerRadius: BirthdayTheme.CornerRadius.xs))
+            .background(color(for: kind).opacity(0.12), in: RoundedRectangle(cornerRadius: 5))
     }
 }
 
@@ -58,18 +66,27 @@ struct CountdownChip: View {
     let days: Int
 
     var body: some View {
-        Text(days == 0 ? model.l10n(.today) : daysLeftText(days, locale: model.language.coreLocale))
-            .font(.system(size: 11.5, weight: .bold))
+        StaticCountdownChip(days: days, title: days == 0 ? model.l10n(.today) : daysLeftText(days, locale: model.language.coreLocale))
+    }
+}
+
+struct StaticCountdownChip: View {
+    let days: Int
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 11.5, weight: .semibold))
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
-            .foregroundStyle(days == 0 ? .white : BirthdayTheme.inkSecondary)
+            .foregroundStyle(days == 0 ? .white : .secondary)
             .background(
-                days == 0 ? BirthdayTheme.accent : BirthdayTheme.mustard.opacity(0.42),
-                in: RoundedRectangle(cornerRadius: BirthdayTheme.CornerRadius.sm)
+                days == 0 ? BirthdayTheme.accent : Color.secondary.opacity(0.11),
+                in: RoundedRectangle(cornerRadius: 7)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: BirthdayTheme.CornerRadius.sm)
-                    .strokeBorder(days == 0 ? Color.clear : BirthdayTheme.mustard.opacity(0.35))
+                RoundedRectangle(cornerRadius: 7)
+                    .strokeBorder(days == 0 ? Color.clear : Color.secondary.opacity(0.12))
             )
     }
 }
@@ -98,5 +115,42 @@ struct ToastView: View {
             .padding(.vertical, 10)
             .background(.black.opacity(0.82), in: Capsule())
             .shadow(radius: 12)
+    }
+}
+
+struct CalculationProgressView: View {
+    @Environment(BirthdayAppModel.self) private var model
+    let progress: BirthdayCalculationProgress
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text(model.l10n(.calculatingBirthdays))
+                    .font(.system(size: 12.5, weight: .bold))
+                Spacer(minLength: 0)
+                Text("\(Int(progress.fraction * 100))%")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(BirthdayTheme.inkSecondary)
+                    .monospacedDigit()
+            }
+
+            if !progress.message.isEmpty {
+                Text(progress.message)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(BirthdayTheme.inkSecondary)
+                    .lineLimit(1)
+            }
+
+            ProgressView(value: progress.fraction)
+                .progressViewStyle(.linear)
+        }
+        .padding(.horizontal, 13)
+        .padding(.vertical, 10)
+        .frame(width: 260)
+        .cardStyle()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(model.l10n(.calculatingBirthdays))
     }
 }

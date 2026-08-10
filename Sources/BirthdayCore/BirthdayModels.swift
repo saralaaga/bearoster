@@ -32,7 +32,7 @@ public enum BirthdayCalendarKind: String, CaseIterable, Codable, Hashable, Ident
     }
 }
 
-public struct BirthdayRecord: Identifiable, Hashable, Sendable {
+public struct BirthdayRecord: Codable, Identifiable, Hashable, Sendable {
     public let id: String
     public let contactID: String
     public let contactName: String
@@ -61,7 +61,7 @@ public struct BirthdayRecord: Identifiable, Hashable, Sendable {
     public var isLeapMonth: Bool { components.isLeapMonth == true }
 }
 
-public struct ContactBirthdayProfile: Identifiable, Hashable, Sendable {
+public struct ContactBirthdayProfile: Codable, Identifiable, Hashable, Sendable {
     public let id: String
     public var displayName: String
     public var organizationName: String
@@ -75,7 +75,7 @@ public struct ContactBirthdayProfile: Identifiable, Hashable, Sendable {
     }
 }
 
-public struct BirthdayOccurrence: Identifiable, Hashable, Sendable {
+public struct BirthdayOccurrence: Codable, Identifiable, Hashable, Sendable {
     public let id: String
     public let record: BirthdayRecord
     public let date: Date

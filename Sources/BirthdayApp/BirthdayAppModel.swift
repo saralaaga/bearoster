@@ -12,7 +12,7 @@ enum SidebarSelection: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-enum BirthdaySort: String, CaseIterable, Identifiable {
+enum BirthdaySort: String, CaseIterable, Identifiable, Sendable {
     case next
     case name
     case age
@@ -21,43 +21,64 @@ enum BirthdaySort: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+struct BirthdayMonthGroup: Identifiable, Hashable, Sendable {
+    let id: String
+    let title: String
+    let occurrences: [BirthdayOccurrence]
+}
+
 @MainActor
 @Observable
 final class BirthdayAppModel {
     var selection: SidebarSelection = .permissions
     var permissionState: ContactsPermissionState = .notDetermined
-    var profiles: [ContactBirthdayProfile] = [] {
-        didSet { rebuildDerivedData() }
-    }
     var selectedContactID: String?
     var searchText = "" {
         didSet {
-            rebuildFilteredRecords()
-            rebuildVisibleOccurrences()
+            scheduleDerivedDataRebuild(message: "Searching birthdays", debounceNanoseconds: 250_000_000)
         }
     }
     var contactSearchText = "" {
-        didSet { rebuildFilteredProfiles() }
+        didSet {
+            rebuildContactProjection()
+        }
     }
     var selectedDate = Date() {
-        didSet { selectedDateOccurrences = records(on: selectedDate) }
+        didSet { selectedDateOccurrences = cachedRecords(on: selectedDate) }
     }
     var visibleMonth = Date() {
-        didSet { rebuildVisibleOccurrences() }
+        didSet { scheduleDerivedDataRebuild(message: "Calculating month") }
     }
     var filter: BirthdayCalendarKind? {
-        didSet { rebuildFilteredRecords() }
+        didSet { scheduleDerivedDataRebuild(message: "Filtering birthdays") }
     }
     var sort: BirthdaySort = .next {
-        didSet { rebuildFilteredRecords() }
+        didSet { scheduleDerivedDataRebuild(message: "Sorting birthdays") }
     }
     var isLoading = false
     var errorMessage: String?
     var toastMessage: String?
-    var language: AppLanguage = .system
+    var language: AppLanguage = .system {
+        didSet {
+            rebuildContactProjection()
+            scheduleDerivedDataRebuild(message: "Updating language")
+        }
+    }
     var showAge = true
     var upcomingRange = 30 {
-        didSet { rebuildUpcomingOccurrences() }
+        didSet { scheduleDerivedDataRebuild(message: "Calculating upcoming birthdays") }
+    }
+    var selectedContactCollectionID = ContactCollectionIdentifier.all {
+        didSet {
+            rebuildContactProjection()
+        }
+    }
+    var contactFieldAccessLevel: ContactFieldAccessLevel = BirthdayAppModel.loadContactFieldAccessLevel() {
+        didSet {
+            guard contactFieldAccessLevel != oldValue else { return }
+            Self.saveContactFieldAccessLevel(contactFieldAccessLevel)
+            Task { await refreshContacts() }
+        }
     }
     var voiceText = ""
     var voiceResult: String?
@@ -66,144 +87,236 @@ final class BirthdayAppModel {
     private(set) var allRecords: [BirthdayRecord] = []
     private(set) var filteredRecords: [BirthdayRecord] = []
     private(set) var filteredRecordOccurrences: [BirthdayOccurrence] = []
+    private(set) var filteredRecordGroups: [BirthdayMonthGroup] = []
+    private(set) var profiles: [ContactBirthdayProfile] = []
     private(set) var filteredProfiles: [ContactBirthdayProfile] = []
+    private(set) var contactGrouping: ContactGroupingSnapshot = .empty
+    private(set) var contactCollectionSections: [ContactCollectionSectionModel] = []
+    private(set) var contactListSections: [ContactListSectionModel] = []
+    private(set) var visibleContactCount = 0
+    private(set) var extendedProfilesByID: [String: ContactExtendedProfile] = [:]
     private(set) var cachedUpcomingOccurrences: [BirthdayOccurrence] = []
     private(set) var selectedDateOccurrences: [BirthdayOccurrence] = []
+    private(set) var visibleMonthDates: [Date] = []
+    private(set) var visibleMonthTitle = ""
+    private(set) var weekdaySymbols: [String] = []
+    private(set) var calculationProgress: BirthdayCalculationProgress = .inactive
 
     let formatter = CalendarFormattingService()
     let resolver = BirthdayOccurrenceResolver()
     let parser = DatePhraseParser()
 
-    private let contactsRepository = ContactsRepository()
+    private let contactSyncService = ContactSyncService()
+    private let derivedDataWorker = BirthdayDerivedDataWorker()
+    private let contactListProjection = ContactListProjectionService()
     private let voiceInput = VoiceInputService()
     private var saveTask: Task<Void, Never>?
+    private var derivedDataTask: Task<Void, Never>?
+    private var contactsRefreshTask: Task<Void, Never>?
+    private var contactsChangeObserver: NSObjectProtocol?
+    private var dataGeneration = 0
+    private var derivedRequestID = 0
+    private var profileByID: [String: ContactBirthdayProfile] = [:]
+    private var birthdayRecordSignature = 0
+    private var calculationStartedAt: Date?
     private var visibleOccurrencesByDay: [Date: [BirthdayOccurrence]] = [:]
     private var visibleFilteredOccurrencesByDay: [Date: [BirthdayOccurrence]] = [:]
 
     var l10n: L10n { L10n(language: language) }
+    var extendedContactFieldsEnabled: Bool {
+        get { contactFieldAccessLevel == .extended }
+        set { contactFieldAccessLevel = newValue ? .extended : .birthdayOnly }
+    }
+
+    init() {
+        observeContactsChanges()
+        scheduleDerivedDataRebuild(message: "Preparing birthdays")
+        Task { await loadCachedContactSnapshot() }
+    }
 
     var selectedProfile: ContactBirthdayProfile? {
         guard let selectedContactID else { return filteredProfiles.first }
-        return profiles.first { $0.id == selectedContactID }
+        return profileByID[selectedContactID]
     }
 
-    private func rebuildDerivedData() {
-        allRecords = profiles.flatMap(\.records)
-        rebuildFilteredRecords()
-        rebuildFilteredProfiles()
-        rebuildUpcomingOccurrences()
-        rebuildVisibleOccurrences()
-        selectedDateOccurrences = records(on: selectedDate)
-    }
+    private func scheduleDerivedDataRebuild(message: String, debounceNanoseconds: UInt64 = 0) {
+        derivedRequestID += 1
+        let requestID = derivedRequestID
+        let request = BirthdayDerivedDataRequest(
+            generation: dataGeneration,
+            profiles: profiles,
+            searchText: searchText,
+            selectedDate: selectedDate,
+            visibleMonth: visibleMonth,
+            filter: filter,
+            sort: sort,
+            language: language,
+            upcomingRange: upcomingRange
+        )
+        let worker = derivedDataWorker
 
-    private func rebuildFilteredRecords() {
-        var records = allRecords
-        if let filter {
-            records = records.filter { $0.kind == filter }
-        }
-        if !searchText.isEmpty {
-            records = records.filter { $0.contactName.localizedCaseInsensitiveContains(searchText) }
-        }
-        let now = Date()
-        switch sort {
-        case .next:
-            records.sort {
-                let lhs = resolver.nextOccurrence(for: $0, after: now)?.date ?? .distantFuture
-                let rhs = resolver.nextOccurrence(for: $1, after: now)?.date ?? .distantFuture
-                return lhs < rhs
+        startCalculationProgress(message: message)
+        derivedDataTask?.cancel()
+        derivedDataTask = Task {
+            if debounceNanoseconds > 0 {
+                try? await Task.sleep(nanoseconds: debounceNanoseconds)
+                guard !Task.isCancelled else { return }
             }
-        case .name:
-            records.sort { $0.contactName.localizedStandardCompare($1.contactName) == .orderedAscending }
-        case .age:
-            records.sort { ($0.year ?? Int.max) < ($1.year ?? Int.max) }
-        case .calendar:
-            records.sort { $0.kind.rawValue < $1.kind.rawValue }
-        }
-        filteredRecords = records
-        filteredRecordOccurrences = records.compactMap { resolver.nextOccurrence(for: $0, after: now) }
-            .sorted { lhs, rhs in
-                lhs.date == rhs.date ? lhs.record.contactName < rhs.record.contactName : lhs.date < rhs.date
+
+            let snapshot = await worker.snapshot(for: request) { [weak self] progress in
+                Task { @MainActor in
+                    guard let self, self.derivedRequestID == requestID else { return }
+                    self.calculationProgress = progress
+                }
             }
+
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard self.derivedRequestID == requestID else { return }
+                self.applyDerivedDataSnapshot(snapshot)
+                self.finishCalculationProgress(requestID: requestID)
+            }
+        }
     }
 
-    private func rebuildFilteredProfiles() {
-        guard !contactSearchText.isEmpty else {
-            filteredProfiles = profiles
+    private func applyDerivedDataSnapshot(_ snapshot: BirthdayDerivedDataSnapshot) {
+        allRecords = snapshot.allRecords
+        filteredRecords = snapshot.filteredRecords
+        filteredRecordOccurrences = snapshot.filteredRecordOccurrences
+        filteredRecordGroups = snapshot.filteredRecordGroups
+        rebuildContactProjection()
+        cachedUpcomingOccurrences = snapshot.cachedUpcomingOccurrences
+        selectedDateOccurrences = snapshot.selectedDateOccurrences
+        visibleMonthDates = snapshot.visibleMonthDates
+        visibleMonthTitle = snapshot.visibleMonthTitle
+        weekdaySymbols = snapshot.weekdaySymbols
+        visibleOccurrencesByDay = snapshot.visibleOccurrencesByDay
+        visibleFilteredOccurrencesByDay = snapshot.visibleFilteredOccurrencesByDay
+    }
+
+    private func finishCalculationProgress(requestID: Int) {
+        let minimumVisibleSeconds: TimeInterval = 0.45
+        let elapsed = calculationStartedAt.map { Date().timeIntervalSince($0) } ?? minimumVisibleSeconds
+        let remaining = max(0, minimumVisibleSeconds - elapsed)
+
+        guard remaining > 0 else {
+            calculationProgress = .inactive
             return
         }
-        filteredProfiles = profiles.filter { $0.displayName.localizedCaseInsensitiveContains(contactSearchText) }
+
+        Task {
+            try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
+            await MainActor.run {
+                guard self.derivedRequestID == requestID else { return }
+                self.calculationProgress = .inactive
+            }
+        }
     }
 
-    private func rebuildUpcomingOccurrences() {
-        let now = Date()
-        cachedUpcomingOccurrences = allRecords.compactMap { resolver.nextOccurrence(for: $0, after: now) }
-            .filter { resolver.daysUntil($0.date, from: now) <= upcomingRange }
-            .sorted { $0.date == $1.date ? $0.record.contactName < $1.record.contactName : $0.date < $1.date }
+    private func startCalculationProgress(message: String) {
+        calculationProgress = BirthdayCalculationProgress(
+            isActive: true,
+            message: message,
+            completed: 0,
+            total: 1
+        )
+        calculationStartedAt = Date()
     }
 
-    private func rebuildVisibleOccurrences() {
-        let days = visibleMonthDays()
-        var occurrencesByDay: [Date: [BirthdayOccurrence]] = [:]
-        var filteredByDay: [Date: [BirthdayOccurrence]] = [:]
+    private func applyContactSnapshot(_ snapshot: ContactDataSnapshot) {
+        profiles = snapshot.profiles
+        profileByID = Dictionary(uniqueKeysWithValues: snapshot.profiles.map { ($0.id, $0) })
+        contactGrouping = snapshot.grouping
+        extendedProfilesByID = snapshot.extendedProfilesByID
+        if contactGrouping.contactIDsByCollectionID[selectedContactCollectionID] == nil {
+            selectedContactCollectionID = ContactCollectionIdentifier.all
+        }
+        rebuildContactProjection()
 
-        for day in days {
-            let key = dayKey(day)
-            let occurrences = resolver.occurrences(on: day, records: allRecords)
-            occurrencesByDay[key] = occurrences
-            filteredByDay[key] = searchText.isEmpty
-                ? occurrences
-                : occurrences.filter { $0.record.contactName.localizedCaseInsensitiveContains(searchText) }
+        if selectedContactID == nil {
+            selectedContactID = filteredProfiles.first?.id ?? snapshot.profiles.first?.id
+        } else if let currentSelectedContactID = selectedContactID, profileByID[currentSelectedContactID] == nil {
+            selectedContactID = filteredProfiles.first?.id ?? snapshot.profiles.first?.id
         }
 
-        visibleOccurrencesByDay = occurrencesByDay
-        visibleFilteredOccurrencesByDay = filteredByDay
-        selectedDateOccurrences = records(on: selectedDate)
+        let nextSignature = Self.birthdaySignature(for: snapshot.profiles)
+        guard nextSignature != birthdayRecordSignature else { return }
+        birthdayRecordSignature = nextSignature
+        dataGeneration += 1
+        scheduleDerivedDataRebuild(message: "Calculating birthdays")
     }
 
-    private func visibleMonthDays() -> [Date] {
-        let calendar = Calendar.current
-        guard let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: visibleMonth)) else {
-            return []
+    private func observeContactsChanges() {
+        contactsChangeObserver = NotificationCenter.default.addObserver(
+            forName: ContactSyncService.didChangeNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.scheduleContactsRefreshFromExternalChange()
+            }
         }
-        let weekday = calendar.component(.weekday, from: startOfMonth) - 1
-        guard let start = calendar.date(byAdding: .day, value: -weekday, to: startOfMonth) else {
-            return []
-        }
-        let daysInMonth = calendar.range(of: .day, in: .month, for: startOfMonth)?.count ?? 31
-        let cells = Int(ceil(Double(weekday + daysInMonth) / 7.0)) * 7
-        return (0..<cells).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
     }
 
-    private func dayKey(_ date: Date) -> Date {
-        Calendar.current.startOfDay(for: date)
+    private func scheduleContactsRefreshFromExternalChange() {
+        guard permissionState == .authorized || permissionState == .limited else { return }
+        contactsRefreshTask?.cancel()
+        contactsRefreshTask = Task {
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            guard !Task.isCancelled else { return }
+            await refreshContacts()
+        }
+    }
+
+    private static func birthdaySignature(for profiles: [ContactBirthdayProfile]) -> Int {
+        var hasher = Hasher()
+        for profile in profiles {
+            for record in profile.records {
+                hasher.combine(record.id)
+                hasher.combine(record.contactName)
+                hasher.combine(record.organizationName)
+                hasher.combine(record.kind)
+                hasher.combine(record.year)
+                hasher.combine(record.month)
+                hasher.combine(record.day)
+                hasher.combine(record.isLeapMonth)
+            }
+        }
+        return hasher.finalize()
     }
 
     func refreshContacts() async {
-        permissionState = contactsRepository.authorizationStatus
-        guard permissionState == .authorized else {
+        permissionState = contactSyncService.authorizationStatus
+        guard permissionState == .authorized || permissionState == .limited else {
             selection = .permissions
             return
         }
 
         isLoading = true
+        let progressRequestID = derivedRequestID
+        startCalculationProgress(message: "Reading macOS Contacts")
         defer { isLoading = false }
 
         do {
-            profiles = try contactsRepository.fetchProfiles()
-            if selectedContactID == nil {
-                selectedContactID = profiles.first?.id
+            let snapshot = try await contactSyncService.refreshSnapshot(fieldAccessLevel: contactFieldAccessLevel)
+            applyContactSnapshot(snapshot)
+            if derivedRequestID == progressRequestID {
+                finishCalculationProgress(requestID: progressRequestID)
             }
             if selection == .permissions {
                 selection = .calendar
             }
         } catch {
+            if derivedRequestID == progressRequestID {
+                finishCalculationProgress(requestID: progressRequestID)
+            }
             errorMessage = error.localizedDescription
         }
     }
 
     func requestContactsAccess() async {
         do {
-            _ = try await contactsRepository.requestAccess()
+            _ = try await contactSyncService.requestAccess()
             await refreshContacts()
         } catch {
             errorMessage = error.localizedDescription
@@ -224,23 +337,47 @@ final class BirthdayAppModel {
     }
 
     func records(on date: Date) -> [BirthdayOccurrence] {
-        let key = dayKey(date)
-        return visibleOccurrencesByDay[key] ?? resolver.occurrences(on: date, records: allRecords)
+        cachedRecords(on: date)
     }
 
     func filteredRecords(on date: Date) -> [BirthdayOccurrence] {
         let key = dayKey(date)
-        if let occurrences = visibleFilteredOccurrencesByDay[key] {
-            return occurrences
-        }
-        let occurrences = records(on: date)
-        return searchText.isEmpty
-            ? occurrences
-            : occurrences.filter { $0.record.contactName.localizedCaseInsensitiveContains(searchText) }
+        return visibleFilteredOccurrencesByDay[key] ?? []
     }
 
-    func upcomingOccurrences() -> [BirthdayOccurrence] {
-        cachedUpcomingOccurrences
+    private func cachedRecords(on date: Date) -> [BirthdayOccurrence] {
+        visibleOccurrencesByDay[dayKey(date)] ?? []
+    }
+
+    private func dayKey(_ date: Date) -> Date {
+        Calendar.current.startOfDay(for: date)
+    }
+
+    private func rebuildContactProjection() {
+        let projection = contactListProjection.snapshot(
+            profiles: profiles,
+            grouping: contactGrouping,
+            selectedCollectionID: selectedContactCollectionID,
+            searchText: contactSearchText,
+            language: language,
+            noBirthdaysText: l10n(.noBirthdays),
+            todayText: l10n(.today),
+            upcomingOccurrencesByContactID: Dictionary(
+                cachedUpcomingOccurrences.map { ($0.record.contactID, $0) },
+                uniquingKeysWith: { lhs, rhs in lhs.date <= rhs.date ? lhs : rhs }
+            )
+        )
+        contactCollectionSections = projection.collectionSections
+        contactListSections = projection.contactSections
+        visibleContactCount = projection.visibleContactCount
+        let visibleIDs = projection.contactSections.flatMap { $0.rows.map(\.id) }
+        filteredProfiles = visibleIDs.compactMap { profileByID[$0] }
+    }
+
+    private func loadCachedContactSnapshot() async {
+        guard let snapshot = await contactSyncService.cachedSnapshot(fieldAccessLevel: contactFieldAccessLevel) else { return }
+        guard profiles.isEmpty else { return }
+        applyContactSnapshot(snapshot)
     }
 
     func scheduleSave(contactID: String, draft: BirthdayEditDraft) {
@@ -255,7 +392,7 @@ final class BirthdayAppModel {
 
     func save(contactID: String, payload: BirthdayEditPayload) async {
         do {
-            try contactsRepository.saveBirthdays(contactID: contactID, payload: payload)
+            try await contactSyncService.saveBirthdays(contactID: contactID, payload: payload)
             toast(L10n(language: language)(.written))
             await refreshContacts()
         } catch {
@@ -321,6 +458,15 @@ final class BirthdayAppModel {
                 toastMessage = nil
             }
         }
+    }
+
+    private static func loadContactFieldAccessLevel() -> ContactFieldAccessLevel {
+        let rawValue = UserDefaults.standard.string(forKey: "contactFieldAccessLevel") ?? ""
+        return ContactFieldAccessLevel(rawValue: rawValue) ?? .birthdayOnly
+    }
+
+    private static func saveContactFieldAccessLevel(_ level: ContactFieldAccessLevel) {
+        UserDefaults.standard.set(level.rawValue, forKey: "contactFieldAccessLevel")
     }
 }
 

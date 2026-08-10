@@ -11,19 +11,6 @@ struct PermissionsSettingsView: View {
         @Bindable var model = model
 
         VStack(spacing: 0) {
-            HStack {
-                Text(model.l10n(.permissions))
-                    .font(.system(size: 19, weight: .black))
-                    .tracking(0.4)
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 13)
-
-            Rectangle()
-                .fill(BirthdayTheme.separator(colorScheme))
-                .frame(height: 1)
-
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     settingsCard(title: model.l10n(.contacts)) {
@@ -53,6 +40,26 @@ struct PermissionsSettingsView: View {
                                 Stepper("\(model.upcomingRange)d", value: $model.upcomingRange, in: 7...120, step: 7)
                                     .frame(width: 140)
                             }
+                        }
+                    }
+
+                    settingsCard(title: model.l10n(.contactFieldAccess)) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            settingsRow(
+                                title: model.l10n(.extendedContactFields),
+                                detail: model.extendedContactFieldsEnabled ? model.l10n(.extendedContactFieldsEnabled) : model.l10n(.basicContactFields)
+                            ) {
+                                Toggle("", isOn: Binding(
+                                    get: { model.extendedContactFieldsEnabled },
+                                    set: { model.extendedContactFieldsEnabled = $0 }
+                                ))
+                                .labelsHidden()
+                                .toggleStyle(.switch)
+                            }
+                            Text(model.l10n(.extendedContactFieldsBody))
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(BirthdayTheme.inkSecondary)
+                                .lineSpacing(3)
                         }
                     }
 
@@ -129,7 +136,7 @@ struct PermissionsSettingsView: View {
 
     @ViewBuilder
     private var permissionHero: some View {
-        if model.permissionState == .authorized {
+        if model.permissionState == .authorized || model.permissionState == .limited {
             VStack(alignment: .leading, spacing: 10) {
                 Label(model.l10n(.permissionGranted), systemImage: "checkmark.seal.fill")
                     .font(.system(size: 13.5, weight: .bold))

@@ -3,26 +3,21 @@ import SwiftUI
 
 // MARK: - Calendar dashboard
 
+enum CalendarDisplayMode: String, CaseIterable, Identifiable {
+    case month
+    case upcoming
+    var id: String { rawValue }
+}
+
 struct CalendarDashboardView: View {
     @Environment(BirthdayAppModel.self) private var model
     @Environment(\.colorScheme) private var colorScheme
-    @State private var mode = CalendarMode.month
-
-    private enum CalendarMode: String, CaseIterable, Identifiable {
-        case month
-        case upcoming
-        var id: String { rawValue }
-    }
+    @Binding var mode: CalendarDisplayMode
 
     var body: some View {
         @Bindable var model = model
 
         VStack(spacing: 0) {
-            toolbar
-            Rectangle()
-                .fill(BirthdayTheme.separator(colorScheme))
-                .frame(height: 1)
-
             if mode == .month {
                 HStack(spacing: 0) {
                     MonthGridView()
@@ -38,95 +33,6 @@ struct CalendarDashboardView: View {
         }
         .background(BirthdayTheme.windowBackground(colorScheme))
     }
-
-    private var toolbar: some View {
-        @Bindable var model = model
-
-        return HStack(spacing: 12) {
-            Text(monthTitle(model.visibleMonth))
-                .font(.system(size: 19, weight: .black))
-                .tracking(0.4)
-                .frame(minWidth: 112, alignment: .leading)
-                .contentTransition(.numericText())
-
-            HStack(spacing: 8) {
-                Button {
-                    model.visibleMonth = Calendar.current.date(byAdding: .month, value: -1, to: model.visibleMonth) ?? model.visibleMonth
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 11, weight: .bold))
-                }
-                .help(model.l10n(.previousMonth))
-                .accessibilityLabel(model.l10n(.previousMonth))
-                .accessibilityHint(model.l10n(.navigateToPreviousMonth))
-                .mcmButtonStyle()
-
-                Button {
-                    model.visibleMonth = Calendar.current.date(byAdding: .month, value: 1, to: model.visibleMonth) ?? model.visibleMonth
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .bold))
-                }
-                .help(model.l10n(.nextMonth))
-                .accessibilityLabel(model.l10n(.nextMonth))
-                .accessibilityHint(model.l10n(.navigateToNextMonth))
-                .mcmButtonStyle()
-            }
-
-            Button(model.l10n(.today)) {
-                model.visibleMonth = Date()
-                model.selectedDate = Date()
-            }
-            .font(.system(size: 12.5, weight: .bold))
-            .mcmButtonStyle()
-
-            Spacer()
-
-            Image(systemName: "atom")
-                .font(.system(size: 27, weight: .light))
-                .foregroundStyle(BirthdayTheme.inkSecondary.opacity(0.16))
-                .frame(width: 50)
-
-            Picker("", selection: $mode) {
-                Text(model.l10n(.month)).tag(CalendarMode.month)
-                Text(model.l10n(.upcoming)).tag(CalendarMode.upcoming)
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 132)
-
-            Button {
-                Task { await model.refreshContacts() }
-            } label: {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 11, weight: .bold))
-            }
-            .help(model.l10n(.refreshContacts))
-            .accessibilityLabel(model.l10n(.refreshContacts))
-            .mcmButtonStyle()
-
-            TextField(model.l10n(.search), text: $model.searchText)
-                .textFieldStyle(.plain)
-                .font(.system(size: 12.5, weight: .medium))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .frame(width: 180)
-                .background(BirthdayTheme.controlBackground(colorScheme), in: RoundedRectangle(cornerRadius: BirthdayTheme.controlCorner))
-                .overlay(
-                    RoundedRectangle(cornerRadius: BirthdayTheme.controlCorner)
-                        .strokeBorder(BirthdayTheme.separator(colorScheme))
-                )
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 13)
-        .background(BirthdayTheme.windowBackground(colorScheme))
-    }
-
-    private func monthTitle(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: model.language.coreLocale.rawValue)
-        formatter.dateFormat = model.language.coreLocale == .english ? "MMMM yyyy" : "yyyy年M月"
-        return formatter.string(from: date)
-    }
 }
 
 struct MonthGridView: View {
@@ -137,7 +43,7 @@ struct MonthGridView: View {
     var body: some View {
         VStack(spacing: 0) {
             LazyVGrid(columns: Self.columns, spacing: 6) {
-                ForEach(weekdaySymbols, id: \.self) { symbol in
+                ForEach(model.weekdaySymbols, id: \.self) { symbol in
                     Text(symbol)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(BirthdayTheme.inkTertiary)
@@ -151,8 +57,13 @@ struct MonthGridView: View {
 
             ScrollView {
                 LazyVGrid(columns: Self.columns, spacing: 6) {
-                    ForEach(monthDays, id: \.self) { date in
-                        CalendarDayCell(date: date, inDisplayedMonth: isInDisplayedMonth(date))
+                    ForEach(model.visibleMonthDates, id: \.self) { date in
+                        CalendarDayCell(
+                            date: date,
+                            occurrences: model.filteredRecords(on: date),
+                            inDisplayedMonth: isInDisplayedMonth(date),
+                            isSelected: Calendar.current.isDate(model.selectedDate, inSameDayAs: date)
+                        )
                             .frame(minHeight: 94)
                     }
                 }
@@ -161,26 +72,6 @@ struct MonthGridView: View {
             }
         }
         .background(BirthdayTheme.windowBackground(colorScheme))
-    }
-
-    private var weekdaySymbols: [String] {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: model.language.coreLocale.rawValue)
-        return formatter.shortStandaloneWeekdaySymbols
-    }
-
-    private var monthDays: [Date] {
-        let calendar = Calendar.current
-        guard let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: model.visibleMonth)) else {
-            return []
-        }
-        let weekday = calendar.component(.weekday, from: startOfMonth) - 1
-        guard let start = calendar.date(byAdding: .day, value: -weekday, to: startOfMonth) else {
-            return []
-        }
-        let daysInMonth = calendar.range(of: .day, in: .month, for: startOfMonth)?.count ?? 31
-        let cells = Int(ceil(Double(weekday + daysInMonth) / 7.0)) * 7
-        return (0..<cells).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
     }
 
     private func isInDisplayedMonth(_ date: Date) -> Bool {
@@ -192,14 +83,13 @@ struct CalendarDayCell: View {
     @Environment(BirthdayAppModel.self) private var model
     @Environment(\.colorScheme) private var colorScheme
     let date: Date
+    let occurrences: [BirthdayOccurrence]
     let inDisplayedMonth: Bool
+    let isSelected: Bool
 
     private var isToday: Bool { Calendar.current.isDateInToday(date) }
-    private var isSelected: Bool { Calendar.current.isDate(model.selectedDate, inSameDayAs: date) }
 
     var body: some View {
-        let occurrences = model.filteredRecords(on: date)
-
         Button {
             model.selectedDate = date
         } label: {
@@ -254,7 +144,7 @@ struct CalendarDayCell: View {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: model.language.coreLocale.rawValue)
         formatter.dateStyle = .full
-        let count = model.filteredRecords(on: date).count
+        let count = occurrences.count
         if count == 0 { return formatter.string(from: date) }
         return "\(formatter.string(from: date)), \(count)"
     }
@@ -410,7 +300,7 @@ struct UpcomingBirthdaysView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let occurrences = model.upcomingOccurrences()
+        let occurrences = model.cachedUpcomingOccurrences
 
         if occurrences.isEmpty {
             ContentUnavailableView(model.l10n(.noBirthdays), systemImage: "calendar.badge.exclamationmark")

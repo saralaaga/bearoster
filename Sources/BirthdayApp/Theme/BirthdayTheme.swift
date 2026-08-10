@@ -4,18 +4,18 @@ import SwiftUI
 // MARK: - Theme
 
 enum BirthdayTheme {
-    static let brandPrimary = Color(hex: 0xE8683C)
-    static let brandSecondary = Color(hex: 0xF2A65A)
-    static let calendarGregorian = Color(hex: 0xE8883C)
-    static let calendarLunar = Color(hex: 0xD64541)
-    static let calendarHebrew = Color(hex: 0x7D9BA8)
-    static let calendarIslamic = Color(hex: 0x4A7C59)
-    static let mustard = Color(hex: 0xD4A574)
-    static let walnut = Color(hex: 0x6B5D4F)
-    static let teak = Color(hex: 0x8B7355)
-    static let ink = Color(hex: 0x2C2416)
-    static let inkSecondary = Color(hex: 0x594A40)
-    static let inkTertiary = Color(hex: 0x6B5D4F)
+    static let brandPrimary = Color(hex: 0x007AFF)
+    static let brandSecondary = Color(hex: 0x34C759)
+    static let calendarGregorian = Color(hex: 0x007AFF)
+    static let calendarLunar = Color(hex: 0xFF3B30)
+    static let calendarHebrew = Color(hex: 0x5856D6)
+    static let calendarIslamic = Color(hex: 0x34C759)
+    static let mustard = Color(hex: 0xFF9500)
+    static let walnut = Color(hex: 0x8E8E93)
+    static let teak = Color(hex: 0x636366)
+    static let ink = Color.primary
+    static let inkSecondary = Color.secondary
+    static let inkTertiary = Color.secondary.opacity(0.78)
 
     static let accent = brandPrimary
     static let olive = calendarIslamic
@@ -26,6 +26,7 @@ enum BirthdayTheme {
 
     enum Layout {
         static let sidebarWidth: CGFloat = 224
+        static let sidebarCollapsedWidth: CGFloat = 64
         static let dayDetailWidth: CGFloat = 296
         static let contactListWidth: CGFloat = 260
         static let minWindowWidth: CGFloat = 1100
@@ -50,35 +51,35 @@ enum BirthdayTheme {
     }
 
     static func pageBackground(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(red: 0.12, green: 0.09, blue: 0.06) : Color(red: 0.91, green: 0.84, blue: 0.74)
+        scheme == .dark ? Color(nsColor: .underPageBackgroundColor) : Color(hex: 0xF5F5F7)
     }
 
     static func windowBackground(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(red: 0.17, green: 0.14, blue: 0.09) : Color(red: 0.96, green: 0.90, blue: 0.83)
+        scheme == .dark ? Color(nsColor: .windowBackgroundColor) : Color.white
     }
 
     static func sidebarBackground(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(red: 0.15, green: 0.12, blue: 0.07) : Color(red: 0.94, green: 0.88, blue: 0.78)
+        scheme == .dark ? Color(nsColor: .underPageBackgroundColor) : Color(hex: 0xF2F2F7)
     }
 
     static func cardBackground(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(red: 0.23, green: 0.20, blue: 0.13) : .white
+        scheme == .dark ? Color(nsColor: .controlBackgroundColor) : .white
     }
 
     static func controlBackground(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(red: 0.27, green: 0.23, blue: 0.16) : .white
+        scheme == .dark ? Color.white.opacity(0.08) : .white
     }
 
     static func separator(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color.white.opacity(0.14) : walnut.opacity(0.22)
+        scheme == .dark ? Color.white.opacity(0.13) : Color.black.opacity(0.10)
     }
 
     static func selectedFill(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? brandPrimary.opacity(0.20) : brandPrimary.opacity(0.13)
+        brandPrimary
     }
 
     static func hoverFill(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color.white.opacity(0.07) : walnut.opacity(0.07)
+        scheme == .dark ? Color.white.opacity(0.07) : Color.black.opacity(0.06)
     }
 }
 
@@ -103,8 +104,18 @@ private struct MCMCardStyle: ViewModifier {
                 RoundedRectangle(cornerRadius: BirthdayTheme.cardCorner)
                     .strokeBorder(BirthdayTheme.separator(colorScheme))
             )
-            .shadow(color: .black.opacity(colorScheme == .dark ? 0.20 : 0.07), radius: 9, y: 2)
-            .shadow(color: .black.opacity(colorScheme == .dark ? 0.12 : 0.04), radius: 18, y: 8)
+            // Emil: 双层阴影系统 - 扩散层 + 清晰层
+            // 真实物体的阴影有两部分：模糊的环境光遮挡 + 清晰的直接投影
+            .shadow(
+                color: .black.opacity(colorScheme == .dark ? 0.15 : 0.04),
+                radius: 12,
+                y: 4
+            )
+            .shadow(
+                color: .black.opacity(colorScheme == .dark ? 0.10 : 0.02),
+                radius: 2,
+                y: 1
+            )
     }
 }
 

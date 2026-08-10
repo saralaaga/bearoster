@@ -26,12 +26,17 @@ let package = Package(
                 .linkedFramework("SwiftUI"),
                 .linkedFramework("AppKit"),
                 .linkedFramework("Speech"),
-                .linkedFramework("AVFoundation")
+                .linkedFramework("AVFoundation"),
+                .linkedLibrary("sqlite3")
             ]
         ),
         .testTarget(
             name: "BirthdayCoreTests",
             dependencies: ["BirthdayCore"]
+        ),
+        .testTarget(
+            name: "BirthdayAppTests",
+            dependencies: ["BirthdayApp"]
         )
     ]
 )

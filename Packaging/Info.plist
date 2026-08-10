@@ -26,6 +26,8 @@
   <string>Birthday reads and writes birthdays directly in macOS Contacts.</string>
   <key>NSMicrophoneUsageDescription</key>
   <string>Birthday uses the microphone only when you start voice date input.</string>
+  <key>NSQuitAlwaysKeepsWindows</key>
+  <false/>
   <key>NSSpeechRecognitionUsageDescription</key>
   <string>Birthday uses speech recognition to convert spoken birthday dates into calendar dates.</string>
   <key>NSPrincipalClass</key>
