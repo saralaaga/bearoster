@@ -61,7 +61,7 @@ struct ContactListProjectionService: Sendable {
                 )
             }
             .sorted { lhs, rhs in
-                let sectionOrder = sectionSortValue(lhs.sectionKey) < sectionSortValue(rhs.sectionKey)
+                let sectionOrder = NameSortKey.sectionSortValue(lhs.sectionKey) < NameSortKey.sectionSortValue(rhs.sectionKey)
                 if lhs.sectionKey != rhs.sectionKey {
                     return sectionOrder
                 }
@@ -73,7 +73,7 @@ struct ContactListProjectionService: Sendable {
             }
 
         let groupedRows = Dictionary(grouping: rows, by: \.sectionKey)
-        let sections = groupedRows.keys.sorted(by: sectionSortValue(_:_:)).map { key in
+        let sections = groupedRows.keys.sorted(by: NameSortKey.sectionSortValue(_:_:)).map { key in
             ContactListSectionModel(
                 id: key,
                 title: key,
@@ -98,7 +98,7 @@ struct ContactListProjectionService: Sendable {
         let firstRecord = profile.records.first
         let daysUntil = upcomingOccurrence.map { BirthdayOccurrenceResolver().daysUntil($0.date) }
         let locale = language.coreLocale
-        let sortKey = romanizedSortKey(for: profile.displayName)
+        let sortKey = NameSortKey.romanized(profile.displayName)
         return ContactListRowModel(
             id: profile.id,
             displayName: profile.displayName,
@@ -112,7 +112,7 @@ struct ContactListProjectionService: Sendable {
             daysUntilText: daysUntil.map { $0 == 0 ? todayText : daysLeftText($0, locale: locale) },
             nextBirthdayText: upcomingOccurrence.map { formatter.occurrenceDate($0.date, locale: locale) },
             ageText: upcomingOccurrence?.age.map { ageText($0, locale: locale) },
-            sectionKey: sectionKey(for: sortKey),
+            sectionKey: NameSortKey.sectionKey(for: sortKey),
             sortKey: sortKey
         )
     }
@@ -148,31 +148,6 @@ struct ContactListProjectionService: Sendable {
         }
 
         return sections
-    }
-
-    private func romanizedSortKey(for value: String) -> String {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return "#" }
-        let mutable = NSMutableString(string: trimmed) as CFMutableString
-        CFStringTransform(mutable, nil, kCFStringTransformToLatin, false)
-        CFStringTransform(mutable, nil, kCFStringTransformStripCombiningMarks, false)
-        return (mutable as String).uppercased()
-    }
-
-    private func sectionKey(for sortKey: String) -> String {
-        guard let first = sortKey.first else { return "#" }
-        let letter = String(first)
-        return letter.range(of: "[A-Z]", options: .regularExpression) == nil ? "#" : letter
-    }
-
-    private func sectionSortValue(_ key: String) -> Int {
-        if key == "#" { return Int.max }
-        guard let scalar = key.unicodeScalars.first else { return Int.max }
-        return Int(scalar.value)
-    }
-
-    private func sectionSortValue(_ lhs: String, _ rhs: String) -> Bool {
-        sectionSortValue(lhs) < sectionSortValue(rhs)
     }
 
     private func shortKindName(

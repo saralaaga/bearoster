@@ -82,6 +82,20 @@ public final class ContactsRepository: @unchecked Sendable {
         }
     }
 
+    public func deleteContacts(contactIDs: [String]) async throws {
+        let store = store
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    try Self.deleteContactsSync(store: store, contactIDs: contactIDs)
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
     private static func mapAuthorization(_ status: CNAuthorizationStatus) -> ContactsPermissionState {
         switch status {
         case .notDetermined: return .notDetermined
@@ -151,6 +165,24 @@ public final class ContactsRepository: @unchecked Sendable {
         try store.execute(saveRequest)
     }
 
+    private static func deleteContactsSync(store: CNContactStore, contactIDs: [String]) throws {
+        guard canReadContacts else {
+            throw ContactsRepositoryError.permissionDenied
+        }
+        guard !contactIDs.isEmpty else { return }
+
+        let saveRequest = CNSaveRequest()
+        for contactID in contactIDs {
+            let contact = try store.unifiedContact(
+                withIdentifier: contactID,
+                keysToFetch: [CNContactIdentifierKey as CNKeyDescriptor]
+            )
+            guard let mutable = contact.mutableCopy() as? CNMutableContact else { continue }
+            saveRequest.delete(mutable)
+        }
+        try store.execute(saveRequest)
+    }
+
     private static func validate(_ components: DateComponents) throws {
         guard let month = components.month, let day = components.day,
               (1...13).contains(month), (1...31).contains(day)
@@ -173,7 +205,9 @@ public final class ContactsRepository: @unchecked Sendable {
                 contactName: name,
                 organizationName: contact.organizationName,
                 kind: .gregorian,
-                components: birthday
+                components: birthday,
+                source: .appleBirthday,
+                syncPolicy: .writeBackToApple
             ))
         }
 
@@ -184,7 +218,9 @@ public final class ContactsRepository: @unchecked Sendable {
                 contactName: name,
                 organizationName: contact.organizationName,
                 kind: kind,
-                components: alternate
+                components: alternate,
+                source: .appleNonGregorianBirthday,
+                syncPolicy: .writeBackToApple
             ))
         }
 

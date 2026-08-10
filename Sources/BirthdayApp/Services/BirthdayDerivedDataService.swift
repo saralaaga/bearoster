@@ -12,6 +12,7 @@ struct BirthdayVisibleMonthData: Sendable {
 
 struct BirthdayDerivedDataService: Sendable {
     private let resolver = BirthdayOccurrenceResolver()
+    private let formatter = CalendarFormattingService()
 
     func allRecords(from profiles: [ContactBirthdayProfile]) -> [BirthdayRecord] {
         profiles.flatMap(\.records)
@@ -51,17 +52,58 @@ struct BirthdayDerivedDataService: Sendable {
             records.sort { $0.kind.rawValue < $1.kind.rawValue }
         }
 
-        let occurrences = recordsWithOccurrences.compactMap(\.occurrence)
-            .sorted { lhs, rhs in
-                lhs.date == rhs.date ? lhs.record.contactName < rhs.record.contactName : lhs.date < rhs.date
-            }
+        let occurrences = sortedOccurrences(
+            recordsWithOccurrences.compactMap(\.occurrence),
+            sort: sort
+        )
         return (records, occurrences)
     }
 
     func recordGroups(
         from occurrences: [BirthdayOccurrence],
+        sort: BirthdaySort,
         locale: CalendarFormattingService.AppLocale
-    ) -> [BirthdayMonthGroup] {
+    ) -> [BirthdayRecordGroup] {
+        switch sort {
+        case .next:
+            return monthGroups(from: occurrences, locale: locale)
+        case .name:
+            return nameGroups(from: occurrences)
+        case .age:
+            return [
+                BirthdayRecordGroup(
+                    id: "age",
+                    title: sortTitle(sort, locale: locale),
+                    occurrences: occurrences
+                )
+            ]
+        case .calendar:
+            return calendarGroups(from: occurrences, locale: locale)
+        }
+    }
+
+    private func sortedOccurrences(
+        _ occurrences: [BirthdayOccurrence],
+        sort: BirthdaySort
+    ) -> [BirthdayOccurrence] {
+        occurrences.sorted { lhs, rhs in
+            switch sort {
+            case .next:
+                return compareByNextDate(lhs, rhs)
+            case .name:
+                return compareByName(lhs, rhs)
+            case .age:
+                return compareByAge(lhs, rhs)
+            case .calendar:
+                return compareByCalendar(lhs, rhs)
+            }
+        }
+    }
+
+    private func monthGroups(
+        from occurrences: [BirthdayOccurrence],
+        locale: CalendarFormattingService.AppLocale
+    ) -> [BirthdayRecordGroup] {
         let grouped = Dictionary(grouping: occurrences) { occurrence in
             let components = Calendar.current.dateComponents([.year, .month], from: occurrence.date)
             guard let year = components.year, let month = components.month else {
@@ -72,12 +114,100 @@ struct BirthdayDerivedDataService: Sendable {
 
         return grouped.keys.sorted().compactMap { key in
             guard let items = grouped[key], let first = items.first else { return nil }
-            return BirthdayMonthGroup(
+            return BirthdayRecordGroup(
                 id: key,
                 title: monthTitle(for: first.date, locale: locale),
                 occurrences: items
             )
         }
+    }
+
+    private func nameGroups(from occurrences: [BirthdayOccurrence]) -> [BirthdayRecordGroup] {
+        let grouped = Dictionary(grouping: occurrences) { occurrence in
+            NameSortKey.sectionKey(for: NameSortKey.romanized(occurrence.record.contactName))
+        }
+
+        return grouped.keys.sorted(by: NameSortKey.sectionSortValue(_:_:)).map { key in
+            BirthdayRecordGroup(id: "name-\(key)", title: key, occurrences: grouped[key] ?? [])
+        }
+    }
+
+    private func calendarGroups(
+        from occurrences: [BirthdayOccurrence],
+        locale: CalendarFormattingService.AppLocale
+    ) -> [BirthdayRecordGroup] {
+        let grouped = Dictionary(grouping: occurrences, by: \.record.kind)
+        return BirthdayCalendarKind.allCases.compactMap { kind in
+            guard let items = grouped[kind], !items.isEmpty else { return nil }
+            return BirthdayRecordGroup(
+                id: "calendar-\(kind.rawValue)",
+                title: formatter.calendarName(kind, locale: locale),
+                occurrences: items
+            )
+        }
+    }
+
+    private func sortTitle(_ sort: BirthdaySort, locale: CalendarFormattingService.AppLocale) -> String {
+        switch (sort, locale) {
+        case (.next, .english): "Next birthday"
+        case (.next, .simplifiedChinese): "最近生日"
+        case (.next, .traditionalChinese): "最近生日"
+        case (.name, .english): "Name"
+        case (.name, .simplifiedChinese): "姓名"
+        case (.name, .traditionalChinese): "姓名"
+        case (.age, .english): "Age"
+        case (.age, .simplifiedChinese): "年龄"
+        case (.age, .traditionalChinese): "年齡"
+        case (.calendar, .english): "Calendar"
+        case (.calendar, .simplifiedChinese): "历法"
+        case (.calendar, .traditionalChinese): "曆法"
+        }
+    }
+
+    private func compareByNextDate(_ lhs: BirthdayOccurrence, _ rhs: BirthdayOccurrence) -> Bool {
+        if lhs.date != rhs.date {
+            return lhs.date < rhs.date
+        }
+        return compareByName(lhs, rhs)
+    }
+
+    private func compareByName(_ lhs: BirthdayOccurrence, _ rhs: BirthdayOccurrence) -> Bool {
+        let lhsKey = NameSortKey.romanized(lhs.record.contactName)
+        let rhsKey = NameSortKey.romanized(rhs.record.contactName)
+        let comparison = lhsKey.localizedStandardCompare(rhsKey)
+        if comparison != .orderedSame {
+            return comparison == .orderedAscending
+        }
+        return compareByNextDateThenID(lhs, rhs)
+    }
+
+    private func compareByAge(_ lhs: BirthdayOccurrence, _ rhs: BirthdayOccurrence) -> Bool {
+        switch (lhs.age, rhs.age) {
+        case let (.some(lhsAge), .some(rhsAge)) where lhsAge != rhsAge:
+            return lhsAge > rhsAge
+        case (.some, .none):
+            return true
+        case (.none, .some):
+            return false
+        default:
+            return compareByNextDateThenID(lhs, rhs)
+        }
+    }
+
+    private func compareByCalendar(_ lhs: BirthdayOccurrence, _ rhs: BirthdayOccurrence) -> Bool {
+        let lhsIndex = BirthdayCalendarKind.allCases.firstIndex(of: lhs.record.kind) ?? BirthdayCalendarKind.allCases.endIndex
+        let rhsIndex = BirthdayCalendarKind.allCases.firstIndex(of: rhs.record.kind) ?? BirthdayCalendarKind.allCases.endIndex
+        if lhsIndex != rhsIndex {
+            return lhsIndex < rhsIndex
+        }
+        return compareByNextDate(lhs, rhs)
+    }
+
+    private func compareByNextDateThenID(_ lhs: BirthdayOccurrence, _ rhs: BirthdayOccurrence) -> Bool {
+        if lhs.date != rhs.date {
+            return lhs.date < rhs.date
+        }
+        return lhs.id < rhs.id
     }
 
     func upcomingOccurrences(

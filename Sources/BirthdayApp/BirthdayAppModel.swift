@@ -21,7 +21,7 @@ enum BirthdaySort: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
 }
 
-struct BirthdayMonthGroup: Identifiable, Hashable, Sendable {
+struct BirthdayRecordGroup: Identifiable, Hashable, Sendable {
     let id: String
     let title: String
     let occurrences: [BirthdayOccurrence]
@@ -83,11 +83,14 @@ final class BirthdayAppModel {
     var voiceText = ""
     var voiceResult: String?
     var isListening = false
+    var isContactSelectionMode = false
+    var selectedContactIDsForDeletion: Set<String> = []
+    var isDeletingContacts = false
 
     private(set) var allRecords: [BirthdayRecord] = []
     private(set) var filteredRecords: [BirthdayRecord] = []
     private(set) var filteredRecordOccurrences: [BirthdayOccurrence] = []
-    private(set) var filteredRecordGroups: [BirthdayMonthGroup] = []
+    private(set) var filteredRecordGroups: [BirthdayRecordGroup] = []
     private(set) var profiles: [ContactBirthdayProfile] = []
     private(set) var filteredProfiles: [ContactBirthdayProfile] = []
     private(set) var contactGrouping: ContactGroupingSnapshot = .empty
@@ -107,6 +110,7 @@ final class BirthdayAppModel {
     let parser = DatePhraseParser()
 
     private let contactSyncService = ContactSyncService()
+    private let localBirthdayStore = LocalBirthdayStore()
     private let derivedDataWorker = BirthdayDerivedDataWorker()
     private let contactListProjection = ContactListProjectionService()
     private let voiceInput = VoiceInputService()
@@ -117,6 +121,7 @@ final class BirthdayAppModel {
     private var dataGeneration = 0
     private var derivedRequestID = 0
     private var profileByID: [String: ContactBirthdayProfile] = [:]
+    private var localDateSpecsByPersonID: [String: [BirthdayDateSpec]] = [:]
     private var birthdayRecordSignature = 0
     private var calculationStartedAt: Date?
     private var visibleOccurrencesByDay: [Date: [BirthdayOccurrence]] = [:]
@@ -131,12 +136,18 @@ final class BirthdayAppModel {
     init() {
         observeContactsChanges()
         scheduleDerivedDataRebuild(message: "Preparing birthdays")
+        Task { await loadLocalBirthdaySpecs() }
         Task { await loadCachedContactSnapshot() }
     }
 
     var selectedProfile: ContactBirthdayProfile? {
+        guard !isContactSelectionMode else { return nil }
         guard let selectedContactID else { return filteredProfiles.first }
         return profileByID[selectedContactID]
+    }
+
+    var selectedContactDeletionCount: Int {
+        selectedContactIDsForDeletion.count
     }
 
     private func scheduleDerivedDataRebuild(message: String, debounceNanoseconds: UInt64 = 0) {
@@ -224,8 +235,9 @@ final class BirthdayAppModel {
     }
 
     private func applyContactSnapshot(_ snapshot: ContactDataSnapshot) {
-        profiles = snapshot.profiles
-        profileByID = Dictionary(uniqueKeysWithValues: snapshot.profiles.map { ($0.id, $0) })
+        let mergedProfiles = profilesByApplyingLocalSpecs(to: snapshot.profiles)
+        profiles = mergedProfiles
+        profileByID = Dictionary(uniqueKeysWithValues: mergedProfiles.map { ($0.id, $0) })
         contactGrouping = snapshot.grouping
         extendedProfilesByID = snapshot.extendedProfilesByID
         if contactGrouping.contactIDsByCollectionID[selectedContactCollectionID] == nil {
@@ -239,11 +251,28 @@ final class BirthdayAppModel {
             selectedContactID = filteredProfiles.first?.id ?? snapshot.profiles.first?.id
         }
 
-        let nextSignature = Self.birthdaySignature(for: snapshot.profiles)
+        let nextSignature = Self.birthdaySignature(for: mergedProfiles)
         guard nextSignature != birthdayRecordSignature else { return }
         birthdayRecordSignature = nextSignature
         dataGeneration += 1
         scheduleDerivedDataRebuild(message: "Calculating birthdays")
+    }
+
+    private func profilesByApplyingLocalSpecs(to profiles: [ContactBirthdayProfile]) -> [ContactBirthdayProfile] {
+        profiles.map { profile in
+            var merged = profile
+            let localSpecs = localDateSpecsByPersonID[profile.id] ?? []
+            let localSpecIDs = Set(localSpecs.map(\.id))
+            let appleRecords = profile.records.filter { !localSpecIDs.contains($0.id) }
+            let localRecords = localSpecs.map { BirthdayRecord(person: profile.person, dateSpec: $0) }
+            merged.records = (appleRecords + localRecords).sorted { lhs, rhs in
+                if lhs.kind != rhs.kind {
+                    return lhs.kind.rawValue < rhs.kind.rawValue
+                }
+                return lhs.id < rhs.id
+            }
+            return merged
+        }
     }
 
     private func observeContactsChanges() {
@@ -372,6 +401,7 @@ final class BirthdayAppModel {
         visibleContactCount = projection.visibleContactCount
         let visibleIDs = projection.contactSections.flatMap { $0.rows.map(\.id) }
         filteredProfiles = visibleIDs.compactMap { profileByID[$0] }
+        selectedContactIDsForDeletion.formIntersection(Set(visibleIDs))
     }
 
     private func loadCachedContactSnapshot() async {
@@ -380,8 +410,20 @@ final class BirthdayAppModel {
         applyContactSnapshot(snapshot)
     }
 
+    private func loadLocalBirthdaySpecs() async {
+        let specsByPersonID = await localBirthdayStore.loadAll()
+        await MainActor.run {
+            self.localDateSpecsByPersonID = specsByPersonID
+            guard !self.profiles.isEmpty else { return }
+            self.profiles = self.profilesByApplyingLocalSpecs(to: self.profiles)
+            self.profileByID = Dictionary(uniqueKeysWithValues: self.profiles.map { ($0.id, $0) })
+            self.rebuildContactProjection()
+            self.scheduleDerivedDataRebuild(message: "Calculating birthdays")
+        }
+    }
+
     func scheduleSave(contactID: String, draft: BirthdayEditDraft) {
-        guard let payload = draft.payload else { return }
+        guard let payload = draft.payload(personID: contactID) else { return }
         saveTask?.cancel()
         saveTask = Task {
             try? await Task.sleep(for: .milliseconds(650))
@@ -392,11 +434,59 @@ final class BirthdayAppModel {
 
     func save(contactID: String, payload: BirthdayEditPayload) async {
         do {
+            await localBirthdayStore.saveLocalOnlySpecs(payload.localOnlyDateSpecs, for: contactID)
+            localDateSpecsByPersonID[contactID] = payload.localOnlyDateSpecs
             try await contactSyncService.saveBirthdays(contactID: contactID, payload: payload)
             toast(L10n(language: language)(.written))
             await refreshContacts()
         } catch {
             errorMessage = L10n(language: language)(.saveFailed)
+        }
+    }
+
+    func enterContactSelectionMode() {
+        isContactSelectionMode = true
+        selectedContactIDsForDeletion = []
+    }
+
+    func exitContactSelectionMode() {
+        isContactSelectionMode = false
+        selectedContactIDsForDeletion = []
+    }
+
+    func toggleContactDeletionSelection(_ contactID: String) {
+        if selectedContactIDsForDeletion.contains(contactID) {
+            selectedContactIDsForDeletion.remove(contactID)
+        } else {
+            selectedContactIDsForDeletion.insert(contactID)
+        }
+    }
+
+    func selectAllVisibleContactsForDeletion() {
+        selectedContactIDsForDeletion = Set(contactListSections.flatMap { $0.rows.map(\.id) })
+    }
+
+    func deleteSelectedContacts() async {
+        let contactIDs = selectedContactIDsForDeletion
+        guard !contactIDs.isEmpty, !isDeletingContacts else { return }
+
+        isDeletingContacts = true
+        defer { isDeletingContacts = false }
+
+        do {
+            try await contactSyncService.deleteContacts(contactIDs: Array(contactIDs))
+            await localBirthdayStore.deleteLocalOnlySpecs(for: contactIDs)
+            for contactID in contactIDs {
+                localDateSpecsByPersonID[contactID] = nil
+            }
+            if let selectedContactID, contactIDs.contains(selectedContactID) {
+                self.selectedContactID = nil
+            }
+            exitContactSelectionMode()
+            toast(L10n(language: language)(.contactsDeleted))
+            await refreshContacts()
+        } catch {
+            errorMessage = L10n(language: language)(.deleteContactsFailed)
         }
     }
 
@@ -471,75 +561,84 @@ final class BirthdayAppModel {
 }
 
 struct BirthdayEditDraft: Equatable {
-    var gregorianYear = ""
-    var gregorianMonth = ""
-    var gregorianDay = ""
-    var nonGregorianKind: BirthdayCalendarKind?
-    var nonGregorianYear = ""
-    var nonGregorianMonth = ""
-    var nonGregorianDay = ""
-    var isLeapMonth = false
+    var entries: [BirthdayEditEntry]
 
     init(profile: ContactBirthdayProfile) {
-        let gregorian = profile.records.first { $0.kind == .gregorian }
-        gregorianYear = gregorian?.year.map(String.init) ?? ""
-        gregorianMonth = gregorian?.month.map(String.init) ?? ""
-        gregorianDay = gregorian?.day.map(String.init) ?? ""
-
-        let alternate = profile.records.first { $0.kind != .gregorian }
-        nonGregorianKind = alternate?.kind
-        nonGregorianYear = alternate?.year.map(String.init) ?? ""
-        nonGregorianMonth = alternate?.month.map(String.init) ?? ""
-        nonGregorianDay = alternate?.day.map(String.init) ?? ""
-        isLeapMonth = alternate?.isLeapMonth ?? false
+        entries = profile.records.map(BirthdayEditEntry.init(record:))
     }
 
-    var payload: BirthdayEditPayload? {
-        guard case let .valid(gregorian) = parsedComponents(year: gregorianYear, month: gregorianMonth, day: gregorianDay, kind: .gregorian),
-              let alternate = alternatePayload
-        else {
+    mutating func addEntry(personID: String, kind: BirthdayCalendarKind = .gregorian) {
+        entries.append(BirthdayEditEntry(personID: personID, kind: kind))
+    }
+
+    mutating func removeEntry(id: String) {
+        entries.removeAll { $0.id == id }
+    }
+
+    func payload(personID: String) -> BirthdayEditPayload? {
+        let parsed = entries.map { entry in
+            (entry: entry, spec: entry.dateSpec(personID: personID))
+        }
+        guard parsed.allSatisfy({ $0.spec != nil }) else {
             return nil
         }
+        let specs = parsed.compactMap(\.spec)
+
+        let appleGregorian = specs.first {
+            $0.source == .appleBirthday && $0.kind == .gregorian
+        }
+        let appleNonGregorian = specs.first {
+            $0.source == .appleNonGregorianBirthday && $0.kind != .gregorian
+        }
+        let appleSpecIDs = Set([appleGregorian?.id, appleNonGregorian?.id].compactMap { $0 })
+        let localOnlySpecs = specs.filter { !appleSpecIDs.contains($0.id) }
+
         return BirthdayEditPayload(
-            gregorian: gregorian,
-            nonGregorianKind: alternate.kind,
-            nonGregorian: alternate.components
+            gregorian: appleGregorian?.components,
+            nonGregorianKind: appleNonGregorian?.kind,
+            nonGregorian: appleNonGregorian?.components,
+            localOnlyDateSpecs: localOnlySpecs
         )
     }
+}
 
-    private var alternatePayload: (kind: BirthdayCalendarKind?, components: DateComponents?)? {
-        guard let nonGregorianKind else {
-            return (nil, nil)
+struct BirthdayEditEntry: Identifiable, Equatable {
+    var id: String
+    var kind: BirthdayCalendarKind
+    var year: String
+    var month: String
+    var day: String
+    var isLeapMonth: Bool
+    var source: BirthdayDateSpecSource
+
+    init(record: BirthdayRecord) {
+        id = record.id
+        kind = record.kind
+        year = record.year.map(String.init) ?? ""
+        month = record.month.map(String.init) ?? ""
+        day = record.day.map(String.init) ?? ""
+        isLeapMonth = record.isLeapMonth
+        if record.source == .local, !record.id.hasPrefix("local:") {
+            source = record.kind == .gregorian ? .appleBirthday : .appleNonGregorianBirthday
+        } else {
+            source = record.source
         }
-        guard case let .valid(components) = parsedComponents(
-            year: nonGregorianYear,
-            month: nonGregorianMonth,
-            day: nonGregorianDay,
-            kind: nonGregorianKind,
-            isLeapMonth: isLeapMonth
-        ) else { return nil }
-        return (nonGregorianKind, components)
     }
 
-    private enum ComponentParse {
-        case valid(DateComponents?)
-        case invalid
+    init(personID: String, kind: BirthdayCalendarKind) {
+        id = "local:\(personID):\(UUID().uuidString)"
+        self.kind = kind
+        year = ""
+        month = ""
+        day = ""
+        isLeapMonth = false
+        source = .local
     }
 
-    private func parsedComponents(
-        year: String,
-        month: String,
-        day: String,
-        kind: BirthdayCalendarKind,
-        isLeapMonth: Bool = false
-    ) -> ComponentParse {
-        if year.isEmpty, month.isEmpty, day.isEmpty {
-            return .valid(nil)
-        }
-
+    func dateSpec(personID: String) -> BirthdayDateSpec? {
         guard let monthValue = Int(month), let dayValue = Int(day),
               (1...13).contains(monthValue), (1...31).contains(dayValue)
-        else { return .invalid }
+        else { return nil }
 
         var value = DateComponents()
         value.calendar = Calendar(identifier: kind.calendarIdentifier)
@@ -549,6 +648,14 @@ struct BirthdayEditDraft: Equatable {
         if kind.supportsLeapMonth {
             value.isLeapMonth = isLeapMonth
         }
-        return .valid(value)
+
+        return BirthdayDateSpec(
+            id: id,
+            personID: personID,
+            kind: kind,
+            components: value,
+            source: source,
+            syncPolicy: source == .local ? .localOnly : .writeBackToApple
+        )
     }
 }

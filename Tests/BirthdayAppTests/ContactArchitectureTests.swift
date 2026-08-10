@@ -104,6 +104,82 @@ struct ContactArchitectureTests {
         #expect(Set(snapshot.contactSections.flatMap { $0.rows.map(\.id) }) == ["b", "c"])
     }
 
+    @Test("Birthday list age sort orders by computed occurrence age")
+    func birthdayListAgeSortUsesOccurrenceAge() throws {
+        let service = BirthdayDerivedDataService()
+        let now = try #require(gregorianDate(year: 2026, month: 8, day: 10))
+        let records = [
+            birthdayRecord(id: "younger", name: "Younger", year: 1995, month: 8, day: 20),
+            birthdayRecord(id: "unknown", name: "Unknown", year: nil, month: 8, day: 20),
+            birthdayRecord(id: "older", name: "Older", year: 1971, month: 8, day: 20)
+        ]
+
+        let filtered = service.filteredRecords(
+            from: records,
+            searchText: "",
+            filter: nil,
+            sort: .age,
+            now: now
+        )
+
+        #expect(filtered.occurrences.map(\.record.contactID) == ["older", "younger", "unknown"])
+        #expect(filtered.occurrences.map(\.age) == [55, 31, nil])
+    }
+
+    @Test("Birthday list name sort groups Chinese names by pinyin initial")
+    func birthdayListNameSortUsesPinyinSections() throws {
+        let service = BirthdayDerivedDataService()
+        let now = try #require(gregorianDate(year: 2026, month: 8, day: 10))
+        let records = [
+            birthdayRecord(id: "huang", name: "黄建秀", year: 1972, month: 9, day: 10),
+            birthdayRecord(id: "ada", name: "Ada", year: 1990, month: 8, day: 20)
+        ]
+
+        let filtered = service.filteredRecords(
+            from: records,
+            searchText: "",
+            filter: nil,
+            sort: .name,
+            now: now
+        )
+        let groups = service.recordGroups(
+            from: filtered.occurrences,
+            sort: .name,
+            locale: .simplifiedChinese
+        )
+
+        #expect(filtered.occurrences.map(\.record.contactID) == ["ada", "huang"])
+        #expect(groups.map(\.title) == ["A", "H"])
+        #expect(groups.last?.occurrences.first?.record.contactID == "huang")
+    }
+
+    @Test("Birthday list calendar sort groups by calendar kind")
+    func birthdayListCalendarSortGroupsByCalendarKind() throws {
+        let service = BirthdayDerivedDataService()
+        let now = try #require(gregorianDate(year: 2026, month: 8, day: 10))
+        let records = [
+            birthdayRecord(id: "lunar", name: "Lunar", kind: .chinese, year: 1971, month: 7, day: 8),
+            birthdayRecord(id: "gregorian", name: "Gregorian", kind: .gregorian, year: 1971, month: 8, day: 20)
+        ]
+
+        let filtered = service.filteredRecords(
+            from: records,
+            searchText: "",
+            filter: nil,
+            sort: .calendar,
+            now: now
+        )
+        let groups = service.recordGroups(
+            from: filtered.occurrences,
+            sort: .calendar,
+            locale: .simplifiedChinese
+        )
+
+        #expect(filtered.occurrences.map(\.record.kind) == [.gregorian, .chinese])
+        #expect(groups.map(\.title) == ["公历", "农历"])
+        #expect(groups.map { $0.occurrences.first?.record.contactID } == ["gregorian", "lunar"])
+    }
+
     @Test("SQLite cache keeps basic and extended snapshots separate")
     func contactSnapshotCacheSeparatesFieldAccessLevels() async {
         let databaseURL = FileManager.default.temporaryDirectory
@@ -124,5 +200,135 @@ struct ContactArchitectureTests {
 
         #expect(await cache.load(fieldAccessLevel: .birthdayOnly)?.profiles.first?.id == "basic")
         #expect(await cache.load(fieldAccessLevel: .extended)?.profiles.first?.id == "extended")
+    }
+
+    @Test("Local birthday store persists extra birthday specs by person")
+    func localBirthdayStoreRoundTripsExtraSpecs() async {
+        let databaseURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("sqlite3")
+        let store = LocalBirthdayStore(databaseURL: databaseURL)
+        let spec = BirthdayDateSpec(
+            id: "local-extra",
+            personID: "guo",
+            kind: .chinese,
+            components: DateComponents(calendar: Calendar(identifier: .chinese), year: 1971, month: 7, day: 8),
+            source: .local,
+            syncPolicy: .localOnly
+        )
+
+        await store.saveLocalOnlySpecs([spec], for: "guo")
+        let loaded = await store.loadAll()
+
+        #expect(loaded["guo"] == [spec])
+    }
+
+    @Test("Local birthday store deletes specs for removed contacts")
+    func localBirthdayStoreDeletesSpecsForRemovedContacts() async {
+        let databaseURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("sqlite3")
+        let store = LocalBirthdayStore(databaseURL: databaseURL)
+        let guoSpec = BirthdayDateSpec(
+            id: "local-guo",
+            personID: "guo",
+            kind: .chinese,
+            components: DateComponents(calendar: Calendar(identifier: .chinese), year: 1971, month: 7, day: 8),
+            source: .local,
+            syncPolicy: .localOnly
+        )
+        let adaSpec = BirthdayDateSpec(
+            id: "local-ada",
+            personID: "ada",
+            kind: .gregorian,
+            components: DateComponents(calendar: Calendar(identifier: .gregorian), year: 1990, month: 8, day: 4),
+            source: .local,
+            syncPolicy: .localOnly
+        )
+
+        await store.saveLocalOnlySpecs([guoSpec], for: "guo")
+        await store.saveLocalOnlySpecs([adaSpec], for: "ada")
+        await store.deleteLocalOnlySpecs(for: ["guo"])
+        let loaded = await store.loadAll()
+
+        #expect(loaded["guo"] == nil)
+        #expect(loaded["ada"] == [adaSpec])
+    }
+
+    @Test("Birthday edit draft separates Apple fields from local-only extra records")
+    func birthdayEditDraftSplitsAppleAndLocalSpecs() throws {
+        let appleBirthday = BirthdayRecord(
+            id: "apple-gregorian",
+            contactID: "guo",
+            contactName: "郭峰",
+            organizationName: "",
+            kind: .gregorian,
+            components: DateComponents(calendar: Calendar(identifier: .gregorian), year: 1971, month: 8, day: 20),
+            source: .appleBirthday,
+            syncPolicy: .writeBackToApple
+        )
+        let profile = ContactBirthdayProfile(id: "guo", displayName: "郭峰", organizationName: "", records: [appleBirthday])
+        var draft = BirthdayEditDraft(profile: profile)
+        draft.entries.append(BirthdayEditEntry(personID: "guo", kind: .chinese))
+        draft.entries[1].year = "1971"
+        draft.entries[1].month = "7"
+        draft.entries[1].day = "8"
+
+        let payload = try #require(draft.payload(personID: "guo"))
+
+        #expect(payload.gregorian?.month == 8)
+        #expect(payload.gregorian?.day == 20)
+        #expect(payload.nonGregorian == nil)
+        #expect(payload.localOnlyDateSpecs.count == 1)
+        #expect(payload.localOnlyDateSpecs.first?.kind == .chinese)
+    }
+
+    @Test("Birthday edit draft treats legacy contact records as Apple editable fields")
+    func birthdayEditDraftPreservesLegacyAppleBirthday() throws {
+        let legacyAppleBirthday = BirthdayRecord(
+            id: "guo-gregorian",
+            contactID: "guo",
+            contactName: "郭峰",
+            organizationName: "",
+            kind: .gregorian,
+            components: DateComponents(calendar: Calendar(identifier: .gregorian), year: 1971, month: 8, day: 20),
+            source: .local,
+            syncPolicy: .localOnly
+        )
+        let profile = ContactBirthdayProfile(id: "guo", displayName: "郭峰", organizationName: "", records: [legacyAppleBirthday])
+        let draft = BirthdayEditDraft(profile: profile)
+        let payload = try #require(draft.payload(personID: "guo"))
+
+        #expect(payload.gregorian?.year == 1971)
+        #expect(payload.gregorian?.month == 8)
+        #expect(payload.gregorian?.day == 20)
+        #expect(payload.localOnlyDateSpecs.isEmpty)
+    }
+
+    private func birthdayRecord(
+        id: String,
+        name: String,
+        kind: BirthdayCalendarKind = .gregorian,
+        year: Int?,
+        month: Int,
+        day: Int
+    ) -> BirthdayRecord {
+        BirthdayRecord(
+            id: "\(id)-\(kind.rawValue)",
+            contactID: id,
+            contactName: name,
+            organizationName: "",
+            kind: kind,
+            components: DateComponents(
+                calendar: Calendar(identifier: kind.calendarIdentifier),
+                year: year,
+                month: month,
+                day: day
+            )
+        )
+    }
+
+    private func gregorianDate(year: Int, month: Int, day: Int) -> Date? {
+        Calendar(identifier: .gregorian).date(from: DateComponents(year: year, month: month, day: day))
     }
 }

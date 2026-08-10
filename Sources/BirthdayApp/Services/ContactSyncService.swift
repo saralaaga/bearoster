@@ -38,4 +38,8 @@ actor ContactSyncService {
     func saveBirthdays(contactID: String, payload: BirthdayEditPayload) async throws {
         try await repository.saveBirthdays(contactID: contactID, payload: payload)
     }
+
+    func deleteContacts(contactIDs: [String]) async throws {
+        try await repository.deleteContacts(contactIDs: contactIDs)
+    }
 }

@@ -65,6 +65,13 @@ struct L10n {
     static let name = Key(zhHans: "姓名", zhHant: "姓名", en: "Name")
     static let age = Key(zhHans: "年龄", zhHant: "年齡", en: "Age")
     static let birthday = Key(zhHans: "生日", zhHant: "生日", en: "Birthday")
+    static let birthdays = Key(zhHans: "个生日", zhHant: "個生日", en: "birthdays")
+    static let birthdayRecords = Key(zhHans: "生日记录", zhHant: "生日記錄", en: "Birthday records")
+    static let addBirthday = Key(zhHans: "添加生日", zhHant: "新增生日", en: "Add birthday")
+    static let deleteBirthday = Key(zhHans: "删除生日", zhHant: "刪除生日", en: "Delete birthday")
+    static let birthDate = Key(zhHans: "出生日期", zhHant: "出生日期", en: "Birth date")
+    static let localOnly = Key(zhHans: "本地保存", zhHant: "本機保存", en: "Local only")
+    static let appleSynced = Key(zhHans: "Apple 通讯录", zhHant: "Apple 通訊錄", en: "Apple Contacts")
     static let group = Key(zhHans: "分组", zhHant: "分組", en: "Group")
     static let edit = Key(zhHans: "编辑", zhHant: "編輯", en: "Edit")
     static let done = Key(zhHans: "完成", zhHant: "完成", en: "Done")
@@ -120,6 +127,14 @@ struct L10n {
     static let refreshContacts = Key(zhHans: "刷新通讯录", zhHant: "重新整理通訊錄", en: "Refresh Contacts")
     static let openContact = Key(zhHans: "打开联系人", zhHant: "打開聯絡人", en: "Open contact")
     static let calculatingBirthdays = Key(zhHans: "正在计算生日数据", zhHant: "正在計算生日資料", en: "Calculating birthday data")
+    static let selectContacts = Key(zhHans: "选择", zhHant: "選擇", en: "Select")
+    static let selectAll = Key(zhHans: "全选", zhHant: "全選", en: "Select All")
+    static let selectedContacts = Key(zhHans: "已选择", zhHant: "已選擇", en: "Selected")
+    static let deleteContacts = Key(zhHans: "删除联系人", zhHant: "刪除聯絡人", en: "Delete Contacts")
+    static let deleteContactsTitle = Key(zhHans: "删除联系人？", zhHant: "刪除聯絡人？", en: "Delete contacts?")
+    static let deleteContactsMessage = Key(zhHans: "这会从 macOS 通讯录中删除所选联系人，并可能同步到 iCloud。此操作无法从 Birthday 中撤销。", zhHant: "這會從 macOS 通訊錄中刪除所選聯絡人，並可能同步到 iCloud。此操作無法從 Birthday 中復原。", en: "This will delete the selected contacts from macOS Contacts and may sync to iCloud. This cannot be undone in Birthday.")
+    static let contactsDeleted = Key(zhHans: "已删除联系人", zhHant: "已刪除聯絡人", en: "Contacts deleted")
+    static let deleteContactsFailed = Key(zhHans: "无法删除联系人，请检查通讯录权限或账户是否允许编辑。", zhHant: "無法刪除聯絡人，請檢查通訊錄權限或帳戶是否允許編輯。", en: "Could not delete contacts. Check Contacts permission or whether the account allows editing.")
 }
 
 extension L10n.Key {
@@ -143,6 +158,13 @@ extension L10n.Key {
     static let name = L10n.name
     static let age = L10n.age
     static let birthday = L10n.birthday
+    static let birthdays = L10n.birthdays
+    static let birthdayRecords = L10n.birthdayRecords
+    static let addBirthday = L10n.addBirthday
+    static let deleteBirthday = L10n.deleteBirthday
+    static let birthDate = L10n.birthDate
+    static let localOnly = L10n.localOnly
+    static let appleSynced = L10n.appleSynced
     static let group = L10n.group
     static let edit = L10n.edit
     static let done = L10n.done
@@ -198,4 +220,12 @@ extension L10n.Key {
     static let refreshContacts = L10n.refreshContacts
     static let openContact = L10n.openContact
     static let calculatingBirthdays = L10n.calculatingBirthdays
+    static let selectContacts = L10n.selectContacts
+    static let selectAll = L10n.selectAll
+    static let selectedContacts = L10n.selectedContacts
+    static let deleteContacts = L10n.deleteContacts
+    static let deleteContactsTitle = L10n.deleteContactsTitle
+    static let deleteContactsMessage = L10n.deleteContactsMessage
+    static let contactsDeleted = L10n.contactsDeleted
+    static let deleteContactsFailed = L10n.deleteContactsFailed
 }

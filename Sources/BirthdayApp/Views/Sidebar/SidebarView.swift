@@ -106,7 +106,7 @@ struct SidebarItem: View {
                     Text(title)
                         .font(.system(size: 13.5, weight: isSelected ? .semibold : .regular))
                         .lineLimit(1)
-                        .transition(.opacity.combined(with: .move(edge: .leading)))
+                        .transition(.opacity)
                     Spacer(minLength: 0)
                     if let badge {
                         Text("\(badge)")

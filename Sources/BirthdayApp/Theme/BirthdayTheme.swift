@@ -50,6 +50,19 @@ enum BirthdayTheme {
         static let full: CGFloat = 999
     }
 
+    enum Motion {
+        static let press = Animation.easeOut(duration: 0.10)
+        static let hover = Animation.easeOut(duration: 0.12)
+        static let quickFade = Animation.easeOut(duration: 0.14)
+        static let stateChange = Animation.easeOut(duration: 0.16)
+        static let toastIn = Animation.easeOut(duration: 0.24)
+        static let toastOut = Animation.easeOut(duration: 0.14)
+
+        static func allowed(_ animation: Animation, reduceMotion: Bool) -> Animation? {
+            reduceMotion ? nil : animation
+        }
+    }
+
     static func pageBackground(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? Color(nsColor: .underPageBackgroundColor) : Color(hex: 0xF5F5F7)
     }
@@ -136,15 +149,17 @@ private struct MCMButtonChrome: ViewModifier {
                     .strokeBorder(BirthdayTheme.separator(colorScheme))
             )
             .onHover { isHovering = $0 }
-            .animation(.easeOut(duration: 0.12), value: isHovering)
+            .animation(BirthdayTheme.Motion.hover, value: isHovering)
     }
 }
 
 private struct MCMPressButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.easeOut(duration: 0.10), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
+            .animation(BirthdayTheme.Motion.allowed(BirthdayTheme.Motion.press, reduceMotion: reduceMotion), value: configuration.isPressed)
     }
 }
 

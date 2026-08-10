@@ -31,7 +31,7 @@ struct BirthdayDerivedDataSnapshot: Sendable {
     let allRecords: [BirthdayRecord]
     let filteredRecords: [BirthdayRecord]
     let filteredRecordOccurrences: [BirthdayOccurrence]
-    let filteredRecordGroups: [BirthdayMonthGroup]
+    let filteredRecordGroups: [BirthdayRecordGroup]
     let cachedUpcomingOccurrences: [BirthdayOccurrence]
     let selectedDateOccurrences: [BirthdayOccurrence]
     let visibleMonthDates: [Date]
@@ -70,6 +70,7 @@ actor BirthdayDerivedDataWorker {
         progress(.active(message: "Grouping birthday list", completed: 2, total: 6))
         let groups = service.recordGroups(
             from: filtered.occurrences,
+            sort: request.sort,
             locale: request.language.coreLocale
         )
 

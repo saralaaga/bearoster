@@ -32,7 +32,18 @@ fi
 chmod +x "$MACOS/Birthday"
 
 if command -v codesign >/dev/null 2>&1; then
-  codesign --force --sign - "$APP_DIR" >/dev/null
+  SIGN_IDENTITY="${BIRTHDAY_CODESIGN_IDENTITY:-}"
+  if [[ -z "$SIGN_IDENTITY" ]] && command -v security >/dev/null 2>&1; then
+    SIGN_IDENTITY="$(
+      security find-identity -v -p codesigning 2>/dev/null \
+        | sed -n 's/.*"\(Apple Development: .*\)".*/\1/p' \
+        | head -n 1
+    )"
+  fi
+  if [[ -z "$SIGN_IDENTITY" ]]; then
+    SIGN_IDENTITY="-"
+  fi
+  codesign --force --sign "$SIGN_IDENTITY" "$APP_DIR" >/dev/null
 fi
 
 if [[ "$CONFIG" == "release" ]]; then

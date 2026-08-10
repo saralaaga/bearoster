@@ -6,6 +6,7 @@ import SwiftUI
 struct RootView: View {
     @Environment(BirthdayAppModel.self) private var model
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var calendarMode = CalendarDisplayMode.month
     @State private var isSidebarCollapsed = false
 
@@ -30,7 +31,9 @@ struct RootView: View {
 
             HStack(spacing: 0) {
                 SidebarView(isCollapsed: isSidebarCollapsed)
-                    .frame(width: sidebarWidth)
+                    .frame(minWidth: sidebarWidth, idealWidth: sidebarWidth, maxWidth: sidebarWidth)
+                    .layoutPriority(3)
+                    .clipped()
 
                 Rectangle()
                     .fill(BirthdayTheme.separator(colorScheme))
@@ -41,11 +44,11 @@ struct RootView: View {
                     currentPane
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .layoutPriority(0)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(BirthdayTheme.pageBackground(colorScheme))
-        .animation(.snappy(duration: 0.2), value: isSidebarCollapsed)
         .overlay(alignment: .topTrailing) {
             if model.calculationProgress.isActive {
                 CalculationProgressView(progress: model.calculationProgress)
@@ -57,15 +60,7 @@ struct RootView: View {
             if let toast = model.toastMessage {
                 ToastView(message: toast)
                     .padding(.bottom, 22)
-                    // Emil: 非对称动画 - 入场从容 (400ms), 退场迅速 (200ms)
-                    .transition(
-                        .asymmetric(
-                            insertion: .move(edge: .bottom).combined(with: .opacity)
-                                .animation(.easeOut(duration: 0.4)),
-                            removal: .move(edge: .bottom).combined(with: .opacity)
-                                .animation(.easeOut(duration: 0.2))
-                        )
-                    )
+                    .transition(toastTransition)
             }
         }
         .tint(BirthdayTheme.accent)
@@ -90,6 +85,19 @@ struct RootView: View {
             ContactsEditorView()
         case .permissions:
             PermissionsSettingsView()
+        }
+    }
+
+    private var toastTransition: AnyTransition {
+        if reduceMotion {
+            .opacity.animation(BirthdayTheme.Motion.stateChange)
+        } else {
+            .asymmetric(
+                insertion: .move(edge: .bottom).combined(with: .opacity)
+                    .animation(BirthdayTheme.Motion.toastIn),
+                removal: .move(edge: .bottom).combined(with: .opacity)
+                    .animation(BirthdayTheme.Motion.toastOut)
+            )
         }
     }
 }
@@ -138,7 +146,7 @@ struct AppToolbar: View {
                 Text("Birthday")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.primary)
-                    .transition(.opacity.combined(with: .move(edge: .leading)))
+                    .transition(.opacity)
             }
         }
         .clipped()
@@ -178,36 +186,67 @@ struct BirthdayListToolbarControls: View {
         @Bindable var model = model
 
         HStack(spacing: 12) {
-            ToolbarTitle(text: model.l10n(.list))
+            // 标题 - 固定宽度确保不换行
+            Text(model.l10n(.list))
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.primary)
+                .frame(minWidth: 80, alignment: .leading)
 
-            HStack(spacing: 7) {
+            // 筛选控件组
+            filterControls
+
+            Spacer(minLength: 12)
+
+            // 搜索和计数
+            searchAndCount
+        }
+    }
+
+    private var filterControls: some View {
+        @Bindable var model = model
+
+        return HStack(spacing: 16) {
+            // 历法筛选 - 改用下拉菜单
+            HStack(spacing: 6) {
                 Text(model.l10n(.calendarKind))
                     .font(.system(size: 12.5, weight: .medium))
                     .foregroundStyle(.secondary)
-                Picker(model.l10n(.calendarKind), selection: $model.filter) {
+
+                Picker("", selection: $model.filter) {
                     Text(model.l10n(.all)).tag(BirthdayCalendarKind?.none)
                     ForEach(BirthdayCalendarKind.allCases) { kind in
-                        Text(model.formatter.calendarName(kind, locale: model.language.coreLocale)).tag(Optional(kind))
+                        Text(model.formatter.calendarName(kind, locale: model.language.coreLocale))
+                            .tag(Optional(kind))
                     }
                 }
                 .pickerStyle(.menu)
                 .fixedSize()
+                .accessibilityLabel(model.l10n(.calendarKind))
             }
 
-            HStack(spacing: 7) {
+            // 排序 - 改用下拉菜单替代分段控件
+            HStack(spacing: 6) {
                 Text(model.l10n(.sort))
                     .font(.system(size: 12.5, weight: .medium))
                     .foregroundStyle(.secondary)
-                Picker(model.l10n(.sort), selection: $model.sort) {
+
+                Picker("", selection: $model.sort) {
                     Text(model.l10n(.nearest)).tag(BirthdaySort.next)
                     Text(model.l10n(.name)).tag(BirthdaySort.name)
                     Text(model.l10n(.age)).tag(BirthdaySort.age)
                     Text(model.l10n(.calendarKind)).tag(BirthdaySort.calendar)
                 }
-                .pickerStyle(.segmented)
-                .frame(width: 330)
+                .pickerStyle(.menu)
+                .fixedSize()
+                .accessibilityLabel(model.l10n(.sort))
             }
+        }
+    }
 
+    private var searchAndCount: some View {
+        @Bindable var model = model
+
+        return HStack(spacing: 12) {
             SearchField(text: $model.searchText, prompt: model.l10n(.search))
                 .frame(width: 220)
 
@@ -217,6 +256,7 @@ struct BirthdayListToolbarControls: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
                 .background(Color.secondary.opacity(0.10), in: RoundedRectangle(cornerRadius: 7))
+                .accessibilityLabel("\(model.filteredRecords.count) \(model.l10n(.birthdays))")
         }
     }
 }
@@ -240,18 +280,18 @@ struct CalendarToolbarControls: View {
                 }
                 .accessibilityHint(model.l10n(.navigateToPreviousMonth))
 
+                Button(model.l10n(.today)) {
+                    model.visibleMonth = Date()
+                    model.selectedDate = Date()
+                }
+                .font(.system(size: 12.5, weight: .medium))
+                .buttonStyle(.bordered)
+
                 ToolbarIconButton(systemImage: "chevron.right", help: model.l10n(.nextMonth)) {
                     model.visibleMonth = Calendar.current.date(byAdding: .month, value: 1, to: model.visibleMonth) ?? model.visibleMonth
                 }
                 .accessibilityHint(model.l10n(.navigateToNextMonth))
             }
-
-            Button(model.l10n(.today)) {
-                model.visibleMonth = Date()
-                model.selectedDate = Date()
-            }
-            .font(.system(size: 12.5, weight: .medium))
-            .buttonStyle(.bordered)
 
             Spacer(minLength: 0)
 
@@ -290,18 +330,18 @@ struct SearchField: View {
                 .textFieldStyle(.plain)
                 .font(.system(size: 13))
 
-            // Emil: 添加清除按钮，有内容时显示
-            if !text.isEmpty {
-                Button {
-                    text = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                }
-                .buttonStyle(.plain)
-                .transition(.scale.combined(with: .opacity))
+            Button {
+                text = ""
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.tertiary)
             }
+            .buttonStyle(.plain)
+            .frame(width: 16, height: 16)
+            .opacity(text.isEmpty ? 0 : 1)
+            .disabled(text.isEmpty)
+            .accessibilityHidden(text.isEmpty)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
@@ -310,11 +350,11 @@ struct SearchField: View {
             RoundedRectangle(cornerRadius: 7)
                 .strokeBorder(BirthdayTheme.separator(colorScheme))
         )
-        .animation(.easeOut(duration: 0.2), value: text.isEmpty)
     }
 }
 
 struct ToolbarIconButton: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let systemImage: String
     let help: String
     var isLoading: Bool = false
@@ -325,12 +365,11 @@ struct ToolbarIconButton: View {
             Image(systemName: systemImage)
                 .font(.system(size: 12, weight: .semibold))
                 .frame(width: 16, height: 16)
-                // Emil: 加载时旋转动画，让用户知道操作正在进行
-                .rotationEffect(.degrees(isLoading ? 360 : 0))
+                .rotationEffect(.degrees(isLoading && !reduceMotion ? 360 : 0))
                 .animation(
-                    isLoading
+                    isLoading && !reduceMotion
                         ? .linear(duration: 1).repeatForever(autoreverses: false)
-                        : .default,
+                        : nil,
                     value: isLoading
                 )
         }

@@ -6,16 +6,17 @@ import SwiftUI
 struct ContactsEditorView: View {
     @Environment(BirthdayAppModel.self) private var model
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         @Bindable var model = model
         let selectedProfile = model.selectedProfile
-        let selectedID = selectedProfile?.id
+        let selectedID = model.isContactSelectionMode ? nil : selectedProfile?.id
 
         VStack(spacing: 0) {
             HStack(spacing: 0) {
                 ContactCollectionsPane()
-                    .frame(width: 210)
+                    .fixedContactColumn(width: ContactsLayout.collectionsWidth, priority: 3)
 
                 KimiSeparator(axis: .vertical)
 
@@ -29,9 +30,15 @@ struct ContactsEditorView: View {
                                     ForEach(section.rows) { row in
                                         ContactListRow(
                                             row: row,
-                                            isSelected: selectedID == row.id
+                                            isSelected: selectedID == row.id,
+                                            isSelectionMode: model.isContactSelectionMode,
+                                            isMarkedForDeletion: model.selectedContactIDsForDeletion.contains(row.id)
                                         ) {
-                                            model.selectedContactID = row.id
+                                            if model.isContactSelectionMode {
+                                                model.toggleContactDeletionSelection(row.id)
+                                            } else {
+                                                model.selectedContactID = row.id
+                                            }
                                         }
                                     }
                                 } header: {
@@ -43,20 +50,28 @@ struct ContactsEditorView: View {
                     .scrollContentBackground(.hidden)
                     .background(ContactsNativeStyle.listBackground(colorScheme))
                 }
-                .frame(width: 300)
+                .fixedContactColumn(width: ContactsLayout.listWidth, priority: 2)
 
                 KimiSeparator(axis: .vertical)
 
                 ZStack {
                     ContactsNativeStyle.detailBackground(colorScheme)
-                    if let profile = selectedProfile {
+                    if model.isContactSelectionMode {
+                        BulkContactSelectionView()
+                            .transition(.opacity)
+                    } else if let profile = selectedProfile {
                         ContactBirthdayEditor(profile: profile)
                             .id(profile.id)
+                            .transition(.opacity)
                     } else {
                         ContentUnavailableView(model.l10n(.contacts), systemImage: "person.crop.circle")
+                            .transition(.opacity)
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
+                .layoutPriority(0)
+                .clipped()
+                .animation(BirthdayTheme.Motion.allowed(BirthdayTheme.Motion.stateChange, reduceMotion: reduceMotion), value: model.isContactSelectionMode)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -64,11 +79,18 @@ struct ContactsEditorView: View {
     }
 }
 
+private enum ContactsLayout {
+    static let collectionsWidth: CGFloat = 210
+    static let listWidth: CGFloat = 300
+}
+
 // MARK: - Toolbar
 
 struct ContactsToolbar: View {
     @Environment(BirthdayAppModel.self) private var model
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isConfirmingDeletion = false
 
     var body: some View {
         @Bindable var model = model
@@ -80,47 +102,96 @@ struct ContactsToolbar: View {
 
             Spacer(minLength: 12)
 
-            HStack(spacing: 7) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                TextField(model.l10n(.search), text: $model.contactSearchText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13))
+            if model.isContactSelectionMode {
+                selectionControls
+            } else {
+                normalControls
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .frame(width: 240)
-            .background(ContactsNativeStyle.searchBackground(colorScheme), in: RoundedRectangle(cornerRadius: 7))
-            .overlay(
-                RoundedRectangle(cornerRadius: 7)
-                    .strokeBorder(ContactsNativeStyle.separator(colorScheme))
-            )
-
-            Button {
-                Task { await model.refreshContacts() }
-            } label: {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 12, weight: .semibold))
-                    .frame(width: 15, height: 15)
-                    // Emil: 加载时旋转动画
-                    .rotationEffect(.degrees(model.isLoading ? 360 : 0))
-                    .animation(
-                        model.isLoading
-                            ? .linear(duration: 1).repeatForever(autoreverses: false)
-                            : .default,
-                        value: model.isLoading
-                    )
-            }
-            .help(model.l10n(.refreshContacts))
-            .accessibilityLabel(model.l10n(.refreshContacts))
-            .buttonStyle(.plain)
-            .disabled(model.isLoading)
-            .opacity(model.isLoading ? 0.5 : 1.0)
-            .kimiToolbarButton()
         }
         .padding(.horizontal, 16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .alert(model.l10n(.deleteContactsTitle), isPresented: $isConfirmingDeletion) {
+            Button(model.l10n(.deleteContacts), role: .destructive) {
+                Task { await model.deleteSelectedContacts() }
+            }
+            Button(model.l10n(.cancel), role: .cancel) { }
+        } message: {
+            Text(model.l10n(.deleteContactsMessage))
+        }
+    }
+
+    private var normalControls: some View {
+        @Bindable var model = model
+
+        return HStack(spacing: 12) {
+            Button(model.l10n(.selectContacts)) {
+                model.enterContactSelectionMode()
+            }
+            .font(.system(size: 12.5, weight: .medium))
+            .buttonStyle(.bordered)
+
+            SearchField(text: $model.contactSearchText, prompt: model.l10n(.search))
+            .frame(width: 240)
+
+            refreshButton
+        }
+    }
+
+    private var selectionControls: some View {
+        @Bindable var model = model
+
+        return HStack(spacing: 10) {
+            Text("\(model.l10n(.selectedContacts)) \(model.selectedContactDeletionCount)")
+                .font(.system(size: 12.5, weight: .medium))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+
+            Button(model.l10n(.selectAll)) {
+                model.selectAllVisibleContactsForDeletion()
+            }
+            .font(.system(size: 12.5, weight: .medium))
+            .buttonStyle(.bordered)
+            .disabled(model.visibleContactCount == 0 || model.isDeletingContacts)
+
+            Button(role: .destructive) {
+                isConfirmingDeletion = true
+            } label: {
+                Label(model.l10n(.deleteContacts), systemImage: "trash")
+            }
+            .font(.system(size: 12.5, weight: .semibold))
+            .buttonStyle(.bordered)
+            .disabled(model.selectedContactDeletionCount == 0 || model.isDeletingContacts)
+
+            Button(model.l10n(.cancel)) {
+                model.exitContactSelectionMode()
+            }
+            .font(.system(size: 12.5, weight: .medium))
+            .buttonStyle(.bordered)
+            .disabled(model.isDeletingContacts)
+        }
+    }
+
+    private var refreshButton: some View {
+        Button {
+            Task { await model.refreshContacts() }
+        } label: {
+            Image(systemName: "arrow.clockwise")
+                .font(.system(size: 12, weight: .semibold))
+                .frame(width: 15, height: 15)
+                .rotationEffect(.degrees(model.isLoading && !reduceMotion ? 360 : 0))
+                .animation(
+                    model.isLoading && !reduceMotion
+                        ? .linear(duration: 1).repeatForever(autoreverses: false)
+                        : nil,
+                    value: model.isLoading
+                )
+        }
+        .help(model.l10n(.refreshContacts))
+        .accessibilityLabel(model.l10n(.refreshContacts))
+        .buttonStyle(.plain)
+        .disabled(model.isLoading)
+        .opacity(model.isLoading ? 0.5 : 1.0)
+        .kimiToolbarButton()
     }
 }
 
@@ -265,11 +336,16 @@ struct ContactSectionHeader: View {
 }
 
 struct ContactListRow: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let row: ContactListRowModel
     let isSelected: Bool
+    let isSelectionMode: Bool
+    let isMarkedForDeletion: Bool
     let action: () -> Void
 
     var body: some View {
+        let rowIsSelected = isSelectionMode ? isMarkedForDeletion : isSelected
+
         Button(action: action) {
             HStack(spacing: 10) {
                 AvatarView(
@@ -277,6 +353,13 @@ struct ContactListRow: View {
                     color: row.kind.map(color(for:)) ?? Color(hex: 0x8E8E93),
                     size: 34
                 )
+                .overlay(alignment: .bottomTrailing) {
+                    if isSelectionMode {
+                        ContactSelectionMark(isSelected: isMarkedForDeletion)
+                            .offset(x: 3, y: 3)
+                            .transition(selectionMarkTransition)
+                    }
+                }
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(row.displayName)
@@ -289,7 +372,7 @@ struct ContactListRow: View {
                         }
                         Text(row.subtitle)
                             .font(.system(size: 11.5))
-                            .foregroundStyle(isSelected ? .white.opacity(0.75) : .secondary)
+                            .foregroundStyle(rowIsSelected ? .white.opacity(0.75) : .secondary)
                             .lineLimit(1)
                     }
                 }
@@ -299,25 +382,109 @@ struct ContactListRow: View {
                 if let text = row.daysUntilText, let days = row.daysUntil {
                     Text(text)
                         .font(.system(size: 11, weight: days <= 7 ? .semibold : .regular))
-                        .foregroundStyle(days <= 7 ? ContactsNativeStyle.red : (isSelected ? .white.opacity(0.75) : Color.secondary.opacity(0.75)))
+                        .foregroundStyle(days <= 7 ? ContactsNativeStyle.red : (rowIsSelected ? .white.opacity(0.75) : Color.secondary.opacity(0.75)))
                         .monospacedDigit()
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 7)
-            .foregroundStyle(isSelected ? .white : .primary)
-            .background(isSelected ? ContactsNativeStyle.accent : Color.clear)
+            .foregroundStyle(rowIsSelected ? .white : .primary)
+            .background(rowIsSelected ? ContactsNativeStyle.accent : Color.clear)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(row.displayName)
+        .accessibilityAddTraits(rowIsSelected ? .isSelected : [])
+        .animation(BirthdayTheme.Motion.allowed(BirthdayTheme.Motion.quickFade, reduceMotion: reduceMotion), value: isSelectionMode)
+        .animation(BirthdayTheme.Motion.allowed(BirthdayTheme.Motion.press, reduceMotion: reduceMotion), value: isMarkedForDeletion)
+    }
+
+    private var selectionMarkTransition: AnyTransition {
+        if reduceMotion {
+            .opacity
+        } else {
+            .scale(scale: 0.92).combined(with: .opacity)
+        }
+    }
+}
+
+private struct ContactSelectionMark: View {
+    let isSelected: Bool
+
+    var body: some View {
+        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+            .font(.system(size: 15, weight: .semibold))
+            .symbolRenderingMode(.palette)
+            .foregroundStyle(isSelected ? ContactsNativeStyle.accent : Color.secondary.opacity(0.75), Color.white)
+            .background(Color.white, in: Circle())
+            .shadow(color: .black.opacity(0.10), radius: 1, y: 0.5)
+            .accessibilityHidden(true)
     }
 }
 
 // MARK: - Detail
 
+struct BulkContactSelectionView: View {
+    @Environment(BirthdayAppModel.self) private var model
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var isConfirmingDeletion = false
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Image(systemName: "person.crop.circle.badge.minus")
+                .font(.system(size: 48, weight: .regular))
+                .foregroundStyle(ContactsNativeStyle.red)
+
+            VStack(spacing: 6) {
+                Text(model.l10n(.deleteContacts))
+                    .font(.system(size: 22, weight: .bold))
+                Text("\(model.l10n(.selectedContacts)) \(model.selectedContactDeletionCount)")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+
+            Text(model.l10n(.deleteContactsMessage))
+                .font(.system(size: 12.5, weight: .medium))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(3)
+                .frame(maxWidth: 420)
+
+            HStack(spacing: 10) {
+                Button(model.l10n(.selectAll)) {
+                    model.selectAllVisibleContactsForDeletion()
+                }
+                .buttonStyle(KimiActionButtonStyle(kind: .regular))
+                .disabled(model.visibleContactCount == 0 || model.isDeletingContacts)
+
+                Button(role: .destructive) {
+                    isConfirmingDeletion = true
+                } label: {
+                    Label(model.l10n(.deleteContacts), systemImage: "trash")
+                }
+                .buttonStyle(KimiActionButtonStyle(kind: .regular))
+                .disabled(model.selectedContactDeletionCount == 0 || model.isDeletingContacts)
+            }
+        }
+        .padding(32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(ContactsNativeStyle.detailBackground(colorScheme))
+        .alert(model.l10n(.deleteContactsTitle), isPresented: $isConfirmingDeletion) {
+            Button(model.l10n(.deleteContacts), role: .destructive) {
+                Task { await model.deleteSelectedContacts() }
+            }
+            Button(model.l10n(.cancel), role: .cancel) { }
+        } message: {
+            Text(model.l10n(.deleteContactsMessage))
+        }
+    }
+}
+
 struct ContactBirthdayEditor: View {
     @Environment(BirthdayAppModel.self) private var model
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let profile: ContactBirthdayProfile
     @State private var draft: BirthdayEditDraft
     @State private var isEditing = false
@@ -334,11 +501,7 @@ struct ContactBirthdayEditor: View {
                 hero
                 countdownBanner
 
-                if isEditing {
-                    editCards
-                } else {
-                    readCards
-                }
+                editableCards
 
                 actionBar
             }
@@ -349,7 +512,30 @@ struct ContactBirthdayEditor: View {
             .frame(maxWidth: .infinity)
         }
         .background(ContactsNativeStyle.detailBackground(colorScheme))
-        .animation(.easeOut(duration: 0.16), value: isEditing)
+    }
+
+    @ViewBuilder
+    private var editableCards: some View {
+        Group {
+            if isEditing {
+                editCards
+            } else {
+                readCards
+            }
+        }
+        .transition(editableCardsTransition)
+        .animation(BirthdayTheme.Motion.allowed(BirthdayTheme.Motion.quickFade, reduceMotion: reduceMotion), value: isEditing)
+    }
+
+    private var editableCardsTransition: AnyTransition {
+        if reduceMotion {
+            .opacity
+        } else {
+            .asymmetric(
+                insertion: .scale(scale: 0.985, anchor: .top).combined(with: .opacity),
+                removal: .opacity
+            )
+        }
     }
 
     private var hero: some View {
@@ -416,17 +602,22 @@ struct ContactBirthdayEditor: View {
     private var readCards: some View {
         VStack(spacing: 18) {
             NativeInfoCard {
-                NativeInfoRow(label: model.l10n(.birthday)) {
-                    BirthdayValues(records: profile.records)
+                if profile.records.isEmpty {
+                    Text(model.l10n(.noBirthdays))
+                        .font(.system(size: 13))
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                } else {
+                    ForEach(Array(profile.records.enumerated()), id: \.element.id) { index, record in
+                        if index > 0 {
+                            NativeDivider()
+                        }
+                        BirthdayRecordSummaryRow(record: record)
+                    }
                 }
-                NativeDivider()
-                NativeInfoRow(label: model.l10n(.nextBirthday)) {
-                    Text(nextOccurrence.map { model.formatter.occurrenceDate($0.date, locale: model.language.coreLocale) } ?? model.l10n(.notFilled))
-                }
-                NativeDivider()
-                NativeInfoRow(label: model.l10n(.age)) {
-                    Text(nextOccurrence?.age.map { ageValueText($0) } ?? model.l10n(.unknownAge))
-                }
+
                 NativeDivider()
                 NativeInfoRow(label: model.l10n(.group)) {
                     Text(groupText)
@@ -445,43 +636,31 @@ struct ContactBirthdayEditor: View {
     private var editCards: some View {
         VStack(spacing: 18) {
             NativeInfoCard {
-                NativeInfoRow(label: model.formatter.calendarName(.gregorian, locale: model.language.coreLocale)) {
-                    HStack(spacing: 8) {
-                        NativeDateField("YYYY", text: $draft.gregorianYear, width: 72)
-                        NativeDateField("MM", text: $draft.gregorianMonth, width: 58)
-                        NativeDateField("DD", text: $draft.gregorianDay, width: 58)
-                    }
-                }
-
-                NativeDivider()
-
-                NativeInfoRow(label: model.l10n(.calendarKind)) {
-                    Picker(model.l10n(.calendarKind), selection: $draft.nonGregorianKind) {
-                        Text("-").tag(BirthdayCalendarKind?.none)
-                        Text(model.formatter.calendarName(.chinese, locale: model.language.coreLocale)).tag(Optional(BirthdayCalendarKind.chinese))
-                        Text(model.formatter.calendarName(.hebrew, locale: model.language.coreLocale)).tag(Optional(BirthdayCalendarKind.hebrew))
-                        Text(model.formatter.calendarName(.islamic, locale: model.language.coreLocale)).tag(Optional(BirthdayCalendarKind.islamic))
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                }
-
-                if draft.nonGregorianKind != nil {
-                    NativeDivider()
-                    NativeInfoRow(label: model.l10n(.originalDate)) {
-                        HStack(spacing: 8) {
-                            NativeDateField("YYYY", text: $draft.nonGregorianYear, width: 72)
-                            NativeDateField("MM", text: $draft.nonGregorianMonth, width: 58)
-                            NativeDateField("DD", text: $draft.nonGregorianDay, width: 58)
-                            if draft.nonGregorianKind == .chinese {
-                                Toggle(model.l10n(.leapMonth), isOn: $draft.isLeapMonth)
-                                    .toggleStyle(.switch)
-                                    .font(.system(size: 12))
-                            }
+                if draft.entries.isEmpty {
+                    Text(model.l10n(.noBirthdays))
+                        .font(.system(size: 13))
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                } else {
+                    ForEach(Array($draft.entries.enumerated()), id: \.element.id) { index, $entry in
+                        if index > 0 {
+                            NativeDivider()
+                        }
+                        BirthdayEditEntryView(entry: $entry, profile: profile) {
+                            draft.removeEntry(id: entry.id)
                         }
                     }
                 }
             }
+
+            Button {
+                draft.addEntry(personID: profile.id, kind: .gregorian)
+            } label: {
+                Label(model.l10n(.addBirthday), systemImage: "plus.circle.fill")
+            }
+            .buttonStyle(KimiActionButtonStyle(kind: .regular))
 
             if model.extendedContactFieldsEnabled,
                let extended = model.extendedProfilesByID[profile.id],
@@ -511,7 +690,7 @@ struct ContactBirthdayEditor: View {
                     }
                 }
                 .buttonStyle(KimiActionButtonStyle(kind: .primary))
-                .disabled(draft.payload == nil || isSaving)
+                .disabled(draft.payload(personID: profile.id) == nil || isSaving)
 
                 Button {
                     draft = BirthdayEditDraft(profile: profile)
@@ -593,7 +772,7 @@ struct ContactBirthdayEditor: View {
     }
 
     private func saveDraft() {
-        guard let payload = draft.payload else { return }
+        guard let payload = draft.payload(personID: profile.id) else { return }
         Task { @MainActor in
             isSaving = true
             await model.save(contactID: profile.id, payload: payload)
@@ -621,6 +800,174 @@ struct BirthdayValues: View {
                     }
                 }
             }
+        }
+    }
+}
+
+struct BirthdayRecordSummaryRow: View {
+    @Environment(BirthdayAppModel.self) private var model
+    let record: BirthdayRecord
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            StaticKindBadge(kind: record.kind, title: shortKindName(record.kind, model: model))
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(model.formatter.calendarName(record.kind, locale: model.language.coreLocale))
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(sourceText)
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+
+                Text(model.formatter.originalDate(record, locale: model.language.coreLocale))
+                    .font(.system(size: 13))
+                    .foregroundStyle(.primary)
+
+                Text(thisYearText)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+
+    private var sourceText: String {
+        record.source == .local ? model.l10n(.localOnly) : model.l10n(.appleSynced)
+    }
+
+    private var thisYearText: String {
+        let year = Calendar(identifier: .gregorian).component(.year, from: Date())
+        guard let date = model.resolver.occurrence(for: record, inGregorianYear: year) else {
+            return model.l10n(.notFilled)
+        }
+        let dateText = model.formatter.occurrenceDate(date, locale: model.language.coreLocale)
+        guard let age = model.resolver.age(for: record, on: date) else {
+            return "\(model.l10n(.thisYearDate)) \(dateText)"
+        }
+        return "\(model.l10n(.thisYearDate)) \(dateText) · \(ageText(age))"
+    }
+
+    private func ageText(_ age: Int) -> String {
+        switch model.language.coreLocale {
+        case .english: "Turns \(age)"
+        case .simplifiedChinese: "满 \(age) 岁"
+        case .traditionalChinese: "滿 \(age) 歲"
+        }
+    }
+}
+
+struct BirthdayEditEntryView: View {
+    @Environment(BirthdayAppModel.self) private var model
+    @Binding var entry: BirthdayEditEntry
+    let profile: ContactBirthdayProfile
+    let onDelete: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Picker(model.l10n(.calendarKind), selection: $entry.kind) {
+                    ForEach(BirthdayCalendarKind.allCases) { kind in
+                        Text(model.formatter.calendarName(kind, locale: model.language.coreLocale)).tag(kind)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(maxWidth: 220, alignment: .leading)
+
+                Text(sourceText)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(.secondary)
+
+                Spacer(minLength: 0)
+
+                Button(role: .destructive) {
+                    onDelete()
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .buttonStyle(.plain)
+                .help(model.l10n(.deleteBirthday))
+                .accessibilityLabel(model.l10n(.deleteBirthday))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+
+            NativeDivider()
+
+            NativeInfoRow(label: model.l10n(.birthDate)) {
+                ViewThatFits(in: .horizontal) {
+                    birthdayDateControls
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        birthdayDateFields
+                        leapMonthToggle
+                    }
+                }
+            }
+
+            NativeDivider()
+
+            NativeInfoRow(label: model.l10n(.thisYearDate)) {
+                Text(thisYearText)
+                    .foregroundStyle(thisYearText == model.l10n(.notFilled) ? .tertiary : .primary)
+            }
+        }
+    }
+
+    private var sourceText: String {
+        entry.source == .local ? model.l10n(.localOnly) : model.l10n(.appleSynced)
+    }
+
+    private var birthdayDateControls: some View {
+        HStack(spacing: 8) {
+            birthdayDateFields
+            leapMonthToggle
+        }
+    }
+
+    private var birthdayDateFields: some View {
+        HStack(spacing: 8) {
+            NativeDateField("YYYY", text: $entry.year, width: 72)
+            NativeDateField("MM", text: $entry.month, width: 58)
+            NativeDateField("DD", text: $entry.day, width: 58)
+        }
+    }
+
+    @ViewBuilder
+    private var leapMonthToggle: some View {
+        if entry.kind == .chinese {
+            Toggle(model.l10n(.leapMonth), isOn: $entry.isLeapMonth)
+                .toggleStyle(.switch)
+                .font(.system(size: 12))
+        }
+    }
+
+    private var thisYearText: String {
+        guard let spec = entry.dateSpec(personID: profile.id) else {
+            return model.l10n(.notFilled)
+        }
+        let record = BirthdayRecord(person: profile.person, dateSpec: spec)
+        let year = Calendar(identifier: .gregorian).component(.year, from: Date())
+        guard let date = model.resolver.occurrence(for: record, inGregorianYear: year) else {
+            return model.l10n(.notFilled)
+        }
+        let dateText = model.formatter.occurrenceDate(date, locale: model.language.coreLocale)
+        guard let age = model.resolver.age(for: record, on: date) else {
+            return dateText
+        }
+        return "\(dateText) · \(ageText(age))"
+    }
+
+    private func ageText(_ age: Int) -> String {
+        switch model.language.coreLocale {
+        case .english: "Turns \(age)"
+        case .simplifiedChinese: "满 \(age) 岁"
+        case .traditionalChinese: "滿 \(age) 歲"
         }
     }
 }
@@ -788,6 +1135,7 @@ private enum KimiActionButtonKind {
 private struct KimiActionButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let kind: KimiActionButtonKind
 
     func makeBody(configuration: Configuration) -> some View {
@@ -804,6 +1152,8 @@ private struct KimiActionButtonStyle: ButtonStyle {
             )
             .shadow(color: .black.opacity(kind == .primary || colorScheme == .dark ? 0 : 0.08), radius: 1.5, y: 0.5)
             .opacity(isEnabled ? 1 : 0.52)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
+            .animation(BirthdayTheme.Motion.allowed(BirthdayTheme.Motion.press, reduceMotion: reduceMotion), value: configuration.isPressed)
     }
 
     private var foreground: Color {
@@ -832,11 +1182,17 @@ private struct KimiToolbarButtonChrome: ViewModifier {
             .padding(6)
             .background(isHovering ? ContactsNativeStyle.sourceRowHover(colorScheme) : Color.clear, in: RoundedRectangle(cornerRadius: 7))
             .onHover { isHovering = $0 }
-            .animation(.easeOut(duration: 0.12), value: isHovering)
+            .animation(BirthdayTheme.Motion.hover, value: isHovering)
     }
 }
 
 private extension View {
+    func fixedContactColumn(width: CGFloat, priority: Double) -> some View {
+        frame(minWidth: width, idealWidth: width, maxWidth: width)
+            .layoutPriority(priority)
+            .clipped()
+    }
+
     func kimiToolbarButton() -> some View {
         modifier(KimiToolbarButtonChrome())
     }
