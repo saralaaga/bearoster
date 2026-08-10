@@ -73,6 +73,7 @@ final class BirthdayAppModel {
             rebuildContactProjection()
         }
     }
+    private(set) var contactAccessScope: ContactAccessScope = BirthdayAppModel.loadContactAccessScope()
     var contactFieldAccessLevel: ContactFieldAccessLevel = BirthdayAppModel.loadContactFieldAccessLevel() {
         didSet {
             guard contactFieldAccessLevel != oldValue else { return }
@@ -235,12 +236,19 @@ final class BirthdayAppModel {
     }
 
     private func applyContactSnapshot(_ snapshot: ContactDataSnapshot) {
+        let availableGroupIDs = Set(snapshot.grouping.groups.map(\.id))
+        let prunedAccessScope = contactAccessScope.pruned(availableGroupIDs: availableGroupIDs)
+        if prunedAccessScope != contactAccessScope {
+            contactAccessScope = prunedAccessScope
+            Self.saveContactAccessScope(prunedAccessScope)
+        }
+
         let mergedProfiles = profilesByApplyingLocalSpecs(to: snapshot.profiles)
         profiles = mergedProfiles
         profileByID = Dictionary(uniqueKeysWithValues: mergedProfiles.map { ($0.id, $0) })
         contactGrouping = snapshot.grouping
         extendedProfilesByID = snapshot.extendedProfilesByID
-        if contactGrouping.contactIDsByCollectionID[selectedContactCollectionID] == nil {
+        if !isContactCollectionSelectable(selectedContactCollectionID) {
             selectedContactCollectionID = ContactCollectionIdentifier.all
         }
         rebuildContactProjection()
@@ -317,6 +325,7 @@ final class BirthdayAppModel {
     func refreshContacts() async {
         permissionState = contactSyncService.authorizationStatus
         guard permissionState == .authorized || permissionState == .limited else {
+            clearContactData()
             selection = .permissions
             return
         }
@@ -327,7 +336,10 @@ final class BirthdayAppModel {
         defer { isLoading = false }
 
         do {
-            let snapshot = try await contactSyncService.refreshSnapshot(fieldAccessLevel: contactFieldAccessLevel)
+            let snapshot = try await contactSyncService.refreshSnapshot(
+                fieldAccessLevel: contactFieldAccessLevel,
+                accessScope: contactAccessScope
+            )
             applyContactSnapshot(snapshot)
             if derivedRequestID == progressRequestID {
                 finishCalculationProgress(requestID: progressRequestID)
@@ -386,6 +398,7 @@ final class BirthdayAppModel {
         let projection = contactListProjection.snapshot(
             profiles: profiles,
             grouping: contactGrouping,
+            accessScope: contactAccessScope,
             selectedCollectionID: selectedContactCollectionID,
             searchText: contactSearchText,
             language: language,
@@ -405,9 +418,109 @@ final class BirthdayAppModel {
     }
 
     private func loadCachedContactSnapshot() async {
-        guard let snapshot = await contactSyncService.cachedSnapshot(fieldAccessLevel: contactFieldAccessLevel) else { return }
+        guard let snapshot = await contactSyncService.cachedSnapshot(
+            fieldAccessLevel: contactFieldAccessLevel,
+            accessScope: contactAccessScope
+        ) else { return }
         guard profiles.isEmpty else { return }
         applyContactSnapshot(snapshot)
+    }
+
+    private func clearContactData() {
+        guard !profiles.isEmpty || !allRecords.isEmpty || contactGrouping != .empty else { return }
+        profiles = []
+        filteredProfiles = []
+        profileByID = [:]
+        selectedContactID = nil
+        selectedContactCollectionID = ContactCollectionIdentifier.all
+        contactGrouping = .empty
+        contactCollectionSections = []
+        contactListSections = []
+        visibleContactCount = 0
+        extendedProfilesByID = [:]
+        selectedContactIDsForDeletion = []
+        isContactSelectionMode = false
+        birthdayRecordSignature = 0
+        dataGeneration += 1
+        scheduleDerivedDataRebuild(message: "Clearing contacts")
+    }
+
+    private func isContactCollectionSelectable(_ collectionID: String) -> Bool {
+        guard collectionID != ContactCollectionIdentifier.all else { return true }
+        guard contactAccessScope.mode == .selectedGroups else {
+            return contactGrouping.contactIDsByCollectionID[collectionID] != nil
+        }
+        if collectionID == ContactCollectionIdentifier.ungrouped {
+            return contactAccessScope.includeUngroupedContacts
+        }
+        let prefix = "group:"
+        if collectionID.hasPrefix(prefix) {
+            let groupID = String(collectionID.dropFirst(prefix.count))
+            return contactAccessScope.allowedGroupIDs.contains(groupID)
+        }
+        return false
+    }
+
+    private func updateContactAccessScope(_ nextScope: ContactAccessScope) {
+        let availableGroupIDs = Set(contactGrouping.groups.map(\.id))
+        let scoped = contactGrouping.groups.isEmpty ? nextScope : nextScope.pruned(availableGroupIDs: availableGroupIDs)
+        guard scoped != contactAccessScope else { return }
+
+        contactAccessScope = scoped
+        Self.saveContactAccessScope(scoped)
+        selectedContactCollectionID = ContactCollectionIdentifier.all
+        exitContactSelectionMode()
+
+        guard permissionState == .authorized || permissionState == .limited else {
+            rebuildContactProjection()
+            scheduleDerivedDataRebuild(message: "Updating contact groups")
+            return
+        }
+
+        Task { await refreshContacts() }
+    }
+
+    func setContactAccessMode(_ mode: ContactAccessScope.Mode) {
+        var scope = contactAccessScope
+        scope.mode = mode
+        if mode == .selectedGroups, scope.allowedGroupIDs.isEmpty, !contactGrouping.groups.isEmpty {
+            scope.allowedGroupIDs = Set(contactGrouping.groups.map(\.id))
+        }
+        updateContactAccessScope(scope)
+    }
+
+    func setContactAccessGroup(_ groupID: String, isAllowed: Bool) {
+        var scope = contactAccessScope
+        scope.mode = .selectedGroups
+        if isAllowed {
+            scope.allowedGroupIDs.insert(groupID)
+        } else {
+            scope.allowedGroupIDs.remove(groupID)
+        }
+        updateContactAccessScope(scope)
+    }
+
+    func setIncludeUngroupedContacts(_ include: Bool) {
+        var scope = contactAccessScope
+        scope.mode = .selectedGroups
+        scope.includeUngroupedContacts = include
+        updateContactAccessScope(scope)
+    }
+
+    func selectAllContactAccessGroups() {
+        updateContactAccessScope(ContactAccessScope(
+            mode: .selectedGroups,
+            allowedGroupIDs: Set(contactGrouping.groups.map(\.id)),
+            includeUngroupedContacts: true
+        ))
+    }
+
+    func clearContactAccessGroups() {
+        updateContactAccessScope(ContactAccessScope(
+            mode: .selectedGroups,
+            allowedGroupIDs: [],
+            includeUngroupedContacts: false
+        ))
     }
 
     private func loadLocalBirthdaySpecs() async {
@@ -557,6 +670,18 @@ final class BirthdayAppModel {
 
     private static func saveContactFieldAccessLevel(_ level: ContactFieldAccessLevel) {
         UserDefaults.standard.set(level.rawValue, forKey: "contactFieldAccessLevel")
+    }
+
+    private static func loadContactAccessScope() -> ContactAccessScope {
+        guard let data = UserDefaults.standard.data(forKey: "contactAccessScope") else {
+            return .all
+        }
+        return (try? JSONDecoder().decode(ContactAccessScope.self, from: data)) ?? .all
+    }
+
+    private static func saveContactAccessScope(_ scope: ContactAccessScope) {
+        guard let data = try? JSONEncoder().encode(scope) else { return }
+        UserDefaults.standard.set(data, forKey: "contactAccessScope")
     }
 }
 

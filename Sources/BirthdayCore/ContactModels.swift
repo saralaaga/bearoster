@@ -85,10 +85,12 @@ public enum ContactCollectionKind: String, Codable, Hashable, Sendable {
     case all
     case container
     case group
+    case ungrouped
 }
 
 public enum ContactCollectionIdentifier {
     public static let all = "all"
+    public static let ungrouped = "ungrouped"
 
     public static func container(_ id: String) -> String {
         "container:\(id)"
@@ -96,6 +98,62 @@ public enum ContactCollectionIdentifier {
 
     public static func group(_ id: String) -> String {
         "group:\(id)"
+    }
+}
+
+public struct ContactAccessScope: Codable, Hashable, Sendable {
+    public enum Mode: String, Codable, Hashable, Sendable {
+        case allContacts
+        case selectedGroups
+    }
+
+    public var mode: Mode
+    public var allowedGroupIDs: Set<String>
+    public var includeUngroupedContacts: Bool
+
+    public init(
+        mode: Mode = .allContacts,
+        allowedGroupIDs: Set<String> = [],
+        includeUngroupedContacts: Bool = true
+    ) {
+        self.mode = mode
+        self.allowedGroupIDs = allowedGroupIDs
+        self.includeUngroupedContacts = includeUngroupedContacts
+    }
+
+    public static let all = ContactAccessScope()
+
+    public var cacheKey: String {
+        switch mode {
+        case .allContacts:
+            return "all"
+        case .selectedGroups:
+            let groups = allowedGroupIDs.sorted().joined(separator: ",")
+            let ungrouped = includeUngroupedContacts ? "ungrouped" : "grouped-only"
+            return "selected:\(ungrouped):\(groups)"
+        }
+    }
+
+    public func pruned(availableGroupIDs: Set<String>) -> ContactAccessScope {
+        var copy = self
+        copy.allowedGroupIDs.formIntersection(availableGroupIDs)
+        return copy
+    }
+
+    public func allowedContactIDs(in grouping: ContactGroupingSnapshot) -> Set<String>? {
+        guard mode == .selectedGroups else { return nil }
+
+        var contactIDs = Set<String>()
+        for groupID in allowedGroupIDs {
+            let collectionID = ContactCollectionIdentifier.group(groupID)
+            contactIDs.formUnion(grouping.contactIDsByCollectionID[collectionID] ?? [])
+        }
+
+        if includeUngroupedContacts {
+            contactIDs.formUnion(grouping.contactIDsByCollectionID[ContactCollectionIdentifier.ungrouped] ?? [])
+        }
+
+        return contactIDs
     }
 }
 
@@ -164,5 +222,18 @@ public struct ContactDataSnapshot: Codable, Hashable, Sendable {
         self.extendedProfilesByID = extendedProfilesByID
         self.fieldAccessLevel = fieldAccessLevel
         self.loadedAt = loadedAt
+    }
+
+    public func scoped(to accessScope: ContactAccessScope) -> ContactDataSnapshot {
+        guard let allowedIDs = accessScope.allowedContactIDs(in: grouping) else { return self }
+        let scopedProfiles = profiles.filter { allowedIDs.contains($0.id) }
+        let scopedExtendedProfiles = extendedProfilesByID.filter { allowedIDs.contains($0.key) }
+        return ContactDataSnapshot(
+            profiles: scopedProfiles,
+            grouping: grouping,
+            extendedProfilesByID: scopedExtendedProfiles,
+            fieldAccessLevel: fieldAccessLevel,
+            loadedAt: loadedAt
+        )
     }
 }

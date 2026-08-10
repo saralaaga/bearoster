@@ -14,6 +14,9 @@ struct PermissionsSettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 permissionSection
+                if permissionIsGranted {
+                    contactGroupAccessSection
+                }
                 preferencesSection
                 contactFieldsSection
                 voiceSection
@@ -31,6 +34,39 @@ struct PermissionsSettingsView: View {
     private var permissionSection: some View {
         SettingsSection(title: model.l10n(.contacts)) {
             PermissionAccessPanel()
+        }
+    }
+
+    private var permissionIsGranted: Bool {
+        model.permissionState == .authorized || model.permissionState == .limited
+    }
+
+    private var contactGroupAccessSection: some View {
+        @Bindable var model = model
+
+        return SettingsSection(title: model.l10n(.contactGroupAccess)) {
+            VStack(spacing: 0) {
+                SettingsRow(
+                    title: model.l10n(.contactGroupAccess),
+                    detail: ""
+                ) {
+                    Picker(model.l10n(.contactGroupAccess), selection: Binding(
+                        get: { model.contactAccessScope.mode },
+                        set: { model.setContactAccessMode($0) }
+                    )) {
+                        Text(model.l10n(.allContactsAccess)).tag(ContactAccessScope.Mode.allContacts)
+                        Text(model.l10n(.selectedGroupsAccess)).tag(ContactAccessScope.Mode.selectedGroups)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 300)
+                }
+
+                if model.contactAccessScope.mode == .selectedGroups {
+                    SettingsDivider()
+                    ContactGroupAccessEditor()
+                        .transition(.opacity)
+                }
+            }
         }
     }
 
@@ -203,12 +239,6 @@ private struct PermissionAccessPanel: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 16) {
-            Image(systemName: isGranted ? "person.crop.circle.badge.checkmark" : "person.crop.circle.badge.questionmark")
-                .font(.system(size: 24, weight: .semibold))
-                .foregroundStyle(isGranted ? BirthdayTheme.brandSecondary : BirthdayTheme.accent)
-                .frame(width: 38, height: 38)
-                .background(statusBackground, in: Circle())
-
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
                     Text(isGranted ? model.l10n(.permissionGranted) : model.l10n(.needContacts))
@@ -234,27 +264,179 @@ private struct PermissionAccessPanel: View {
             }
             .layoutPriority(1)
 
-            VStack(alignment: .trailing, spacing: 8) {
-                if !isGranted && !needsSettings {
-                    Button(model.l10n(.allowContacts)) {
-                        Task { await model.requestContactsAccess() }
-                    }
-                    .buttonStyle(SettingsActionButtonStyle(kind: .primary))
-                }
+            HStack(spacing: 14) {
+                statusIcon
 
-                Button(model.l10n(.openSettings)) {
-                    model.openContactsSettings()
+                VStack(alignment: .trailing, spacing: 8) {
+                    if !isGranted && !needsSettings {
+                        Button(model.l10n(.allowContacts)) {
+                            Task { await model.requestContactsAccess() }
+                        }
+                        .buttonStyle(SettingsActionButtonStyle(kind: .primary))
+                    }
+
+                    Button(model.l10n(.openSettings)) {
+                        model.openContactsSettings()
+                    }
+                    .buttonStyle(SettingsActionButtonStyle(kind: isGranted ? .regular : .secondary))
                 }
-                .buttonStyle(SettingsActionButtonStyle(kind: isGranted ? .regular : .secondary))
+                .frame(minWidth: 156, alignment: .trailing)
             }
-            .frame(minWidth: 156, alignment: .trailing)
         }
         .padding(18)
         .background(BirthdayTheme.cardBackground(colorScheme))
     }
 
+    private var statusIcon: some View {
+        Image(systemName: isGranted ? "person.crop.circle.badge.checkmark" : "person.crop.circle.badge.questionmark")
+            .font(.system(size: 24, weight: .semibold))
+            .foregroundStyle(isGranted ? BirthdayTheme.brandSecondary : BirthdayTheme.accent)
+            .frame(width: 38, height: 38)
+            .background(statusBackground, in: Circle())
+            .accessibilityHidden(true)
+    }
+
     private var statusBackground: Color {
         isGranted ? BirthdayTheme.brandSecondary.opacity(0.12) : BirthdayTheme.accent.opacity(0.12)
+    }
+}
+
+private struct ContactGroupAccessEditor: View {
+    @Environment(BirthdayAppModel.self) private var model
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                Text(summaryText)
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundStyle(BirthdayTheme.inkSecondary)
+                    .monospacedDigit()
+
+                Spacer(minLength: 12)
+
+                Button(model.l10n(.selectAll)) {
+                    model.selectAllContactAccessGroups()
+                }
+                .buttonStyle(SettingsActionButtonStyle(kind: .secondary))
+
+                Button(model.l10n(.clearSelection)) {
+                    model.clearContactAccessGroups()
+                }
+                .buttonStyle(SettingsActionButtonStyle(kind: .secondary))
+            }
+
+            if model.contactGrouping.groups.isEmpty && ungroupedContactCount == 0 {
+                Text(model.l10n(.noContactGroups))
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundStyle(BirthdayTheme.inkSecondary)
+                    .padding(.vertical, 4)
+            } else {
+                groupRows
+            }
+        }
+        .padding(18)
+    }
+
+    @ViewBuilder
+    private var groupRows: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if ungroupedContactCount > 0 {
+                ContactGroupAccessRow(
+                    title: model.l10n(.ungroupedContacts),
+                    count: ungroupedContactCount,
+                    isOn: Binding(
+                        get: { model.contactAccessScope.includeUngroupedContacts },
+                        set: { model.setIncludeUngroupedContacts($0) }
+                    )
+                )
+            }
+
+            ForEach(containerGroups, id: \.container.id) { section in
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(section.container.name)
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 2)
+
+                    VStack(spacing: 0) {
+                        ForEach(Array(section.groups.enumerated()), id: \.element.id) { index, group in
+                            if index > 0 {
+                                BirthdayTheme.separator(colorScheme)
+                                    .frame(height: 0.5)
+                                    .padding(.leading, 26)
+                            }
+                            ContactGroupAccessRow(
+                                title: group.name,
+                                count: group.contactCount,
+                                isOn: Binding(
+                                    get: { model.contactAccessScope.allowedGroupIDs.contains(group.id) },
+                                    set: { model.setContactAccessGroup(group.id, isAllowed: $0) }
+                                )
+                            )
+                        }
+                    }
+                    .background(BirthdayTheme.hoverFill(colorScheme), in: RoundedRectangle(cornerRadius: BirthdayTheme.controlCorner))
+                }
+            }
+        }
+    }
+
+    private var containerGroups: [(container: ContactContainerSummary, groups: [ContactGroupSummary])] {
+        model.contactGrouping.containers
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+            .compactMap { container in
+                let groups = model.contactGrouping.groups
+                    .filter { $0.containerID == container.id }
+                    .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+                guard !groups.isEmpty else { return nil }
+                return (container, groups)
+            }
+    }
+
+    private var ungroupedContactCount: Int {
+        model.contactGrouping.contactIDsByCollectionID[ContactCollectionIdentifier.ungrouped]?.count ?? 0
+    }
+
+    private var summaryText: String {
+        let groupCount = model.contactAccessScope.allowedGroupIDs.count
+        let contactCount = selectedContactCount
+        switch model.language.coreLocale {
+        case .english:
+            return "\(model.l10n(.selectedGroupsSummary)): \(groupCount), \(contactCount) contacts"
+        case .simplifiedChinese:
+            return "\(model.l10n(.selectedGroupsSummary)) \(groupCount) 个，包含 \(contactCount) 位联系人"
+        case .traditionalChinese:
+            return "\(model.l10n(.selectedGroupsSummary)) \(groupCount) 個，包含 \(contactCount) 位聯絡人"
+        }
+    }
+
+    private var selectedContactCount: Int {
+        model.contactAccessScope.allowedContactIDs(in: model.contactGrouping)?.count ?? model.profiles.count
+    }
+}
+
+private struct ContactGroupAccessRow: View {
+    let title: String
+    let count: Int
+    @Binding var isOn: Bool
+
+    var body: some View {
+        Toggle(isOn: $isOn) {
+            HStack(spacing: 8) {
+                Text(title)
+                    .font(.system(size: 13, weight: .medium))
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                Text("\(count)")
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+        }
+        .toggleStyle(.checkbox)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
     }
 }
 
@@ -295,11 +477,13 @@ private struct SettingsRow<Accessory: View>: View {
                 Text(title)
                     .font(.system(size: 13.5, weight: .semibold))
                     .foregroundStyle(.primary)
-                Text(detail)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(BirthdayTheme.inkSecondary)
-                    .lineSpacing(2)
-                    .fixedSize(horizontal: false, vertical: true)
+                if !detail.isEmpty {
+                    Text(detail)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(BirthdayTheme.inkSecondary)
+                        .lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             .layoutPriority(1)
 

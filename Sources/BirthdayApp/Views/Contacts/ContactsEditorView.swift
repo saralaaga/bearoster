@@ -281,6 +281,7 @@ struct ContactCollectionRow: View {
         case .all: Image(systemName: "person.2.fill")
         case .container: Image(systemName: "tray.full.fill")
         case .group: Image(systemName: "folder.fill")
+        case .ungrouped: Image(systemName: "person.crop.circle.badge.questionmark")
         }
     }
 
@@ -289,6 +290,7 @@ struct ContactCollectionRow: View {
         case .all: ContactsNativeStyle.accent
         case .container: Color(hex: 0x8E8E93)
         case .group: Color(hex: 0xFF9500)
+        case .ungrouped: Color(hex: 0x8E8E93)
         }
     }
 }

@@ -52,15 +52,22 @@ public final class ContactsRepository: @unchecked Sendable {
     }
 
     public func fetchProfiles() async throws -> [ContactBirthdayProfile] {
-        try await fetchDataSnapshot(fieldAccessLevel: .birthdayOnly).profiles
+        try await fetchDataSnapshot(fieldAccessLevel: .birthdayOnly, accessScope: .all).profiles
     }
 
-    public func fetchDataSnapshot(fieldAccessLevel: ContactFieldAccessLevel) async throws -> ContactDataSnapshot {
+    public func fetchDataSnapshot(
+        fieldAccessLevel: ContactFieldAccessLevel,
+        accessScope: ContactAccessScope = .all
+    ) async throws -> ContactDataSnapshot {
         let store = store
         return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    continuation.resume(returning: try Self.fetchDataSnapshotSync(store: store, fieldAccessLevel: fieldAccessLevel))
+                    continuation.resume(returning: try Self.fetchDataSnapshotSync(
+                        store: store,
+                        fieldAccessLevel: fieldAccessLevel,
+                        accessScope: accessScope
+                    ))
                 } catch {
                     continuation.resume(throwing: error)
                 }
@@ -106,7 +113,11 @@ public final class ContactsRepository: @unchecked Sendable {
         }
     }
 
-    private static func fetchDataSnapshotSync(store: CNContactStore, fieldAccessLevel: ContactFieldAccessLevel) throws -> ContactDataSnapshot {
+    private static func fetchDataSnapshotSync(
+        store: CNContactStore,
+        fieldAccessLevel: ContactFieldAccessLevel,
+        accessScope: ContactAccessScope
+    ) throws -> ContactDataSnapshot {
         guard canReadContacts else {
             throw ContactsRepositoryError.permissionDenied
         }
@@ -127,12 +138,13 @@ public final class ContactsRepository: @unchecked Sendable {
         }
 
         let sortedProfiles = profiles.sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
-        return ContactDataSnapshot(
+        let snapshot = ContactDataSnapshot(
             profiles: sortedProfiles,
             grouping: groupingSnapshot(store: store, allContactIDs: Set(sortedProfiles.map(\.id))),
             extendedProfilesByID: extendedProfilesByID,
             fieldAccessLevel: fieldAccessLevel
         )
+        return snapshot.scoped(to: accessScope)
     }
 
     private static func saveBirthdaysSync(store: CNContactStore, contactID: String, payload: BirthdayEditPayload) throws {
@@ -290,6 +302,7 @@ public final class ContactsRepository: @unchecked Sendable {
             ContactCollectionIdentifier.all: allContactIDs
         ]
         var groupIDsByContactID: [String: Set<String>] = [:]
+        var groupedContactIDs = Set<String>()
 
         for container in containers {
             let containerID = ContactCollectionIdentifier.container(container.identifier)
@@ -334,11 +347,22 @@ public final class ContactsRepository: @unchecked Sendable {
                     contactCount: groupContactIDs.count
                 ))
                 contactIDsByCollectionID[groupID] = groupContactIDs
+                groupedContactIDs.formUnion(groupContactIDs)
                 for contactID in groupContactIDs {
                     groupIDsByContactID[contactID, default: []].insert(group.identifier)
                 }
             }
         }
+
+        let ungroupedContactIDs = allContactIDs.subtracting(groupedContactIDs)
+        collections.append(ContactCollectionSummary(
+            id: ContactCollectionIdentifier.ungrouped,
+            title: "Ungrouped",
+            kind: .ungrouped,
+            parentContainerID: nil,
+            contactCount: ungroupedContactIDs.count
+        ))
+        contactIDsByCollectionID[ContactCollectionIdentifier.ungrouped] = ungroupedContactIDs
 
         return ContactGroupingSnapshot(
             containers: containerSummaries,

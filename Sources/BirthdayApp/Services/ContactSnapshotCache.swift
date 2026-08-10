@@ -16,30 +16,20 @@ actor ContactSnapshotCache {
         self.databaseURL = databaseURL
     }
 
-    func load(fieldAccessLevel: ContactFieldAccessLevel) -> ContactDataSnapshot? {
+    func load(
+        fieldAccessLevel: ContactFieldAccessLevel,
+        accessScope: ContactAccessScope = .all
+    ) -> ContactDataSnapshot? {
         do {
             let database = try openDatabase()
             defer { sqlite3_close(database) }
             try prepareSchema(database)
 
-            let sql = "SELECT payload FROM contact_snapshots WHERE id = ? LIMIT 1"
-            var statement: OpaquePointer?
-            guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK else {
-                return nil
-            }
-            defer { sqlite3_finalize(statement) }
-
-            sqlite3_bind_text(statement, 1, cacheID(for: fieldAccessLevel), -1, transientDestructor)
-            guard sqlite3_step(statement) == SQLITE_ROW,
-                  let bytes = sqlite3_column_blob(statement, 0)
-            else {
-                return nil
-            }
-
-            let byteCount = Int(sqlite3_column_bytes(statement, 0))
-            let data = Data(bytes: bytes, count: byteCount)
-            let snapshot = try decoder.decode(ContactDataSnapshot.self, from: data)
-            guard snapshot.fieldAccessLevel == fieldAccessLevel else {
+            guard let snapshot = loadSnapshot(
+                database: database,
+                cacheIDs: cacheIDs(for: fieldAccessLevel, accessScope: accessScope),
+                fieldAccessLevel: fieldAccessLevel
+            ) else {
                 return nil
             }
             return snapshot
@@ -48,7 +38,41 @@ actor ContactSnapshotCache {
         }
     }
 
-    func save(_ snapshot: ContactDataSnapshot) {
+    private func loadSnapshot(
+        database: OpaquePointer?,
+        cacheIDs: [String],
+        fieldAccessLevel: ContactFieldAccessLevel
+    ) -> ContactDataSnapshot? {
+        let sql = "SELECT payload FROM contact_snapshots WHERE id = ? LIMIT 1"
+
+        for cacheID in cacheIDs {
+            var statement: OpaquePointer?
+            guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK else {
+                continue
+            }
+            defer { sqlite3_finalize(statement) }
+
+            sqlite3_bind_text(statement, 1, cacheID, -1, transientDestructor)
+            guard sqlite3_step(statement) == SQLITE_ROW,
+                  let bytes = sqlite3_column_blob(statement, 0)
+            else {
+                continue
+            }
+
+            let byteCount = Int(sqlite3_column_bytes(statement, 0))
+            let data = Data(bytes: bytes, count: byteCount)
+            guard let snapshot = try? decoder.decode(ContactDataSnapshot.self, from: data),
+                  snapshot.fieldAccessLevel == fieldAccessLevel
+            else {
+                continue
+            }
+            return snapshot
+        }
+
+        return nil
+    }
+
+    func save(_ snapshot: ContactDataSnapshot, accessScope: ContactAccessScope = .all) {
         do {
             let database = try openDatabase()
             defer { sqlite3_close(database) }
@@ -65,7 +89,7 @@ actor ContactSnapshotCache {
             }
             defer { sqlite3_finalize(statement) }
 
-            sqlite3_bind_text(statement, 1, cacheID(for: snapshot.fieldAccessLevel), -1, transientDestructor)
+            sqlite3_bind_text(statement, 1, cacheID(for: snapshot.fieldAccessLevel, accessScope: accessScope), -1, transientDestructor)
             sqlite3_bind_text(statement, 2, snapshot.fieldAccessLevel.rawValue, -1, transientDestructor)
             sqlite3_bind_double(statement, 3, snapshot.loadedAt.timeIntervalSince1970)
             _ = data.withUnsafeBytes { buffer in
@@ -104,8 +128,20 @@ actor ContactSnapshotCache {
         }
     }
 
-    private func cacheID(for fieldAccessLevel: ContactFieldAccessLevel) -> String {
-        "latest:\(fieldAccessLevel.rawValue)"
+    private func cacheID(
+        for fieldAccessLevel: ContactFieldAccessLevel,
+        accessScope: ContactAccessScope
+    ) -> String {
+        "latest:\(fieldAccessLevel.rawValue):\(accessScope.cacheKey)"
+    }
+
+    private func cacheIDs(
+        for fieldAccessLevel: ContactFieldAccessLevel,
+        accessScope: ContactAccessScope
+    ) -> [String] {
+        let scopedID = cacheID(for: fieldAccessLevel, accessScope: accessScope)
+        guard accessScope == .all else { return [scopedID] }
+        return [scopedID, "latest:\(fieldAccessLevel.rawValue)"]
     }
 }
 

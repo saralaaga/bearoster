@@ -25,13 +25,22 @@ actor ContactSyncService {
         try await repository.requestAccess()
     }
 
-    func cachedSnapshot(fieldAccessLevel: ContactFieldAccessLevel) async -> ContactDataSnapshot? {
-        await cache.load(fieldAccessLevel: fieldAccessLevel)
+    func cachedSnapshot(
+        fieldAccessLevel: ContactFieldAccessLevel,
+        accessScope: ContactAccessScope
+    ) async -> ContactDataSnapshot? {
+        await cache.load(fieldAccessLevel: fieldAccessLevel, accessScope: accessScope)
     }
 
-    func refreshSnapshot(fieldAccessLevel: ContactFieldAccessLevel) async throws -> ContactDataSnapshot {
-        let snapshot = try await repository.fetchDataSnapshot(fieldAccessLevel: fieldAccessLevel)
-        await cache.save(snapshot)
+    func refreshSnapshot(
+        fieldAccessLevel: ContactFieldAccessLevel,
+        accessScope: ContactAccessScope
+    ) async throws -> ContactDataSnapshot {
+        let snapshot = try await repository.fetchDataSnapshot(
+            fieldAccessLevel: fieldAccessLevel,
+            accessScope: accessScope
+        )
+        await cache.save(snapshot, accessScope: accessScope)
         return snapshot
     }
 

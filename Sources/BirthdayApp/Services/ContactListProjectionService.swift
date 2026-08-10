@@ -40,6 +40,7 @@ struct ContactListProjectionService: Sendable {
     func snapshot(
         profiles: [ContactBirthdayProfile],
         grouping: ContactGroupingSnapshot,
+        accessScope: ContactAccessScope = .all,
         selectedCollectionID: String,
         searchText: String,
         language: AppLanguage,
@@ -47,7 +48,13 @@ struct ContactListProjectionService: Sendable {
         todayText: String,
         upcomingOccurrencesByContactID: [String: BirthdayOccurrence] = [:]
     ) -> ContactListProjectionSnapshot {
-        let visibleIDs = grouping.contactIDsByCollectionID[selectedCollectionID] ?? Set(profiles.map(\.id))
+        let profileIDs = Set(profiles.map(\.id))
+        let visibleIDs = visibleContactIDs(
+            profiles: profiles,
+            grouping: grouping,
+            accessScope: accessScope,
+            selectedCollectionID: selectedCollectionID
+        )
         let rows = profiles
             .filter { visibleIDs.contains($0.id) }
             .filter { searchText.isEmpty || $0.displayName.localizedCaseInsensitiveContains(searchText) }
@@ -82,10 +89,29 @@ struct ContactListProjectionService: Sendable {
         }
 
         return ContactListProjectionSnapshot(
-            collectionSections: collectionSections(from: grouping),
+            collectionSections: collectionSections(from: grouping, accessScope: accessScope, profileIDs: profileIDs),
             contactSections: sections,
             visibleContactCount: rows.count
         )
+    }
+
+    private func visibleContactIDs(
+        profiles: [ContactBirthdayProfile],
+        grouping: ContactGroupingSnapshot,
+        accessScope: ContactAccessScope,
+        selectedCollectionID: String
+    ) -> Set<String> {
+        let profileIDs = Set(profiles.map(\.id))
+        let scopedIDs = accessScope.allowedContactIDs(in: grouping) ?? profileIDs
+
+        guard selectedCollectionID != ContactCollectionIdentifier.all else {
+            return scopedIDs.intersection(profileIDs)
+        }
+
+        let collectionIDs = grouping.contactIDsByCollectionID[selectedCollectionID] ?? profileIDs
+        return collectionIDs
+            .intersection(scopedIDs)
+            .intersection(profileIDs)
     }
 
     private func rowModel(
@@ -117,7 +143,15 @@ struct ContactListProjectionService: Sendable {
         )
     }
 
-    private func collectionSections(from grouping: ContactGroupingSnapshot) -> [ContactCollectionSectionModel] {
+    private func collectionSections(
+        from grouping: ContactGroupingSnapshot,
+        accessScope: ContactAccessScope,
+        profileIDs: Set<String>
+    ) -> [ContactCollectionSectionModel] {
+        if accessScope.mode == .selectedGroups {
+            return scopedCollectionSections(from: grouping, accessScope: accessScope, profileIDs: profileIDs)
+        }
+
         let all = grouping.collections.first { $0.id == ContactCollectionIdentifier.all }
             ?? ContactCollectionSummary(
                 id: ContactCollectionIdentifier.all,
@@ -126,8 +160,13 @@ struct ContactListProjectionService: Sendable {
                 parentContainerID: nil,
                 contactCount: 0
             )
+        var libraryCollections = [all]
+        if let ungrouped = grouping.collections.first(where: { $0.id == ContactCollectionIdentifier.ungrouped }),
+           ungrouped.contactCount > 0 {
+            libraryCollections.append(ungrouped)
+        }
         var sections = [
-            ContactCollectionSectionModel(id: "all", title: "All Contacts", collections: [all])
+            ContactCollectionSectionModel(id: "all", title: "All Contacts", collections: libraryCollections)
         ]
 
         for container in grouping.containers.sorted(by: { $0.name.localizedStandardCompare($1.name) == .orderedAscending }) {
@@ -144,6 +183,67 @@ struct ContactListProjectionService: Sendable {
                 id: container.id,
                 title: container.name,
                 collections: containerCollections
+            ))
+        }
+
+        return sections
+    }
+
+    private func scopedCollectionSections(
+        from grouping: ContactGroupingSnapshot,
+        accessScope: ContactAccessScope,
+        profileIDs: Set<String>
+    ) -> [ContactCollectionSectionModel] {
+        var libraryCollections = [
+            ContactCollectionSummary(
+                id: ContactCollectionIdentifier.all,
+                title: "All Contacts",
+                kind: .all,
+                parentContainerID: nil,
+                contactCount: profileIDs.count
+            )
+        ]
+
+        if accessScope.includeUngroupedContacts {
+            let ungroupedIDs = (grouping.contactIDsByCollectionID[ContactCollectionIdentifier.ungrouped] ?? [])
+                .intersection(profileIDs)
+            if !ungroupedIDs.isEmpty {
+                libraryCollections.append(ContactCollectionSummary(
+                    id: ContactCollectionIdentifier.ungrouped,
+                    title: "Ungrouped",
+                    kind: .ungrouped,
+                    parentContainerID: nil,
+                    contactCount: ungroupedIDs.count
+                ))
+            }
+        }
+
+        var sections = [
+            ContactCollectionSectionModel(id: "all", title: "All Contacts", collections: libraryCollections)
+        ]
+
+        for container in grouping.containers.sorted(by: { $0.name.localizedStandardCompare($1.name) == .orderedAscending }) {
+            let selectedGroupCollections = grouping.groups
+                .filter { $0.containerID == container.id && accessScope.allowedGroupIDs.contains($0.id) }
+                .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+                .compactMap { group -> ContactCollectionSummary? in
+                    let collectionID = ContactCollectionIdentifier.group(group.id)
+                    let count = (grouping.contactIDsByCollectionID[collectionID] ?? []).intersection(profileIDs).count
+                    guard count > 0 else { return nil }
+                    return ContactCollectionSummary(
+                        id: collectionID,
+                        title: group.name,
+                        kind: .group,
+                        parentContainerID: container.id,
+                        contactCount: count
+                    )
+                }
+
+            guard !selectedGroupCollections.isEmpty else { continue }
+            sections.append(ContactCollectionSectionModel(
+                id: container.id,
+                title: container.name,
+                collections: selectedGroupCollections
             ))
         }
 

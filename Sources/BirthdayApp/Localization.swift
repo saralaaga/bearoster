@@ -135,6 +135,15 @@ struct L10n {
     static let deleteContactsMessage = Key(zhHans: "这会从 macOS 通讯录中删除所选联系人，并可能同步到 iCloud。此操作无法从 Birthday 中撤销。", zhHant: "這會從 macOS 通訊錄中刪除所選聯絡人，並可能同步到 iCloud。此操作無法從 Birthday 中復原。", en: "This will delete the selected contacts from macOS Contacts and may sync to iCloud. This cannot be undone in Birthday.")
     static let contactsDeleted = Key(zhHans: "已删除联系人", zhHant: "已刪除聯絡人", en: "Contacts deleted")
     static let deleteContactsFailed = Key(zhHans: "无法删除联系人，请检查通讯录权限或账户是否允许编辑。", zhHant: "無法刪除聯絡人，請檢查通訊錄權限或帳戶是否允許編輯。", en: "Could not delete contacts. Check Contacts permission or whether the account allows editing.")
+    static let contactGroupAccess = Key(zhHans: "通讯录分组访问", zhHant: "通訊錄分組存取", en: "Contact group access")
+    static let allContactsAccess = Key(zhHans: "全部通讯录", zhHant: "全部通訊錄", en: "All contacts")
+    static let selectedGroupsAccess = Key(zhHans: "仅选择的分组", zhHant: "僅選取的分組", en: "Selected groups only")
+    static let contactGroupAccessBody = Key(zhHans: "这是 Birthday 内部的访问范围。macOS 仍然按 App 授权通讯录，Birthday 会只显示和计算你选择的分组。", zhHant: "這是 Birthday 內部的存取範圍。macOS 仍然以 App 為單位授權通訊錄，Birthday 只會顯示和計算你選取的分組。", en: "This is Birthday's local access scope. macOS still grants Contacts access to the app, and Birthday only displays and calculates selected groups.")
+    static let includeUngroupedContacts = Key(zhHans: "包含未分组联系人", zhHant: "包含未分組聯絡人", en: "Include ungrouped contacts")
+    static let ungroupedContacts = Key(zhHans: "未分组联系人", zhHant: "未分組聯絡人", en: "Ungrouped contacts")
+    static let noContactGroups = Key(zhHans: "没有从 Apple 通讯录读取到分组。", zhHant: "沒有從 Apple 通訊錄讀取到分組。", en: "No groups were found in Apple Contacts.")
+    static let clearSelection = Key(zhHans: "清空", zhHant: "清空", en: "Clear")
+    static let selectedGroupsSummary = Key(zhHans: "已选择分组", zhHant: "已選取分組", en: "Selected groups")
 }
 
 extension L10n.Key {
@@ -228,4 +237,13 @@ extension L10n.Key {
     static let deleteContactsMessage = L10n.deleteContactsMessage
     static let contactsDeleted = L10n.contactsDeleted
     static let deleteContactsFailed = L10n.deleteContactsFailed
+    static let contactGroupAccess = L10n.contactGroupAccess
+    static let allContactsAccess = L10n.allContactsAccess
+    static let selectedGroupsAccess = L10n.selectedGroupsAccess
+    static let contactGroupAccessBody = L10n.contactGroupAccessBody
+    static let includeUngroupedContacts = L10n.includeUngroupedContacts
+    static let ungroupedContacts = L10n.ungroupedContacts
+    static let noContactGroups = L10n.noContactGroups
+    static let clearSelection = L10n.clearSelection
+    static let selectedGroupsSummary = L10n.selectedGroupsSummary
 }

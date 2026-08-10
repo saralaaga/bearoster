@@ -202,6 +202,133 @@ struct ContactArchitectureTests {
         #expect(await cache.load(fieldAccessLevel: .extended)?.profiles.first?.id == "extended")
     }
 
+    @Test("Contact access scope filters selected groups and ungrouped contacts")
+    func contactAccessScopeFiltersSelectedGroupsAndUngroupedContacts() {
+        let grouping = ContactGroupingSnapshot(
+            groups: [
+                ContactGroupSummary(id: "friends", containerID: "icloud", name: "Friends", contactCount: 2),
+                ContactGroupSummary(id: "work", containerID: "icloud", name: "Work", contactCount: 1)
+            ],
+            contactIDsByCollectionID: [
+                ContactCollectionIdentifier.all: ["ada", "grace", "linus", "ungrouped"],
+                ContactCollectionIdentifier.group("friends"): ["ada", "grace"],
+                ContactCollectionIdentifier.group("work"): ["linus"],
+                ContactCollectionIdentifier.ungrouped: ["ungrouped"]
+            ]
+        )
+        let scope = ContactAccessScope(
+            mode: .selectedGroups,
+            allowedGroupIDs: ["friends"],
+            includeUngroupedContacts: true
+        )
+
+        #expect(scope.allowedContactIDs(in: grouping) == ["ada", "grace", "ungrouped"])
+    }
+
+    @Test("Contact snapshot scope removes non-selected profiles and extended fields")
+    func contactSnapshotScopeRemovesNonSelectedProfilesAndExtendedFields() {
+        let profiles = [
+            ContactBirthdayProfile(id: "ada", displayName: "Ada", organizationName: "", records: []),
+            ContactBirthdayProfile(id: "grace", displayName: "Grace", organizationName: "", records: []),
+            ContactBirthdayProfile(id: "linus", displayName: "Linus", organizationName: "", records: [])
+        ]
+        let snapshot = ContactDataSnapshot(
+            profiles: profiles,
+            grouping: ContactGroupingSnapshot(
+                groups: [ContactGroupSummary(id: "friends", containerID: "icloud", name: "Friends", contactCount: 2)],
+                contactIDsByCollectionID: [
+                    ContactCollectionIdentifier.all: Set(profiles.map(\.id)),
+                    ContactCollectionIdentifier.group("friends"): ["ada", "grace"]
+                ]
+            ),
+            extendedProfilesByID: [
+                "ada": ContactExtendedProfile(phoneNumbers: ["1"]),
+                "linus": ContactExtendedProfile(phoneNumbers: ["2"])
+            ],
+            fieldAccessLevel: .extended
+        )
+
+        let scoped = snapshot.scoped(to: ContactAccessScope(
+            mode: .selectedGroups,
+            allowedGroupIDs: ["friends"],
+            includeUngroupedContacts: false
+        ))
+
+        #expect(scoped.profiles.map(\.id) == ["ada", "grace"])
+        #expect(scoped.extendedProfilesByID.keys.sorted() == ["ada"])
+    }
+
+    @Test("Contact projection deduplicates multiple selected groups")
+    func contactProjectionDeduplicatesMultipleSelectedGroups() {
+        let profiles = [
+            ContactBirthdayProfile(id: "ada", displayName: "Ada", organizationName: "", records: []),
+            ContactBirthdayProfile(id: "grace", displayName: "Grace", organizationName: "", records: []),
+            ContactBirthdayProfile(id: "linus", displayName: "Linus", organizationName: "", records: [])
+        ]
+        let grouping = ContactGroupingSnapshot(
+            containers: [ContactContainerSummary(id: "icloud", name: "iCloud", typeName: "CardDAV")],
+            groups: [
+                ContactGroupSummary(id: "friends", containerID: "icloud", name: "Friends", contactCount: 2),
+                ContactGroupSummary(id: "work", containerID: "icloud", name: "Work", contactCount: 2)
+            ],
+            collections: [
+                ContactCollectionSummary(id: ContactCollectionIdentifier.all, title: "All Contacts", kind: .all, parentContainerID: nil, contactCount: 3),
+                ContactCollectionSummary(id: ContactCollectionIdentifier.group("friends"), title: "Friends", kind: .group, parentContainerID: "icloud", contactCount: 2),
+                ContactCollectionSummary(id: ContactCollectionIdentifier.group("work"), title: "Work", kind: .group, parentContainerID: "icloud", contactCount: 2)
+            ],
+            contactIDsByCollectionID: [
+                ContactCollectionIdentifier.all: Set(profiles.map(\.id)),
+                ContactCollectionIdentifier.group("friends"): ["ada", "grace"],
+                ContactCollectionIdentifier.group("work"): ["grace", "linus"]
+            ]
+        )
+
+        let snapshot = ContactListProjectionService().snapshot(
+            profiles: profiles,
+            grouping: grouping,
+            accessScope: ContactAccessScope(
+                mode: .selectedGroups,
+                allowedGroupIDs: ["friends", "work"],
+                includeUngroupedContacts: false
+            ),
+            selectedCollectionID: ContactCollectionIdentifier.all,
+            searchText: "",
+            language: .en,
+            noBirthdaysText: "No birthdays",
+            todayText: "Today"
+        )
+
+        #expect(snapshot.visibleContactCount == 3)
+        #expect(Set(snapshot.contactSections.flatMap { $0.rows.map(\.id) }) == ["ada", "grace", "linus"])
+    }
+
+    @Test("SQLite cache separates contact access scopes")
+    func contactSnapshotCacheSeparatesAccessScopes() async {
+        let databaseURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("sqlite3")
+        let cache = ContactSnapshotCache(databaseURL: databaseURL)
+        let allSnapshot = ContactDataSnapshot(
+            profiles: [ContactBirthdayProfile(id: "all", displayName: "All", organizationName: "", records: [])],
+            fieldAccessLevel: .birthdayOnly
+        )
+        let selectedScope = ContactAccessScope(
+            mode: .selectedGroups,
+            allowedGroupIDs: ["friends"],
+            includeUngroupedContacts: false
+        )
+        let selectedSnapshot = ContactDataSnapshot(
+            profiles: [ContactBirthdayProfile(id: "selected", displayName: "Selected", organizationName: "", records: [])],
+            fieldAccessLevel: .birthdayOnly
+        )
+
+        await cache.save(allSnapshot, accessScope: .all)
+        await cache.save(selectedSnapshot, accessScope: selectedScope)
+
+        #expect(await cache.load(fieldAccessLevel: .birthdayOnly, accessScope: .all)?.profiles.first?.id == "all")
+        #expect(await cache.load(fieldAccessLevel: .birthdayOnly, accessScope: selectedScope)?.profiles.first?.id == "selected")
+    }
+
     @Test("Local birthday store persists extra birthday specs by person")
     func localBirthdayStoreRoundTripsExtraSpecs() async {
         let databaseURL = FileManager.default.temporaryDirectory
