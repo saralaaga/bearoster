@@ -10,6 +10,7 @@
 .tmp-screenshots/
 .tmp-shots/
 .omx/
+.superpowers/
 
 # Release/build outputs
 dist/
@@ -22,4 +23,3 @@ DerivedData/
 *.xcuserdata/
 *.xcuserstate
 *.moved-aside
-
