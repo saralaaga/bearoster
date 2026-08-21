@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-// Renders Apple-style app-icon concept drafts for Birthday.
+// Renders Apple-style app-icon concept drafts for Roster.
 // Output: Assets/Logo/concepts/concept-N-<name>.png (2048x2048)
 
 let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)

@@ -1,14 +1,14 @@
-# Birthday App UI 设计与代码审查报告
+# Roster App UI 设计与代码审查报告
 
 **审查日期**: 2026-08-09  
-**项目**: Birthday - macOS 生日管理应用  
+**项目**: Roster - macOS 生日管理应用  
 **当前版本**: 0.2.0
 
 ---
 
 ## 一、项目概述
 
-Birthday 是一个本地优先的 macOS 通讯录生日管理工具，支持公历、农历、希伯来历和伊斯兰历四种历法。目前有两个 HTML 设计原型：
+Roster 是一个本地优先的 macOS 通讯录生日管理工具，支持公历、农历、希伯来历和伊斯兰历四种历法。目前有两个 HTML 设计原型：
 - **redesign-mcm.html**: Mid-Century Modern 风格（中世纪现代主义）
 - **redesign-warm.html**: 奶油橘温暖风格
 - **实现版本**: SwiftUI 实现，采用 MCM 风格的设计系统
@@ -92,7 +92,7 @@ private struct MCMButtonChrome: ViewModifier {
         content
             .buttonStyle(.plain)
             .padding(.horizontal, 12)
-            .background(BirthdayTheme.controlBackground(colorScheme), ...)
+            .background(RosterTheme.controlBackground(colorScheme), ...)
     }
 }
 ```
@@ -144,9 +144,9 @@ private let columns = Array(repeating: GridItem(.flexible(minimum: 84), spacing:
 
 **建议重构**:
 ```
-Sources/BirthdayApp/
+Sources/RosterApp/
 ├── Theme/
-│   ├── BirthdayTheme.swift         # 颜色、字体、间距
+│   ├── RosterTheme.swift         # 颜色、字体、间距
 │   ├── ThemeModifiers.swift        # 卡片、按钮样式
 │   └── ThemeColors.swift           # 语义化颜色
 ├── Components/
@@ -157,13 +157,13 @@ Sources/BirthdayApp/
 ├── Views/
 │   ├── Sidebar/
 │   │   ├── SidebarView.swift
-│   │   └── NextBirthdayCard.swift
+│   │   └── NextRosterCard.swift
 │   ├── Calendar/
 │   │   ├── CalendarDashboardView.swift
 │   │   ├── MonthGridView.swift
 │   │   └── DayDetailView.swift
 │   ├── List/
-│   │   └── BirthdayRecordsView.swift
+│   │   └── RosterRecordsView.swift
 │   ├── Contacts/
 │   │   └── ContactsEditorView.swift
 │   └── Settings/
@@ -220,8 +220,8 @@ let occurrences = model.records(on: date)
 **建议**: 
 ```swift
 @MainActor
-final class BirthdayAppModel: ObservableObject {
-    @Published private(set) var filteredOccurrencesByDate: [Date: [BirthdayOccurrence]] = [:]
+final class RosterAppModel: ObservableObject {
+    @Published private(set) var filteredOccurrencesByDate: [Date: [RosterOccurrence]] = [:]
     
     private func updateFilteredOccurrences() {
         // 在 searchText 或 records 变化时计算一次
@@ -322,8 +322,8 @@ Button {
 
 ### 5.2 Design Tokens
 ```swift
-// BirthdayTheme.swift
-enum BirthdayTheme {
+// RosterTheme.swift
+enum RosterTheme {
     // MARK: - Semantic Colors
     static let brandPrimary = Color(hex: "E8683C")
     static let brandSecondary = Color(hex: "F2A65A")
@@ -441,13 +441,13 @@ struct CardStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(
-                BirthdayTheme.backgroundCard.resolve(colorScheme),
-                in: RoundedRectangle(cornerRadius: BirthdayTheme.CornerRadius.md)
+                RosterTheme.backgroundCard.resolve(colorScheme),
+                in: RoundedRectangle(cornerRadius: RosterTheme.CornerRadius.md)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: BirthdayTheme.CornerRadius.md)
+                RoundedRectangle(cornerRadius: RosterTheme.CornerRadius.md)
                     .strokeBorder(
-                        highlighted ? BirthdayTheme.brandPrimary : BirthdayTheme.separator.resolve(colorScheme),
+                        highlighted ? RosterTheme.brandPrimary : RosterTheme.separator.resolve(colorScheme),
                         lineWidth: highlighted ? 1.5 : 1
                     )
             )
@@ -458,10 +458,10 @@ struct CardStyle: ViewModifier {
         switch elevation {
         case .flat: return (.clear, 0, 0)
         case .elevated:
-            let shadow = colorScheme == .dark ? BirthdayTheme.Shadow.cardDark : BirthdayTheme.Shadow.card
+            let shadow = colorScheme == .dark ? RosterTheme.Shadow.cardDark : RosterTheme.Shadow.card
             return (shadow.color, shadow.radius, shadow.y)
         case .floating:
-            let shadow = BirthdayTheme.Shadow.popup
+            let shadow = RosterTheme.Shadow.popup
             return (shadow.color, shadow.radius, shadow.y)
         }
     }
@@ -562,15 +562,15 @@ Button {
 
 #### 4. 性能优化
 ```swift
-// BirthdayAppModel.swift
-@Published private(set) var filteredOccurrencesByDate: [Date: [BirthdayOccurrence]] = [:]
+// RosterAppModel.swift
+@Published private(set) var filteredOccurrencesByDate: [Date: [RosterOccurrence]] = [:]
 
 private func updateFilteredOccurrences() {
     let calendar = Calendar.current
     let startDate = calendar.date(byAdding: .month, value: -1, to: visibleMonth) ?? visibleMonth
     let endDate = calendar.date(byAdding: .month, value: 2, to: visibleMonth) ?? visibleMonth
     
-    var result: [Date: [BirthdayOccurrence]] = [:]
+    var result: [Date: [RosterOccurrence]] = [:]
     var currentDate = startDate
     
     while currentDate <= endDate {
@@ -666,7 +666,7 @@ func testAvatarViewDark() {
 ### 8.2 可访问性测试
 ```swift
 func testCalendarGridAccessibility() {
-    let model = BirthdayAppModel()
+    let model = RosterAppModel()
     let view = CalendarDashboardView()
         .environment(model)
     
@@ -679,7 +679,7 @@ func testCalendarGridAccessibility() {
 ### 8.3 性能测试
 ```swift
 func testMonthGridPerformance() {
-    let model = BirthdayAppModel()
+    let model = RosterAppModel()
     // 添加 1000 个生日记录
     
     measure {
@@ -711,7 +711,7 @@ func testMonthGridPerformance() {
 5. **统一两种设计风格，形成最终方案**
 
 ### 预期效果
-完成上述改进后，Birthday App 将成为：
+完成上述改进后，Roster App 将成为：
 - ✅ 符合 Apple Human Interface Guidelines 的原生应用
 - ✅ 通过 WCAG 2.1 AA 可访问性标准
 - ✅ 具备清晰的设计系统和组件库

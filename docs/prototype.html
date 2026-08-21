@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>名片夹 — 通讯录管理原型</title>
+<style>
+/* ============ Design Tokens ============ */
+:root{
+  --canvas:#F5F0E6;
+  --surface:#FFFFFF;
+  --surface-hover:#F0EBE3;
+  --surface-selected:#EDE8DF;
+  --text-primary:#1A1A1A;
+  --text-secondary:#6B6560;
+  --text-tertiary:#9E978F;
+  --border:#E8E2D9;
+  --border-strong:#D5CFC6;
+  --accent:#1A1A1A;
+  --accent-text:#FFFFFF;
+  --tag-bg:#EDE8DF;
+  --tag-text:#4A4540;
+  --success:#5A7D5A;
+  --warning:#B8A15A;
+  --error:#A65D5D;
+  --info:#6A8FA8;
+  --radius-sm:6px; --radius-md:8px; --radius-lg:12px; --radius-xl:16px; --radius-full:9999px;
+  --ease-out-expo:cubic-bezier(0.16,1,0.3,1);
+  --ease-spring:cubic-bezier(0.34,1.56,0.64,1);
+  --font:"Inter","PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:var(--font);
+  background:var(--canvas);
+  color:var(--text-primary);
+  font-size:14px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,textarea{font-family:inherit}
+::selection{background:var(--surface-selected)}
+
+/* 细滚动条 */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:3px}
+
+/* ============ 布局骨架 ============ */
+.app{display:flex;flex-direction:column;height:100vh}
+.app-body{display:flex;flex:1;overflow:hidden}
+
+/* ---- 顶部导航栏 ---- */
+.topbar{
+  height:56px;flex-shrink:0;background:var(--surface);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 24px;gap:16px;z-index:20;
+}
+.logo{width:196px;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.logo svg{display:block}
+.logo-name{font-size:16px;font-weight:600;letter-spacing:.01em}
+.topbar-title{font-size:15px;font-weight:600;color:var(--text-primary)}
+.topbar-spacer{flex:1}
+.topbar .search{width:280px}
+
+/* ---- 左侧导航 ---- */
+.sidebar{
+  width:220px;flex-shrink:0;padding:20px 12px;
+  display:flex;flex-direction:column;overflow-y:auto;
+}
+.sidebar-heading{
+  font-size:13px;font-weight:500;color:var(--text-secondary);
+  letter-spacing:.05em;text-transform:uppercase;padding:0 12px;margin-bottom:8px;
+}
+.nav-item{
+  display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;
+  border-radius:var(--radius-sm);color:var(--text-primary);font-size:14px;
+  transition:background 150ms ease-in-out;width:100%;text-align:left;
+}
+.nav-item:hover{background:var(--surface-hover)}
+.nav-item.active{background:var(--surface-selected);font-weight:600}
+.nav-item svg{flex-shrink:0;color:var(--text-secondary)}
+.nav-item.active svg{color:var(--text-primary)}
+.nav-item .label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge{
+  background:var(--tag-bg);color:var(--tag-text);
+  font-size:12px;line-height:1;padding:3px 8px;border-radius:var(--radius-full);
+  font-variant-numeric:tabular-nums;
+}
+.sidebar-footer{margin-top:auto;padding-top:16px}
+
+/* ---- 主内容区 ---- */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;border-left:1px solid var(--border)}
+.toolbar{
+  height:48px;flex-shrink:0;display:flex;align-items:center;gap:8px;
+  padding:0 24px;border-bottom:1px solid var(--border);
+}
+.crumb{font-size:18px;font-weight:600;line-height:1.4}
+.crumb-count{font-size:14px;color:var(--text-secondary);margin-left:8px;font-weight:400}
+.toolbar-mid{display:flex;gap:8px;margin-left:24px}
+.toolbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+
+/* 筛选 Pill */
+.pill{
+  height:28px;padding:0 12px;border-radius:var(--radius-full);
+  font-size:13px;font-weight:500;color:var(--tag-text);background:var(--tag-bg);
+  transition:all 150ms ease-in-out;display:inline-flex;align-items:center;gap:6px;
+}
+.pill:hover{background:#E4DED3}
+.pill.on{background:var(--accent);color:var(--accent-text)}
+
+/* ---- 内容滚动区 ---- */
+.content{flex:1;overflow-y:auto;padding:24px;position:relative}
+
+/* ============ 组件：按钮 ============ */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  border-radius:var(--radius-full);font-weight:500;white-space:nowrap;
+  transition:all 150ms ease-in-out;
+}
+.btn:active{transform:scale(0.98)}
+.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn-lg{height:40px;padding:0 20px;font-size:14px}
+.btn-md{height:32px;padding:0 16px;font-size:13px}
+.btn-sm{height:24px;padding:0 12px;font-size:12px}
+.btn-primary{background:var(--accent);color:var(--accent-text)}
+.btn-primary:hover{background:#333333}
+.btn-secondary{background:transparent;border:1px solid var(--border-strong);color:var(--text-primary)}
+.btn-secondary:hover{background:var(--surface-hover)}
+.btn-ghost{color:var(--text-secondary);border-radius:var(--radius-md)}
+.btn-ghost:hover{color:var(--text-primary);background:var(--surface-hover)}
+.btn[disabled]{opacity:.4;cursor:not-allowed;pointer-events:none}
+.btn-icon{
+  width:32px;height:32px;border-radius:var(--radius-md);color:var(--text-secondary);
+  display:inline-flex;align-items:center;justify-content:center;
+  transition:all 150ms ease-in-out;flex-shrink:0;
+}
+.btn-icon:hover{background:var(--surface-hover);color:var(--text-primary)}
+.btn-icon.on{background:var(--accent);color:var(--accent-text)}
+.btn-danger{background:var(--error);color:#fff}
+.btn-danger:hover{background:#8F4F4F}
+
+/* ============ 组件：输入框 ============ */
+.input{
+  height:36px;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-md);padding:0 12px;font-size:14px;color:var(--text-primary);
+  transition:border-color 150ms ease-in-out;width:100%;
+}
+.input::placeholder{color:var(--text-tertiary)}
+.input:hover{border-color:var(--border-strong)}
+.input:focus{outline:none;border-color:var(--accent)}
+.search{position:relative}
+.search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-tertiary);pointer-events:none}
+.search .input{padding-left:32px}
+.search .clear{
+  position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  width:20px;height:20px;border-radius:var(--radius-sm);color:var(--text-tertiary);
+  display:none;align-items:center;justify-content:center;
+}
+.search .clear:hover{background:var(--surface-hover);color:var(--text-primary)}
+.search.has-value .clear{display:inline-flex}
+
+/* ============ 组件：复选框 ============ */
+.checkbox{
+  width:16px;height:16px;border:1.5px solid var(--border-strong);border-radius:4px;
+  background:transparent;display:inline-flex;align-items:center;justify-content:center;
+  transition:all 150ms ease-in-out;flex-shrink:0;padding:0;
+}
+.checkbox:hover{border-color:var(--accent)}
+.checkbox.checked,.checkbox.indeterminate{background:var(--accent);border-color:var(--accent)}
+.checkbox svg{opacity:0;transition:opacity 100ms}
+.checkbox.checked svg,.checkbox.indeterminate svg{opacity:1}
+
+/* ============ 组件：标签 ============ */
+.tag{
+  display:inline-flex;align-items:center;gap:4px;background:var(--tag-bg);color:var(--tag-text);
+  font-size:13px;font-weight:500;padding:4px 10px;border-radius:var(--radius-full);
+  line-height:1.4;white-space:nowrap;
+}
+.tag .x{
+  width:14px;height:14px;display:inline-flex;align-items:center;justify-content:center;
+  border-radius:var(--radius-full);color:var(--text-secondary);
+}
+.tag .x:hover{background:rgba(26,26,26,.08);color:var(--text-primary)}
+.tag.more{background:transparent;color:var(--text-secondary);font-size:12px;padding:4px 4px}
+@keyframes tagIn{from{transform:scale(0)}to{transform:scale(1)}}
+.tag.in{animation:tagIn 150ms var(--ease-out-expo)}
+
+/* ============ 组件：头像 ============ */
+.avatar{border-radius:var(--radius-md);background:var(--surface-hover);flex-shrink:0;display:block}
+.avatar-lg{border-radius:var(--radius-lg)}
+
+/* ============ 表格视图 ============ */
+.table-wrap{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+  overflow:hidden;
+}
+.table-scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:880px}
+thead th{
+  height:40px;font-size:13px;font-weight:500;color:var(--text-secondary);
+  letter-spacing:.05em;text-align:left;padding:0 12px;
+  border-bottom:1px solid var(--border-strong);background:var(--surface);
+  white-space:nowrap;user-select:none;
+  position:sticky;top:0;z-index:2;
+}
+thead th.sortable{cursor:pointer}
+thead th.sortable:hover{color:var(--text-primary)}
+tbody td{
+  height:56px;padding:0 12px;border-bottom:1px solid var(--border);
+  font-size:14px;color:var(--text-primary);vertical-align:middle;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;
+}
+tbody tr{position:relative;transition:background 150ms ease-in-out;cursor:pointer}
+tbody tr:hover{background:var(--surface-hover)}
+tbody tr.selected{background:var(--surface-selected)}
+tbody tr.selected::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--accent);
+}
+tbody tr:last-child td{border-bottom:none}
+.cell-name{display:flex;align-items:center;gap:8px}
+.cell-name .who{min-width:0}
+.cell-name .who .n{font-weight:500;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell-name .who .t{font-size:13px;color:var(--text-secondary);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell-sub{color:var(--text-secondary)}
+.cell-time{color:var(--text-tertiary);font-size:13px;font-variant-numeric:tabular-nums}
+.cell-tags{display:flex;gap:4px;align-items:center}
+.mono{font-variant-numeric:tabular-nums}
+th .sort-arrow{display:inline-block;margin-left:4px;font-size:10px}
+
+/* ============ 名片卡片视图 ============ */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+.card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+  padding:16px;cursor:pointer;position:relative;min-height:160px;
+  transition:all 150ms ease-in-out;
+}
+.card:hover{border-color:var(--border-strong);background:var(--surface-hover)}
+.card.selected{border-color:var(--accent);background:var(--surface-selected)}
+.card .check{
+  position:absolute;top:10px;left:10px;opacity:0;transition:opacity 150ms;z-index:2;
+}
+.card:hover .check,.card.selected .check{opacity:1}
+.card-head{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+.card-head .who{min-width:0}
+.card-head .n{font-size:16px;font-weight:500;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-head .t{font-size:13px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-line{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text-primary);margin-top:6px;min-width:0}
+.card-line svg{color:var(--text-secondary);flex-shrink:0}
+.card-line span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-tags{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+
+/* ============ 侧滑面板 ============ */
+.overlay{
+  position:fixed;inset:0;background:rgba(245,240,230,.3);z-index:40;
+  opacity:0;pointer-events:none;transition:opacity 300ms var(--ease-out-expo);
+}
+.overlay.show{opacity:1;pointer-events:auto}
+.panel{
+  position:fixed;top:0;right:0;bottom:0;width:420px;background:var(--surface);z-index:50;
+  border-left:1px solid var(--border-strong);
+  box-shadow:0 4px 24px rgba(26,26,26,.06);
+  transform:translateX(100%);transition:transform 300ms var(--ease-out-expo);
+  display:flex;flex-direction:column;
+}
+.panel.show{transform:translateX(0)}
+.panel-head{
+  height:72px;flex-shrink:0;display:flex;align-items:center;gap:12px;
+  padding:0 20px;border-bottom:1px solid var(--border);
+}
+.panel-head .who{flex:1;min-width:0}
+.panel-head .n{font-size:18px;font-weight:600;line-height:1.4}
+.panel-head .t{font-size:13px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.panel-body{flex:1;overflow-y:auto;padding:20px}
+.quick-actions{display:flex;gap:16px;margin-bottom:24px}
+.qa{display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--text-secondary)}
+.qa .btn-icon{border:1px solid var(--border)}
+.qa span{font-size:12px}
+.qa:hover{color:var(--text-primary)}
+.section{margin-bottom:24px}
+.section-title{
+  font-size:13px;font-weight:500;color:var(--text-secondary);
+  letter-spacing:.05em;text-transform:uppercase;margin-bottom:12px;
+  display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;
+}
+.section-title .caret{transition:transform 150ms}
+.section.collapsed .caret{transform:rotate(-90deg)}
+.section.collapsed .section-content{display:none}
+.info-row{display:flex;align-items:flex-start;gap:10px;padding:6px 0;line-height:2}
+.info-row svg{color:var(--text-secondary);flex-shrink:0;margin-top:8px}
+.info-row .v{flex:1;min-width:0;font-size:14px;color:var(--text-primary);word-break:break-all}
+.info-row a{color:var(--text-secondary);text-decoration:none}
+.info-row a:hover{text-decoration:underline}
+.panel .tag-editor{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.tag-input{
+  height:28px;border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:0 8px;font-size:13px;width:110px;color:var(--text-primary);
+}
+.tag-input:focus{outline:none;border-color:var(--accent)}
+.add-tag{height:28px;padding:0 10px;border-radius:var(--radius-full);font-size:13px;color:var(--text-secondary);border:1px dashed var(--border-strong)}
+.add-tag:hover{color:var(--text-primary);border-color:var(--text-secondary)}
+.notes{
+  width:100%;min-height:72px;border:1px solid var(--border);border-radius:var(--radius-md);
+  padding:10px 12px;font-size:14px;line-height:1.6;color:var(--text-primary);
+  background:var(--surface);resize:vertical;
+}
+.notes:focus{outline:none;border-color:var(--accent)}
+.notes[readonly]{border-color:transparent;background:transparent;padding:10px 0}
+.timeline{position:relative;padding-left:20px}
+.timeline::before{content:"";position:absolute;left:4px;top:8px;bottom:8px;width:1px;background:var(--border)}
+.tl-item{position:relative;padding-bottom:16px}
+.tl-item::before{
+  content:"";position:absolute;left:-19px;top:7px;width:7px;height:7px;
+  border-radius:50%;background:var(--border-strong);
+}
+.tl-item .d{font-size:12px;color:var(--text-tertiary)}
+.tl-item .h{font-size:14px;color:var(--text-primary);line-height:1.5}
+.tl-item .s{font-size:13px;color:var(--text-secondary);line-height:1.5}
+.panel-foot{
+  flex-shrink:0;display:none;gap:8px;justify-content:flex-end;
+  padding:16px 20px;border-top:1px solid var(--border);background:var(--surface);
+}
+.panel.editing .panel-foot{display:flex}
+.panel.editing .static-text{display:none}
+.edit-input{
+  height:32px;width:100%;border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:0 8px;font-size:14px;color:var(--text-primary);display:none;
+}
+.edit-input:focus{outline:none;border-color:var(--accent)}
+.panel.editing .edit-input{display:block}
+
+/* ============ 批量操作浮动栏 ============ */
+.bulkbar{
+  position:fixed;bottom:24px;left:50%;transform:translate(-50%,calc(100% + 40px));
+  background:var(--surface);border-radius:var(--radius-xl);
+  box-shadow:0 4px 24px rgba(26,26,26,.06),0 0 0 1px var(--border);
+  padding:12px 20px;display:flex;align-items:center;gap:12px;z-index:30;
+  transition:transform 250ms var(--ease-spring);
+}
+.bulkbar.show{transform:translate(-50%,0)}
+.bulkbar .count{font-size:14px;font-weight:500;margin-right:4px;white-space:nowrap}
+.bulkbar .sep{width:1px;height:20px;background:var(--border)}
+
+/* ============ 弹窗 ============ */
+.modal-mask{
+  position:fixed;inset:0;background:rgba(245,240,230,.3);z-index:60;
+  display:none;align-items:center;justify-content:center;padding:24px;
+}
+.modal-mask.show{display:flex}
+.modal{
+  background:var(--surface);border-radius:var(--radius-lg);max-width:480px;width:100%;
+  max-height:80vh;overflow-y:auto;padding:24px;
+  box-shadow:0 4px 24px rgba(26,26,26,.06),0 0 0 1px var(--border);
+  animation:modalIn 200ms var(--ease-out-expo);
+}
+.modal.wide{max-width:640px}
+@keyframes modalIn{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
+.modal h3{font-size:18px;font-weight:600;margin-bottom:8px}
+.modal .desc{font-size:14px;color:var(--text-secondary);margin-bottom:20px;line-height:1.6}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:24px}
+.form-row{margin-bottom:16px}
+.form-row label{display:block;font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:6px}
+
+/* 导入向导 */
+.steps{display:flex;align-items:center;gap:8px;margin-bottom:24px}
+.step{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-tertiary)}
+.step .dot{
+  width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border-strong);
+  display:inline-flex;align-items:center;justify-content:center;font-size:11px;
+}
+.step.on{color:var(--text-primary);font-weight:500}
+.step.on .dot{background:var(--accent);border-color:var(--accent);color:#fff}
+.step-line{flex:1;height:1px;background:var(--border)}
+.upload-zone{
+  border:1.5px dashed var(--border-strong);border-radius:var(--radius-lg);
+  padding:40px 24px;text-align:center;color:var(--text-secondary);
+  transition:all 150ms;cursor:pointer;
+}
+.upload-zone:hover{border-color:var(--text-tertiary);background:var(--surface-hover)}
+.upload-zone .big{font-size:15px;font-weight:500;color:var(--text-primary);margin-top:12px}
+.upload-zone .sub{font-size:13px;margin-top:4px}
+.map-row{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)}
+.map-row .from{flex:1;font-size:14px}
+.map-row select{
+  flex:1;height:32px;border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:0 8px;font-size:13px;background:var(--surface);color:var(--text-primary);font-family:inherit;
+}
+.progress{height:6px;background:var(--surface-hover);border-radius:3px;overflow:hidden;margin:16px 0}
+.progress i{display:block;height:100%;width:0;background:var(--accent);border-radius:3px;transition:width 200ms}
+
+/* ============ Toast ============ */
+.toasts{position:fixed;top:24px;right:24px;z-index:80;display:flex;flex-direction:column;gap:8px}
+.toast{
+  background:var(--accent);color:#fff;font-size:14px;border-radius:var(--radius-lg);
+  padding:12px 16px;max-width:360px;display:flex;align-items:center;gap:8px;
+  transform:translateX(20px);opacity:0;transition:all 200ms var(--ease-out-expo);
+}
+.toast.in{transform:translateX(0);opacity:1}
+
+/* ============ 空状态 ============ */
+.empty{
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  padding:80px 24px;text-align:center;
+}
+.empty.show{display:flex}
+.empty h4{font-size:18px;font-weight:600;margin:20px 0 8px}
+.empty p{font-size:14px;color:var(--text-secondary);margin-bottom:24px}
+.empty .actions{display:flex;gap:8px}
+
+/* 下拉菜单 */
+.menu{
+  position:fixed;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-md);padding:4px;z-index:70;min-width:160px;
+  box-shadow:0 4px 24px rgba(26,26,26,.06);
+  animation:modalIn 150ms var(--ease-out-expo);
+}
+.menu-item{
+  display:flex;align-items:center;gap:8px;height:32px;padding:0 12px;
+  font-size:14px;color:var(--text-primary);border-radius:var(--radius-sm);
+  width:100%;text-align:left;
+}
+.menu-item:hover{background:var(--surface-hover)}
+.menu-sep{height:1px;background:var(--border);margin:4px 8px}
+
+@media (prefers-reduced-motion:reduce){
+  *{transition-duration:0ms!important;animation-duration:0ms!important}
+}
+@media (max-width:900px){
+  .sidebar{display:none}
+  .panel{width:100%}
+  .topbar .search{display:none}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- 顶部导航栏 -->
+  <header class="topbar">
+    <div class="logo">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+        <rect x="1" y="1" width="26" height="26" rx="7" fill="#EDE8DF"/>
+        <circle cx="10" cy="12" r="1.4" fill="#6B6560"/>
+        <circle cx="18" cy="12" r="1.4" fill="#6B6560"/>
+        <path d="M9.5 16.5 Q14 21 18.5 16.5" stroke="#6B6560" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+      </svg>
+      <span class="logo-name">名片夹</span>
+    </div>
+    <span class="topbar-title" id="topbarTitle">全部联系人</span>
+    <div class="topbar-spacer"></div>
+    <div class="search" id="searchWrap">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M11 11 L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <input class="input" id="searchInput" placeholder="搜索姓名、公司、邮箱… (⌘K)">
+      <button class="clear" id="searchClear" aria-label="清空搜索">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2 L10 10 M10 2 L2 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <button class="btn btn-primary btn-lg" id="btnNew">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3 V13 M3 8 H13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      新建联系人
+    </button>
+  </header>
+
+  <div class="app-body">
+    <!-- 左侧导航 -->
+    <aside class="sidebar">
+      <div class="sidebar-heading">分组</div>
+      <div id="groupList"></div>
+      <div class="sidebar-footer">
+        <button class="btn btn-ghost btn-md" id="btnNewGroup" style="width:100%;justify-content:flex-start">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3 V13 M3 8 H13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          新建分组
+        </button>
+        <button class="btn btn-ghost btn-md" id="btnImport" style="width:100%;justify-content:flex-start;margin-top:4px">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2 V10 M5 7 L8 10 L11 7 M3 12 V13 A1 1 0 0 0 4 14 H12 A1 1 0 0 0 13 13 V12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          导入联系人
+        </button>
+      </div>
+    </aside>
+
+    <!-- 中央主内容区 -->
+    <main class="main">
+      <div class="toolbar">
+        <div>
+          <span class="crumb" id="crumb">全部联系人</span>
+          <span class="crumb-count" id="crumbCount"></span>
+        </div>
+        <div class="toolbar-mid" id="filterPills">
+          <button class="pill on" data-filter="all">全部</button>
+          <button class="pill" data-filter="recent">最近更新</button>
+          <button class="pill" data-filter="email">有邮箱</button>
+          <button class="pill" data-filter="phone">有电话</button>
+        </div>
+        <div class="toolbar-right">
+          <button class="btn btn-secondary btn-md" id="btnSort">最近更新 ↓</button>
+          <button class="btn-icon on" id="viewTable" title="表格视图" aria-label="表格视图">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4 H14 M2 8 H14 M2 12 H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+          <button class="btn-icon" id="viewCards" title="名片视图" aria-label="名片视图">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="5" height="5" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="2" width="5" height="5" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="9" width="5" height="5" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="9" width="5" height="5" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="content" id="content">
+        <!-- 表格视图 -->
+        <div class="table-wrap" id="tableWrap">
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:40px"><button class="checkbox" id="checkAll" aria-label="全选当前视图"></button></th>
+                  <th class="sortable" data-sort="name">姓名</th>
+                  <th>公司</th>
+                  <th>职位</th>
+                  <th>邮箱</th>
+                  <th>电话</th>
+                  <th>标签</th>
+                  <th class="sortable" data-sort="updated">最后更新 <span class="sort-arrow">↓</span></th>
+                </tr>
+              </thead>
+              <tbody id="tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <!-- 卡片视图 -->
+        <div class="cards" id="cardsWrap" style="display:none"></div>
+        <!-- 空状态 -->
+        <div class="empty" id="emptyState">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+            <rect x="2" y="2" width="60" height="60" rx="14" fill="#F0EBE3"/>
+            <circle cx="23" cy="27" r="2.6" fill="#6B6560"/>
+            <circle cx="41" cy="27" r="2.6" fill="#6B6560"/>
+            <path d="M22 38 Q32 48 42 37" stroke="#6B6560" stroke-width="2" stroke-linecap="round" fill="none"/>
+          </svg>
+          <h4 id="emptyTitle">还没有联系人</h4>
+          <p id="emptyDesc">导入现有联系人或手动添加</p>
+          <div class="actions" id="emptyActions">
+            <button class="btn btn-primary btn-md" onclick="openImport()">导入联系人</button>
+            <button class="btn btn-secondary btn-md" onclick="openNewContact()">新建联系人</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- 侧滑详情面板 -->
+<div class="overlay" id="overlay"></div>
+<aside class="panel" id="panel" role="dialog" aria-modal="true" aria-label="联系人详情">
+  <div class="panel-head" id="panelHead"></div>
+  <div class="panel-body" id="panelBody"></div>
+  <div class="panel-foot">
+    <button class="btn btn-secondary btn-md" id="panelCancel">取消</button>
+    <button class="btn btn-primary btn-md" id="panelSave">保存</button>
+  </div>
+</aside>
+
+<!-- 批量操作浮动栏 -->
+<div class="bulkbar" id="bulkbar" aria-live="polite">
+  <span class="count" id="bulkCount">已选 0 人</span>
+  <button class="btn btn-ghost btn-md" id="bulkCancel">取消</button>
+  <div class="sep"></div>
+  <button class="btn btn-secondary btn-md" id="bulkTag">添加标签</button>
+  <button class="btn btn-secondary btn-md" id="bulkMove">移动分组</button>
+  <button class="btn btn-secondary btn-md" id="bulkExport">导出</button>
+  <button class="btn btn-secondary btn-md" id="bulkDelete" style="color:var(--error)">删除</button>
+</div>
+
+<!-- 弹窗挂载点 -->
+<div class="modal-mask" id="modalMask"></div>
+<div class="toasts" id="toasts"></div>
+
+<script>
+/* ================= 数据 ================= */
+const GROUPS = ["全部","家人","同事","客户","合作伙伴","未分组"];
+const GROUP_ICONS = {
+  "全部":'<circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/>',
+  "家人":'<path d="M8 13 C4 10 2.5 7.5 4 5.5 C5.5 3.8 7.5 4.5 8 6 C8.5 4.5 10.5 3.8 12 5.5 C13.5 7.5 12 10 8 13 Z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linejoin="round"/>',
+  "同事":'<rect x="2.5" y="4" width="11" height="9" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 4 V2.5 H10.5 V4" stroke="currentColor" stroke-width="1.5"/>',
+  "客户":'<circle cx="8" cy="5.5" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 13 C3 10 5.5 9 8 9 C10.5 9 13 10 13 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>',
+  "合作伙伴":'<path d="M5 3 L11 3 L13 8 L8 13 L3 8 Z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linejoin="round"/>',
+  "未分组":'<circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2.5 2"/>'
+};
+const H = 3600e3, D = 24*H;
+const now = Date.now();
+let contacts = [
+  {id:1, name:"林晓雨", company:"拾光文化", title:"品牌总监", email:"xiaoyu.lin@shiguang.cn", phone:"+86 138 0011 2233", group:"客户", tags:["VIP","设计"], updated:now-2*H, wechat:"linxiaoyu", linkedin:"in/xiaoyulin", notes:"对纸质手账联名感兴趣，Q3 跟进。", timeline:[{d:"3天前",h:"电话沟通",s:"确认联名方案初稿时间"},{d:"上周",h:"邮件",s:"发送品牌手册 PDF"}]},
+  {id:2, name:"王志远", company:"南山科技", title:"前端工程师", email:"zywang@nanshan.io", phone:"+86 139 2233 4455", group:"同事", tags:["前端","React"], updated:now-5*H, wechat:"wzy_dev", notes:"工位在 4 楼东侧。", timeline:[{d:"昨天",h:"会议",s:"设计评审，确认表格组件规范"}]},
+  {id:3, name:"陈思思", company:"", title:"", email:"sisi.chen@gmail.com", phone:"", group:"家人", tags:[], updated:now-1*D, wechat:"sisichen", notes:"表妹，生日 10 月 2 日。", timeline:[{d:"上周",h:"微信",s:"聊了国庆回家安排"}]},
+  {id:4, name:"David Müller", company:"Folkways GmbH", title:"Partnership Lead", email:"david@folkways.de", phone:"+49 30 555 0182", group:"合作伙伴", tags:["欧洲","渠道"], updated:now-2*D, linkedin:"in/davidmueller", twitter:"@davidm", notes:"英语沟通，柏林时区。", timeline:[{d:"2天前",h:"邮件",s:"确认分销协议条款"}]},
+  {id:5, name:"周明轩", company:"南山科技", title:"产品经理", email:"mxzhou@nanshan.io", phone:"+86 137 8899 0011", group:"同事", tags:["产品"], updated:now-3*D, wechat:"zhoumx", notes:"", timeline:[{d:"3天前",h:"会议",s:"Q3 路线图对齐"}]},
+  {id:6, name:"苏婉婷", company:"沐禾传媒", title:"客户经理", email:"wanting@muhe.com", phone:"+86 136 5544 3322", group:"客户", tags:["广告"], updated:now-4*D, wechat:"suwanting", notes:"偏好微信沟通。", timeline:[{d:"4天前",h:"微信",s:"询价年度框架"}]},
+  {id:7, name:"高翔", company:"", title:"自由摄影师", email:"", phone:"+86 135 6677 8899", group:"未分组", tags:["摄影"], updated:now-6*D, notes:"活动拍摄可约，报价合理。", timeline:[]},
+  {id:8, name:"Emma Laurent", company:"Maison Kitsuné", title:"Buyer", email:"emma.l@kitsune.fr", phone:"+33 1 44 55 1020", group:"客户", tags:["欧洲","零售"], updated:now-8*D, linkedin:"in/emmalaurent", notes:"巴黎，春季选品会见过。", timeline:[{d:"上周",h:"邮件",s:"发送秋冬 lookbook"}]},
+  {id:9, name:"赵建国", company:"", title:"", email:"", phone:"+86 133 1122 3344", group:"家人", tags:[], updated:now-10*D, notes:"父亲，每周日通电话。", timeline:[{d:"10天前",h:"电话",s:"例行问候"}]},
+  {id:10, name:"许静怡", company:"橙光咨询", title:"合伙人", email:"jingyi.xu@orangeadvise.com", phone:"+86 131 9988 7766", group:"合作伙伴", tags:["咨询","VIP"], updated:now-12*D, wechat:"xujingyi", linkedin:"in/jingyixu", notes:"介绍过两个客户，记得回礼。", timeline:[{d:"2周前",h:"午餐",s:"讨论联合提案"}]},
+  {id:11, name:"韩东旭", company:"南山科技", title:"设计师", email:"dxhan@nanshan.io", phone:"", group:"同事", tags:["设计","UI"], updated:now-15*D, wechat:"handx", notes:"", timeline:[]},
+  {id:12, name:"田中健一", company:"Sakura Trading", title:"営業部長", email:"tanaka@sakura-trading.jp", phone:"+81 3 5555 0134", group:"客户", tags:["日本"], updated:now-20*D, notes:"邮件用日语，附敬语模板。", timeline:[{d:"3周前",h:"邮件",s:"确认样品寄送"}]},
+  {id:13, name:"刘一诺", company:"", title:"研究生", email:"yinuo.liu@edu.cn", phone:"+86 132 4455 6677", group:"未分组", tags:[], updated:now-30*D, wechat:"liuyinuo", notes:"导师组聚餐认识。", timeline:[]},
+  {id:14, name:"Margaret Chen", company:"Bluepeak Capital", title:"投资经理", email:"mchen@bluepeak.vc", phone:"+1 415 555 0173", group:"合作伙伴", tags:["投资"], updated:now-45*D, linkedin:"in/margaretchen", twitter:"@margchen", notes:"关注消费赛道早期项目。", timeline:[{d:"1月前",h:"电话",s:"介绍项目进展"}]}
+];
+let nextId = 15;
+
+/* ================= 状态 ================= */
+const state = {
+  view:"table", group:"全部", filter:"all",
+  search:"", sortKey:"updated", sortDir:-1,
+  selected:new Set(), panelId:null, editing:false
+};
+
+/* ================= 工具 ================= */
+const $ = s => document.querySelector(s);
+function relTime(ts){
+  const d = now - ts;
+  if(d < H) return Math.max(1,Math.floor(d/60e3))+" 分钟前";
+  if(d < D) return Math.floor(d/H)+" 小时前";
+  if(d < 7*D) return Math.floor(d/D)+" 天前";
+  if(d < 30*D) return Math.floor(d/(7*D))+" 周前";
+  return Math.floor(d/(30*D))+" 个月前";
+}
+/* 简笔画笑脸默认头像：每只眼睛/嘴略有差异，保留手绘感 */
+function avatarSVG(id, size){
+  const r = size>=56?12:8;
+  const jitter = (id%5)*0.35;
+  const ey = size*0.42 + (id%3)*0.4;
+  const ex = size*0.36, ex2 = size*0.64;
+  const my = size*0.58, lift = size*0.12 + jitter;
+  return `<svg class="avatar${size>=56?' avatar-lg':''}" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" fill="none">
+    <rect width="${size}" height="${size}" rx="${r}" fill="#F0EBE3"/>
+    <circle cx="${ex}" cy="${ey}" r="${size*0.045}" fill="#6B6560"/>
+    <circle cx="${ex2}" cy="${ey+(id%2)*0.6}" r="${size*0.045}" fill="#6B6560"/>
+    <path d="M${size*0.33} ${my} Q${size*0.5} ${my+lift} ${size*0.67} ${my-(id%3)*0.5}" stroke="#6B6560" stroke-width="${Math.max(1.5,size*0.035)}" stroke-linecap="round" fill="none"/>
+  </svg>`;
+}
+const CHECK_SVG = '<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1.5 5.5 L4 8 L8.5 2.5" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const DASH_SVG = '<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1.5 5 H8.5" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>';
+const X_SVG = '<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 2 L8 8 M8 2 L2 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+const ICONS = {
+  mail:'<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3.5" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 4.5 L8 8.5 L13.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+  phone:'<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 2.5 H6 L7 5.5 L5.5 6.5 C6.5 8.5 8 10 9.5 10.5 L10.5 9 L13.5 10 V13 C13.5 13.5 13 14 12.5 14 C7 13.5 2.5 9 2 3.5 C2 3 2.5 2.5 3 2.5 Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+  copy:'<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="5" y="5" width="9" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M11 5 V3.5 A1.5 1.5 0 0 0 9.5 2 H3.5 A1.5 1.5 0 0 0 2 3.5 V9.5 A1.5 1.5 0 0 0 3.5 11 H5" stroke="currentColor" stroke-width="1.5"/></svg>',
+  pin:'<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 14 C8 14 12.5 9.5 12.5 6.5 A4.5 4.5 0 0 0 3.5 6.5 C3.5 9.5 8 14 8 14 Z" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="6.5" r="1.5" stroke="currentColor" stroke-width="1.5"/></svg>',
+  wechat:'<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 2.5 C3 2.5 1 4.3 1 6.5 C1 8 2 9.2 3.5 9.9 L3 11.5 L4.8 10.5 C5.2 10.6 5.6 10.7 6 10.7 M10 5.5 C12.8 5.5 15 7.2 15 9.2 C15 10.5 14.1 11.6 12.8 12.2 L13.2 13.7 L11.6 12.8 C11.1 13 10.6 13 10 13 C7.2 13 5 11.3 5 9.2 C5 7.2 7.2 5.5 10 5.5 Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>',
+  linkedin:'<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M5 7 V11 M5 5 V5.1 M8 11 V8.5 C8 7.5 11 7.5 11 8.8 V11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
+  twitter:'<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 3 L6.5 8.5 L2.5 13 H4 L7.2 9.6 L9.5 13 H14 L9.3 7.2 L13 3 H11.5 L8.6 6.2 L6.5 3 Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>',
+  edit:'<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10.5 2.5 L13.5 5.5 L5.5 13.5 L2 14 L2.5 10.5 Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+  close:'<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3 L13 13 M13 3 L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+  check:'<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.5 L5.5 10.5 L11.5 3.5" stroke="#5A7D5A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  err:'<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="#fff" stroke-width="1.5"/><path d="M4.5 4.5 L9.5 9.5 M9.5 4.5 L4.5 9.5" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>'
+};
+function toast(msg, ok=true){
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.innerHTML = (ok?ICONS.check:ICONS.err) + `<span>${msg}</span>`;
+  $("#toasts").appendChild(el);
+  requestAnimationFrame(()=>el.classList.add("in"));
+  setTimeout(()=>{ el.classList.remove("in"); setTimeout(()=>el.remove(),200); }, 3000);
+}
+
+/* ================= 过滤 ================= */
+function visibleContacts(){
+  let list = contacts.filter(c => state.group==="全部" || c.group===state.group);
+  if(state.filter==="recent") list = list.filter(c => now - c.updated < 7*D);
+  if(state.filter==="email")  list = list.filter(c => c.email);
+  if(state.filter==="phone")  list = list.filter(c => c.phone);
+  if(state.search){
+    const q = state.search.toLowerCase();
+    list = list.filter(c => [c.name,c.company,c.title,c.email,c.phone,...c.tags].join(" ").toLowerCase().includes(q));
+  }
+  list = [...list].sort((a,b)=>{
+    if(state.sortKey==="name") return state.sortDir * a.name.localeCompare(b.name,"zh");
+    return state.sortDir * (a.updated - b.updated);
+  });
+  return list;
+}
+
+/* ================= 渲染：侧边栏 ================= */
+function renderSidebar(){
+  $("#groupList").innerHTML = GROUPS.map(g=>{
+    const n = g==="全部" ? contacts.length : contacts.filter(c=>c.group===g).length;
+    return `<button class="nav-item ${state.group===g?'active':''}" data-group="${g}">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">${GROUP_ICONS[g]}</svg>
+      <span class="label">${g}</span><span class="badge">${n}</span>
+    </button>`;
+  }).join("");
+  document.querySelectorAll(".nav-item").forEach(b=>b.onclick=()=>{
+    state.group=b.dataset.group; state.selected.clear();
+    $("#topbarTitle").textContent = b.dataset.group;
+    $("#crumb").textContent = b.dataset.group;
+    renderAll();
+  });
+}
+
+/* ================= 渲染：表格 ================= */
+function tagHTML(tags, max=2){
+  const shown = tags.slice(0,max).map(t=>`<span class="tag">${t}</span>`).join("");
+  const more = tags.length>max ? `<span class="tag more">+${tags.length-max}</span>` : "";
+  return shown+more;
+}
+function renderTable(list){
+  $("#tbody").innerHTML = list.map(c=>`<tr data-id="${c.id}" class="${state.selected.has(c.id)?'selected':''}">
+    <td onclick="event.stopPropagation()"><button class="checkbox row-check ${state.selected.has(c.id)?'checked':''}" data-id="${c.id}" aria-label="选择 ${c.name}">${state.selected.has(c.id)?CHECK_SVG:''}</button></td>
+    <td><div class="cell-name">${avatarSVG(c.id,32)}<div class="who"><div class="n">${c.name}</div>${c.title?`<div class="t">${c.title}</div>`:''}</div></div></td>
+    <td class="cell-sub">${c.company||'—'}</td>
+    <td class="cell-sub">${c.title||'—'}</td>
+    <td class="cell-sub mono">${c.email||'—'}</td>
+    <td class="cell-sub mono">${c.phone||'—'}</td>
+    <td><div class="cell-tags">${tagHTML(c.tags)}</div></td>
+    <td class="cell-time">${relTime(c.updated)}</td>
+  </tr>`).join("");
+  document.querySelectorAll("#tbody tr").forEach(tr=>{
+    tr.onclick = ()=>openPanel(+tr.dataset.id);
+  });
+  document.querySelectorAll(".row-check").forEach(cb=>{
+    cb.onclick = e=>{ e.stopPropagation(); toggleSelect(+cb.dataset.id); };
+  });
+  updateCheckAll();
+}
+
+/* ================= 渲染：卡片 ================= */
+function renderCards(list){
+  $("#cardsWrap").innerHTML = list.map(c=>`<div class="card ${state.selected.has(c.id)?'selected':''}" data-id="${c.id}">
+    <div class="check" onclick="event.stopPropagation()"><button class="checkbox row-check ${state.selected.has(c.id)?'checked':''}" data-id="${c.id}" aria-label="选择 ${c.name}">${state.selected.has(c.id)?CHECK_SVG:''}</button></div>
+    <div class="card-head">${avatarSVG(c.id,48)}<div class="who"><div class="n">${c.name}</div><div class="t">${[c.title,c.company].filter(Boolean).join(" · ")||"—"}</div></div></div>
+    ${c.email?`<div class="card-line">${ICONS.mail}<span>${c.email}</span></div>`:''}
+    ${c.phone?`<div class="card-line">${ICONS.phone}<span class="mono">${c.phone}</span></div>`:''}
+    <div class="card-tags">${tagHTML(c.tags,3)}</div>
+  </div>`).join("");
+  document.querySelectorAll(".card").forEach(card=>{
+    card.onclick = ()=>openPanel(+card.dataset.id);
+  });
+  document.querySelectorAll("#cardsWrap .row-check").forEach(cb=>{
+    cb.onclick = e=>{ e.stopPropagation(); toggleSelect(+cb.dataset.id); };
+  });
+}
+
+/* ================= 渲染汇总 ================= */
+function renderAll(){
+  renderSidebar();
+  const list = visibleContacts();
+  $("#crumbCount").textContent = `${list.length} 位联系人`;
+  const empty = list.length===0;
+  $("#tableWrap").style.display = (!empty && state.view==="table") ? "" : "none";
+  $("#cardsWrap").style.display = (!empty && state.view==="cards") ? "" : "none";
+  $("#emptyState").classList.toggle("show", empty);
+  if(empty){
+    if(state.search){
+      $("#emptyTitle").textContent = "未找到匹配联系人";
+      $("#emptyDesc").textContent = "尝试其他关键词";
+      $("#emptyActions").innerHTML = `<button class="btn btn-secondary btn-md" onclick="clearSearch()">清空搜索</button>`;
+    }else{
+      $("#emptyTitle").textContent = state.group==="全部" ? "还没有联系人" : "该分组暂无联系人";
+      $("#emptyDesc").textContent = state.group==="全部" ? "导入现有联系人或手动添加" : "将联系人移动到该分组后会显示在这里";
+      $("#emptyActions").innerHTML = `<button class="btn btn-primary btn-md" onclick="openImport()">导入联系人</button>
+        <button class="btn btn-secondary btn-md" onclick="openNewContact()">新建联系人</button>`;
+    }
+  }else{
+    state.view==="table" ? renderTable(list) : renderCards(list);
+  }
+  renderBulkbar();
+}
+
+/* ================= 选择 & 批量栏 ================= */
+function toggleSelect(id){
+  state.selected.has(id) ? state.selected.delete(id) : state.selected.add(id);
+  renderAll();
+}
+function updateCheckAll(){
+  const list = visibleContacts();
+  const all = list.length>0 && list.every(c=>state.selected.has(c.id));
+  const some = list.some(c=>state.selected.has(c.id));
+  const cb = $("#checkAll");
+  cb.className = "checkbox" + (all?" checked":some?" indeterminate":"");
+  cb.innerHTML = all?CHECK_SVG:some?DASH_SVG:"";
+}
+$("#checkAll").onclick = ()=>{
+  const list = visibleContacts();
+  const all = list.every(c=>state.selected.has(c.id));
+  all ? list.forEach(c=>state.selected.delete(c.id)) : list.forEach(c=>state.selected.add(c.id));
+  renderAll();
+};
+function renderBulkbar(){
+  const bar = $("#bulkbar");
+  if(state.selected.size>0){
+    $("#bulkCount").textContent = `已选 ${state.selected.size} 人`;
+    bar.classList.add("show");
+  }else{
+    setTimeout(()=>{ if(state.selected.size===0) bar.classList.remove("show"); },200);
+  }
+}
+$("#bulkCancel").onclick = ()=>{ state.selected.clear(); renderAll(); };
+$("#bulkDelete").onclick = ()=>{
+  openModal(`<h3>删除联系人</h3>
+    <p class="desc">确定要删除选中的 ${state.selected.size} 位联系人吗？此操作无法撤销。</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary btn-md" onclick="closeModal()">取消</button>
+      <button class="btn btn-danger btn-md" id="confirmDelete">删除</button>
+    </div>`);
+  $("#confirmDelete").onclick = ()=>{
+    const n = state.selected.size;
+    contacts = contacts.filter(c=>!state.selected.has(c.id));
+    state.selected.clear(); closeModal(); renderAll();
+    toast(`已删除 ${n} 位联系人`);
+  };
+};
+$("#bulkMove").onclick = e=>{
+  openMenu(e.currentTarget, GROUPS.filter(g=>g!=="全部"&&g!==state.group).map(g=>({label:`移动到「${g}」`,fn:()=>{
+    state.selected.forEach(id=>{ const c=contacts.find(x=>x.id===id); if(c) c.group=g; });
+    state.selected.clear(); renderAll(); toast(`已移动到「${g}」`);
+  }})));
+};
+$("#bulkExport").onclick = e=>{
+  openMenu(e.currentTarget, ["CSV","Excel","vCard"].map(f=>({label:`导出为 ${f}`,fn:()=>{
+    toast(`已导出 ${state.selected.size} 位联系人（${f}）`);
+  }})));
+};
+$("#bulkTag").onclick = e=>{
+  openMenu(e.currentTarget, [{label:'添加标签「VIP」',fn:()=>{
+    state.selected.forEach(id=>{ const c=contacts.find(x=>x.id===id); if(c&&!c.tags.includes("VIP")) c.tags.push("VIP"); });
+    state.selected.clear(); renderAll(); toast("已批量添加标签");
+  }}]);
+};
+
+/* ================= 下拉菜单 ================= */
+let menuEl = null;
+function openMenu(anchor, items){
+  closeMenu();
+  menuEl = document.createElement("div");
+  menuEl.className = "menu";
+  menuEl.innerHTML = items.map((it,i)=>`<button class="menu-item" data-i="${i}">${it.label}</button>`).join("");
+  document.body.appendChild(menuEl);
+  const r = anchor.getBoundingClientRect();
+  menuEl.style.left = Math.min(r.left, innerWidth-180)+"px";
+  menuEl.style.top = (r.bottom+4)+"px";
+  menuEl.querySelectorAll(".menu-item").forEach(b=>b.onclick=()=>{ items[+b.dataset.i].fn(); closeMenu(); });
+  setTimeout(()=>document.addEventListener("click", closeMenuOnce),0);
+}
+function closeMenuOnce(e){ if(menuEl && !menuEl.contains(e.target)) closeMenu(); }
+function closeMenu(){ menuEl?.remove(); menuEl=null; document.removeEventListener("click",closeMenuOnce); }
+
+/* ================= 侧滑面板 ================= */
+function infoRow(icon, value, editKey, isLink){
+  if(!value && !state.editing) return "";
+  return `<div class="info-row">${icon}
+    <div class="v static-text">${isLink?`<a href="#">${value}</a>`:value}</div>
+    <input class="edit-input" data-key="${editKey}" value="${value||""}">
+  </div>`;
+}
+function openPanel(id){
+  state.panelId = id; state.editing = false;
+  renderPanel();
+  $("#panel").classList.add("show");
+  $("#panel").classList.remove("editing");
+  $("#overlay").classList.add("show");
+}
+function closePanel(){
+  $("#panel").classList.remove("show");
+  $("#overlay").classList.remove("show");
+  state.panelId = null;
+}
+$("#overlay").onclick = closePanel;
+function renderPanel(){
+  const c = contacts.find(x=>x.id===state.panelId);
+  if(!c) return;
+  $("#panelHead").innerHTML = `${avatarSVG(c.id,64)}
+    <div class="who"><div class="n static-text">${c.name}</div>
+    <input class="edit-input" data-key="name" value="${c.name}" style="font-size:18px;font-weight:600;height:38px">
+    <div class="t static-text">${[c.title,c.company].filter(Boolean).join(" · ")||"—"}</div></div>
+    <button class="btn-icon" id="panelEdit" title="编辑">${ICONS.edit}</button>
+    <button class="btn-icon" id="panelClose" title="关闭 (Esc)">${ICONS.close}</button>`;
+  const social = [
+    c.wechat && [ICONS.wechat,"微信",c.wechat],
+    c.linkedin && [ICONS.linkedin,"LinkedIn",c.linkedin],
+    c.twitter && [ICONS.twitter,"X",c.twitter]
+  ].filter(Boolean);
+  $("#panelBody").innerHTML = `
+    <div class="quick-actions">
+      <div class="qa"><button class="btn-icon" onclick="toast('正在呼叫 ${c.name}…')">${ICONS.phone}</button><span>电话</span></div>
+      <div class="qa"><button class="btn-icon" onclick="toast('已打开邮件草稿')">${ICONS.mail}</button><span>邮件</span></div>
+      <div class="qa"><button class="btn-icon" onclick="toast('已复制联系方式')">${ICONS.copy}</button><span>复制</span></div>
+    </div>
+    <div class="section"><div class="section-title" onclick="this.parentElement.classList.toggle('collapsed')"><span class="caret">▾</span>联系方式</div>
+      <div class="section-content">
+        ${infoRow(ICONS.phone,c.phone,"phone")}
+        ${infoRow(ICONS.mail,c.email,"email")}
+        ${infoRow(ICONS.pin,c.address,"address")}
+      </div>
+    </div>
+    ${social.length?`<div class="section"><div class="section-title" onclick="this.parentElement.classList.toggle('collapsed')"><span class="caret">▾</span>社交账号</div>
+      <div class="section-content">${social.map(([i,n,v])=>`<div class="info-row">${i}<div class="v"><a href="#">${v}</a></div></div>`).join("")}</div></div>`:""}
+    <div class="section"><div class="section-title" onclick="this.parentElement.classList.toggle('collapsed')"><span class="caret">▾</span>标签</div>
+      <div class="section-content tag-editor" id="tagEditor">
+        ${c.tags.map(t=>`<span class="tag in">${t}<button class="x" data-tag="${t}">${X_SVG}</button></span>`).join("")}
+        <button class="add-tag" id="addTag">+ 添加标签</button>
+      </div>
+    </div>
+    <div class="section"><div class="section-title" onclick="this.parentElement.classList.toggle('collapsed')"><span class="caret">▾</span>备注</div>
+      <div class="section-content"><textarea class="notes" id="notes" ${state.editing?"":"readonly"} placeholder="添加备注…">${c.notes||""}</textarea></div>
+    </div>
+    <div class="section"><div class="section-title" onclick="this.parentElement.classList.toggle('collapsed')"><span class="caret">▾</span>互动记录</div>
+      <div class="section-content timeline">
+        ${c.timeline.length ? c.timeline.map(t=>`<div class="tl-item"><div class="d">${t.d}</div><div class="h">${t.h}</div><div class="s">${t.s}</div></div>`).join("") : '<div style="font-size:13px;color:var(--text-tertiary)">暂无互动记录</div>'}
+      </div>
+    </div>`;
+  $("#panelClose").onclick = closePanel;
+  $("#panelEdit").onclick = ()=>{
+    state.editing = true;
+    $("#panel").classList.add("editing");
+    $("#notes").removeAttribute("readonly");
+  };
+  document.querySelectorAll("#tagEditor .x").forEach(b=>b.onclick=()=>{
+    c.tags = c.tags.filter(t=>t!==b.dataset.tag);
+    renderPanel();
+  });
+  $("#addTag").onclick = ()=>{
+    const input = document.createElement("input");
+    input.className = "tag-input"; input.placeholder = "标签名…";
+    $("#addTag").replaceWith(input); input.focus();
+    input.onkeydown = e=>{
+      if(e.key==="Enter" && input.value.trim()){
+        c.tags.push(input.value.trim());
+        c.updated = now; renderPanel(); renderAll();
+      }
+      if(e.key==="Escape") renderPanel();
+    };
+    input.onblur = ()=>renderPanel();
+  };
+}
+$("#panelCancel").onclick = ()=>{ state.editing=false; $("#panel").classList.remove("editing"); renderPanel(); };
+$("#panelSave").onclick = ()=>{
+  const c = contacts.find(x=>x.id===state.panelId);
+  document.querySelectorAll("#panel .edit-input").forEach(inp=>{ c[inp.dataset.key] = inp.value.trim(); });
+  c.notes = $("#notes").value;
+  c.updated = now;
+  state.editing=false; $("#panel").classList.remove("editing");
+  renderPanel(); renderAll(); toast("已保存");
+};
+
+/* ================= 弹窗 ================= */
+function openModal(html, wide){
+  $("#modalMask").innerHTML = `<div class="modal${wide?' wide':''}">${html}</div>`;
+  $("#modalMask").classList.add("show");
+}
+function closeModal(){ $("#modalMask").classList.remove("show"); }
+$("#modalMask").onclick = e=>{ if(e.target.id==="modalMask") closeModal(); };
+
+/* 新建联系人 */
+function openNewContact(){
+  openModal(`<h3>新建联系人</h3>
+    <p class="desc">填写基本信息，更多字段可在创建后补充。</p>
+    <div class="form-row"><label>姓名</label><input class="input" id="ncName" placeholder="姓名"></div>
+    <div class="form-row"><label>公司</label><input class="input" id="ncCompany" placeholder="公司"></div>
+    <div class="form-row"><label>邮箱</label><input class="input" id="ncEmail" placeholder="name@example.com"></div>
+    <div class="form-row"><label>电话</label><input class="input" id="ncPhone" placeholder="+86 …"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary btn-md" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary btn-md" id="ncSave">创建</button>
+    </div>`);
+  $("#ncName").focus();
+  $("#ncSave").onclick = ()=>{
+    const name = $("#ncName").value.trim();
+    if(!name){ $("#ncName").style.borderColor="var(--error)"; return; }
+    contacts.unshift({id:nextId++, name, company:$("#ncCompany").value.trim(), title:"",
+      email:$("#ncEmail").value.trim(), phone:$("#ncPhone").value.trim(),
+      group:state.group==="全部"?"未分组":state.group, tags:[], updated:now, notes:"", timeline:[]});
+    closeModal(); renderAll(); toast(`已创建「${name}」`);
+  };
+}
+$("#btnNew").onclick = openNewContact;
+$("#btnNewGroup").onclick = ()=>{
+  openModal(`<h3>新建分组</h3>
+    <div class="form-row"><label>分组名称</label><input class="input" id="ngName" placeholder="例如：供应商"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary btn-md" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary btn-md" id="ngSave">创建</button>
+    </div>`);
+  $("#ngName").focus();
+  $("#ngSave").onclick = ()=>{
+    const n = $("#ngName").value.trim();
+    if(n && !GROUPS.includes(n)){ GROUPS.splice(GROUPS.length-1,0,n); closeModal(); renderAll(); toast(`已创建分组「${n}」`); }
+  };
+};
+
+/* 导入向导（3 步） */
+function openImport(){
+  openModal(`<h3>导入联系人</h3>
+    <div class="steps" style="margin-top:16px">
+      <div class="step on" id="st1"><span class="dot">1</span>上传</div><div class="step-line"></div>
+      <div class="step" id="st2"><span class="dot">2</span>字段映射</div><div class="step-line"></div>
+      <div class="step" id="st3"><span class="dot">3</span>预览确认</div>
+    </div>
+    <div id="importBody">
+      <div class="upload-zone" id="uploadZone">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><path d="M16 6 V20 M11 11 L16 6 L21 11 M7 23 V25 A2 2 0 0 0 9 27 H23 A2 2 0 0 0 25 25 V23" stroke="#6B6560" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="big">拖拽文件到这里，或点击上传</div>
+        <div class="sub">支持 CSV、Excel、vCard，单次最多 5,000 条</div>
+      </div>
+    </div>
+    <div class="modal-actions" id="importActions">
+      <button class="btn btn-secondary btn-md" onclick="closeModal()">取消</button>
+    </div>`, true);
+  $("#uploadZone").onclick = ()=>importStep2();
+}
+function importStep2(){
+  $("#st1").classList.remove("on"); $("#st2").classList.add("on");
+  $("#importBody").innerHTML = `
+    <p class="desc" style="margin-bottom:12px">已识别 <b>contacts.csv</b>（共 128 行），请确认字段映射：</p>
+    ${[["姓名","姓名"],["电子邮箱","邮箱"],["手机","电话"],[" organization ","公司"],["职位头衔","职位"],["备注1","忽略"]].map(([f,t])=>`
+      <div class="map-row"><span class="from">${f.trim()}</span>
+      <select>${["姓名","公司","职位","邮箱","电话","地址","忽略"].map(o=>`<option ${o===t.trim()?"selected":""}>${o}</option>`).join("")}</select></div>`).join("")}`;
+  $("#importActions").innerHTML = `
+    <button class="btn btn-secondary btn-md" onclick="closeModal()">取消</button>
+    <button class="btn btn-primary btn-md" onclick="importStep3()">下一步</button>`;
+}
+function importStep3(){
+  $("#st2").classList.remove("on"); $("#st3").classList.add("on");
+  $("#importBody").innerHTML = `
+    <p class="desc" style="margin-bottom:12px">前 5 条数据预览：</p>
+    <div class="table-wrap" style="border-radius:var(--radius-md)"><table style="min-width:0">
+      <thead><tr><th>姓名</th><th>邮箱</th><th>电话</th></tr></thead>
+      <tbody>
+        <tr style="cursor:default"><td>钱多多</td><td class="cell-sub">qian@dd.com</td><td class="cell-sub mono">+86 138…</td></tr>
+        <tr style="cursor:default"><td>孙小美</td><td class="cell-sub">sun@xm.com</td><td class="cell-sub mono">+86 139…</td></tr>
+        <tr style="cursor:default"><td>李雷</td><td class="cell-sub">lilei@edu.cn</td><td class="cell-sub mono">+86 137…</td></tr>
+      </tbody></table></div>
+    <div class="progress" id="impProgress" style="display:none"><i></i></div>`;
+  $("#importActions").innerHTML = `
+    <button class="btn btn-secondary btn-md" onclick="importStep2()">上一步</button>
+    <button class="btn btn-primary btn-md" id="impStart">开始导入</button>`;
+  $("#impStart").onclick = ()=>{
+    const bar = $("#impProgress"); bar.style.display="";
+    $("#impStart").setAttribute("disabled","");
+    let p = 0;
+    const t = setInterval(()=>{
+      p += 20; bar.firstElementChild.style.width = Math.min(p,100)+"%";
+      if(p>=100){ clearInterval(t); closeModal(); toast("成功导入 128 位联系人"); }
+    },250);
+  };
+}
+$("#btnImport").onclick = openImport;
+
+/* ================= 搜索 / 筛选 / 视图切换 ================= */
+let debounce;
+$("#searchInput").oninput = e=>{
+  clearTimeout(debounce);
+  $("#searchWrap").classList.toggle("has-value", !!e.target.value);
+  debounce = setTimeout(()=>{ state.search = e.target.value.trim(); renderAll(); },300);
+};
+$("#searchClear").onclick = clearSearch;
+function clearSearch(){
+  $("#searchInput").value=""; state.search="";
+  $("#searchWrap").classList.remove("has-value"); renderAll();
+}
+document.querySelectorAll("#filterPills .pill").forEach(p=>p.onclick=()=>{
+  document.querySelectorAll("#filterPills .pill").forEach(x=>x.classList.remove("on"));
+  p.classList.add("on"); state.filter = p.dataset.filter; renderAll();
+});
+$("#viewTable").onclick = ()=>{ state.view="table"; $("#viewTable").classList.add("on"); $("#viewCards").classList.remove("on"); renderAll(); };
+$("#viewCards").onclick = ()=>{ state.view="cards"; $("#viewCards").classList.add("on"); $("#viewTable").classList.remove("on"); renderAll(); };
+$("#btnSort").onclick = ()=>{
+  state.sortDir *= -1;
+  $("#btnSort").textContent = `最近更新 ${state.sortDir<0?"↓":"↑"}`;
+  renderAll();
+};
+document.querySelectorAll("thead th.sortable").forEach(th=>th.onclick=()=>{
+  state.sortKey = th.dataset.sort; renderAll();
+});
+
+/* ================= 快捷键 ================= */
+document.addEventListener("keydown", e=>{
+  if(e.key==="Escape"){
+    if(menuEl) return closeMenu();
+    if($("#modalMask").classList.contains("show")) return closeModal();
+    if($("#panel").classList.contains("show")) return closePanel();
+    if(state.selected.size){ state.selected.clear(); renderAll(); }
+  }
+  if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==="k"){ e.preventDefault(); $("#searchInput").focus(); }
+  if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==="n"){ e.preventDefault(); openNewContact(); }
+});
+
+renderAll();
+</script>
+</body>
+</html>

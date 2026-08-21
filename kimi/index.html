@@ -472,7 +472,7 @@ const pad = n => String(n).padStart(2,'0');
 const MONTHS = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
 
 function parseBD(s){ const [y,m,d]=s.split('-').map(Number); return {y,m,d}; }
-function nextBirthday(c){
+function nextRoster(c){
   const {m,d} = parseBD(c.birthday);
   const now = new Date(); const today = new Date(now.getFullYear(),now.getMonth(),now.getDate());
   let t = new Date(now.getFullYear(), m-1, d);
@@ -481,9 +481,9 @@ function nextBirthday(c){
 }
 function daysUntil(c){
   const now = new Date(); const today = new Date(now.getFullYear(),now.getMonth(),now.getDate());
-  return Math.round((nextBirthday(c)-today)/86400000);
+  return Math.round((nextRoster(c)-today)/86400000);
 }
-function turningAge(c){ return nextBirthday(c).getFullYear()-parseBD(c.birthday).y; }
+function turningAge(c){ return nextRoster(c).getFullYear()-parseBD(c.birthday).y; }
 function fmtDate(s){ const {y,m,d}=parseBD(s); return `${y}年${m}月${d}日`; }
 function avatarColor(c){ return AV_COLORS[c.avatar % AV_COLORS.length]; }
 function initialOf(name){ return name.replace(/^(母亲|父亲|外婆|外公|爷爷|奶奶)/,'').charAt(0) || name.charAt(0); }
@@ -742,7 +742,7 @@ function calToday(){
 function renderUpcoming(){
   const sorted = [...contacts].sort((a,b)=>daysUntil(a)-daysUntil(b)).slice(0,8);
   $('#upcomingList').innerHTML = sorted.map(c=>{
-    const du = daysUntil(c), nb = nextBirthday(c);
+    const du = daysUntil(c), nb = nextRoster(c);
     return `<button class="up-item" onclick="selectContact(${c.id});setView('contacts')">
       <div class="up-date"><b>${nb.getDate()}</b><span>${nb.getMonth()+1}月</span></div>
       <span class="avatar" style="background:${avatarColor(c)}">${initialOf(c.name)}</span>

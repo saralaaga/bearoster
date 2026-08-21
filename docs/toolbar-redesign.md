@@ -306,11 +306,11 @@ toolbarHeight: 54px (保持与日历页一致)
 ### 5.2 颜色规范
 
 ```swift
-背景: BirthdayTheme.pageBackground(colorScheme)
+背景: RosterTheme.pageBackground(colorScheme)
 标题: .primary
 标签: .secondary
 选择器: 系统默认
-搜索框: BirthdayTheme.controlBackground + separator border
+搜索框: RosterTheme.controlBackground + separator border
 徽章背景: .secondary.opacity(0.10)
 徽章文字: .secondary
 ```
@@ -396,8 +396,8 @@ if windowWidth < 700 {
 ### 7.1 关键代码结构
 
 ```swift
-struct BirthdayListToolbarControls: View {
-    @Environment(BirthdayAppModel.self) private var model
+struct RosterListToolbarControls: View {
+    @Environment(RosterAppModel.self) private var model
     @Environment(\.colorScheme) private var colorScheme
     
     var body: some View {
@@ -435,8 +435,8 @@ struct BirthdayListToolbarControls: View {
                     .foregroundStyle(.secondary)
                 
                 Picker("", selection: $model.filter) {
-                    Text(model.l10n(.all)).tag(BirthdayCalendarKind?.none)
-                    ForEach(BirthdayCalendarKind.allCases) { kind in
+                    Text(model.l10n(.all)).tag(RosterCalendarKind?.none)
+                    ForEach(RosterCalendarKind.allCases) { kind in
                         Text(model.formatter.calendarName(kind, locale: model.language.coreLocale))
                             .tag(Optional(kind))
                     }
@@ -452,10 +452,10 @@ struct BirthdayListToolbarControls: View {
                     .foregroundStyle(.secondary)
                 
                 Picker("", selection: $model.sort) {
-                    Text(model.l10n(.nearest)).tag(BirthdaySort.next)
-                    Text(model.l10n(.name)).tag(BirthdaySort.name)
-                    Text(model.l10n(.age)).tag(BirthdaySort.age)
-                    Text(model.l10n(.calendarKind)).tag(BirthdaySort.calendar)
+                    Text(model.l10n(.nearest)).tag(RosterSort.next)
+                    Text(model.l10n(.name)).tag(RosterSort.name)
+                    Text(model.l10n(.age)).tag(RosterSort.age)
+                    Text(model.l10n(.calendarKind)).tag(RosterSort.calendar)
                 }
                 .pickerStyle(.menu)
                 .fixedSize()
@@ -586,7 +586,7 @@ struct BirthdayListToolbarControls: View {
 
 **优先级**: 🔴 High  
 **估算时间**: 30 分钟  
-**影响范围**: `Sources/BirthdayApp/RootView.swift` 的 `BirthdayListToolbarControls`
+**影响范围**: `Sources/RosterApp/RootView.swift` 的 `RosterListToolbarControls`
 
 **下一步**:
 1. 实现方案 A 的代码

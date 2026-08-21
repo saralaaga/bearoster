@@ -2,15 +2,15 @@
 
 ## Goal
 
-After the user grants macOS Contacts permission, Birthday should let the user choose which Contacts groups are included in the app. Contacts outside the selected groups should not appear in Contacts, birthday list, calendar, upcoming, search, edit, or delete workflows.
+After the user grants macOS Contacts permission, Roster should let the user choose which Contacts groups are included in the app. Contacts outside the selected groups should not appear in Contacts, birthday list, calendar, upcoming, search, edit, or delete workflows.
 
 ## Important Constraint
 
-macOS Contacts permission is app-wide. Apple does not provide a system permission prompt that grants access to only specific groups. Group access in Birthday is therefore an app-level allowlist:
+macOS Contacts permission is app-wide. Apple does not provide a system permission prompt that grants access to only specific groups. Group access in Roster is therefore an app-level allowlist:
 
 - The system grants or denies Contacts access for the whole app.
-- Birthday stores the user's selected group scope locally.
-- Birthday should fetch and process only contacts inside the selected scope whenever possible.
+- Roster stores the user's selected group scope locally.
+- Roster should fetch and process only contacts inside the selected scope whenever possible.
 - If a broad fetch is temporarily needed to build metadata, non-selected contacts must not be projected into app models, UI, birthday calculations, caches, or editing actions.
 
 ## User Experience
@@ -70,7 +70,7 @@ The selected scope must affect every derived surface:
 
 - Contacts sidebar group list
 - Contact list
-- Birthday records
+- Roster records
 - Calendar month cells
 - Upcoming birthdays
 - Search results
@@ -78,7 +78,7 @@ The selected scope must affect every derived surface:
 - Bulk delete selection
 - Extended contact fields
 
-This should not be UI-only filtering. The filtered contact set should be the source input for `BirthdayDerivedDataService` and `ContactListProjectionService`.
+This should not be UI-only filtering. The filtered contact set should be the source input for `RosterDerivedDataService` and `ContactListProjectionService`.
 
 ## Editing And Deleting
 

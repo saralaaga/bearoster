@@ -1,0 +1,243 @@
+ObjC.import("ApplicationServices");
+
+const app = Application.currentApplication();
+app.includeStandardAdditions = true;
+const systemEvents = Application("System Events");
+const roster = Application("Roster");
+const framesPath = "/tmp/roster-e2e-frames.tsv";
+const eventsPath = "/tmp/roster-e2e-events.log";
+const screenProbePath = "/tmp/roster-e2e-screen-probe.png";
+
+function waitForProcess(name, timeoutSeconds) {
+  const deadline = Date.now() + timeoutSeconds * 1000;
+  while (Date.now() < deadline) {
+    const process = systemEvents.processes[name];
+    if (process.exists()) {
+      return process;
+    }
+    delay(0.2);
+  }
+  throw new Error(`Timed out waiting for ${name}`);
+}
+
+function attrs(element) {
+  const result = {};
+  let names = [];
+  try {
+    names = element.attributeNames();
+  } catch (_) {
+    return result;
+  }
+  for (const name of names) {
+    try {
+      result[name] = element.attributes[name].value();
+    } catch (_) {}
+  }
+  return result;
+}
+
+function children(element) {
+  try {
+    return element.uiElements();
+  } catch (_) {
+    return [];
+  }
+}
+
+function matchesIdentifier(element, identifier) {
+  const values = attrs(element);
+  return values.AXIdentifier === identifier ||
+    values.AXDescription === identifier ||
+    values.AXTitle === identifier ||
+    values.AXLabel === identifier ||
+    values.AXHelp === identifier;
+}
+
+function findByIdentifier(element, identifier, depth = 0) {
+  if (depth > 12) {
+    return null;
+  }
+  if (matchesIdentifier(element, identifier)) {
+    return element;
+  }
+  for (const child of children(element)) {
+    const found = findByIdentifier(child, identifier, depth + 1);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
+function findText(element, text, depth = 0) {
+  if (depth > 12) {
+    return null;
+  }
+  const values = attrs(element);
+  if (values.AXValue === text || values.AXTitle === text || values.AXDescription === text) {
+    return element;
+  }
+  for (const child of children(element)) {
+    const found = findText(child, text, depth + 1);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
+function center(element) {
+  const position = element.position();
+  const size = element.size();
+  return {
+    x: position[0] + size[0] / 2,
+    y: position[1] + size[1] / 2,
+  };
+}
+
+function mouse(event, point) {
+  const e = $.CGEventCreateMouseEvent(null, event, $.CGPointMake(point.x, point.y), $.kCGMouseButtonLeft);
+  $.CGEventPost($.kCGHIDEventTap, e);
+}
+
+function drag(source, target) {
+  const start = center(source);
+  const end = center(target);
+  mouse($.kCGEventMouseMoved, start);
+  delay(0.2);
+  mouse($.kCGEventLeftMouseDown, start);
+  delay(0.8);
+  for (let step = 1; step <= 18; step += 1) {
+    const point = {
+      x: start.x + ((end.x - start.x) * step / 18),
+      y: start.y + ((end.y - start.y) * step / 18),
+    };
+    mouse($.kCGEventLeftMouseDragged, point);
+    delay(0.04);
+  }
+  delay(0.4);
+  mouse($.kCGEventLeftMouseUp, end);
+}
+
+roster.activate();
+const process = waitForProcess("Roster", 10);
+try {
+  process.frontmost = true;
+} catch (_) {}
+delay(0.5);
+const frames = waitForFrames(10);
+const row = frames["contact-row-e2e-ada"];
+const tag = frames["contact-tag-drop-e2e-vip"];
+if (!row) {
+  throw new Error("Missing frame contact-row-e2e-ada");
+}
+if (!tag) {
+  throw new Error("Missing frame contact-tag-drop-e2e-vip");
+}
+
+ensureAutomationPermissions();
+clickRect(row);
+delay(0.5);
+dragRects(row, tag);
+delay(1.2);
+
+const events = readFile(eventsPath);
+if (!events.includes("row-tap contact=e2e-ada")) {
+  throw new Error(`Mouse input did not reach contact row. Events:\n${events}`);
+}
+if (!events.includes("tag-drop tag=e2e-vip contacts=e2e-ada")) {
+  throw new Error(`Drop did not reach tag assignment handler. Events:\n${events}`);
+}
+
+"contact drag-and-drop e2e passed";
+
+function readFile(path) {
+  try {
+    return app.doShellScript(`/bin/cat ${quote(path)} 2>/dev/null || true`);
+  } catch (_) {
+    return "";
+  }
+}
+
+function quote(value) {
+  return `'${String(value).replace(/'/g, "'\\''")}'`;
+}
+
+function waitForFrames(timeoutSeconds) {
+  const deadline = Date.now() + timeoutSeconds * 1000;
+  while (Date.now() < deadline) {
+    const frames = parseFrames(readFile(framesPath));
+    if (frames["contact-row-e2e-ada"] && frames["contact-tag-drop-e2e-vip"]) {
+      return frames;
+    }
+    delay(0.2);
+  }
+  throw new Error(`Timed out waiting for E2E frames. Last file:\n${readFile(framesPath)}`);
+}
+
+function parseFrames(text) {
+  const frames = {};
+  for (const line of text.split(/\r\n|\n|\r/)) {
+    const parts = line.trim().split(/\t/);
+    if (parts.length !== 5) {
+      continue;
+    }
+    frames[parts[0]] = {
+      x: Number(parts[1]),
+      y: Number(parts[2]),
+      width: Number(parts[3]),
+      height: Number(parts[4]),
+    };
+  }
+  return frames;
+}
+
+function centerRect(rect) {
+  return {
+    x: rect.x + Math.min(42, rect.width / 2),
+    y: rect.y + rect.height / 2,
+  };
+}
+
+function dragRects(source, target) {
+  const start = centerRect(source);
+  const end = centerRect(target);
+  mouse($.kCGEventMouseMoved, start);
+  delay(0.4);
+  mouse($.kCGEventLeftMouseDown, start);
+  delay(1.2);
+  for (let step = 1; step <= 36; step += 1) {
+    const point = {
+      x: start.x + ((end.x - start.x) * step / 36),
+      y: start.y + ((end.y - start.y) * step / 36),
+    };
+    mouse($.kCGEventLeftMouseDragged, point);
+    delay(0.05);
+  }
+  delay(0.8);
+  mouse($.kCGEventLeftMouseUp, end);
+}
+
+function clickRect(rect) {
+  const point = centerRect(rect);
+  mouse($.kCGEventMouseMoved, point);
+  delay(0.2);
+  mouse($.kCGEventLeftMouseDown, point);
+  delay(0.1);
+  mouse($.kCGEventLeftMouseUp, point);
+}
+
+function ensureAutomationPermissions() {
+  try {
+    app.doShellScript(`/usr/sbin/screencapture -x ${quote(screenProbePath)}`);
+    const size = Number(app.doShellScript(`/usr/bin/stat -f %z ${quote(screenProbePath)} 2>/dev/null || echo 0`));
+    if (!size) {
+      throw new Error("empty screencapture");
+    }
+    if (!$.AXIsProcessTrusted()) {
+      throw new Error("Accessibility permission is not trusted");
+    }
+  } catch (error) {
+    throw new Error(`macOS E2E needs Screen Recording permission for this terminal/Codex process: ${error}`);
+  }
+}

@@ -3,25 +3,25 @@
 import PackageDescription
 
 let package = Package(
-    name: "Birthday",
+    name: "Roster",
     defaultLocalization: "en",
     platforms: [
         .macOS(.v14)
     ],
     products: [
-        .library(name: "BirthdayCore", targets: ["BirthdayCore"]),
-        .executable(name: "Birthday", targets: ["BirthdayApp"])
+        .library(name: "RosterCore", targets: ["RosterCore"]),
+        .executable(name: "Roster", targets: ["RosterApp"])
     ],
     targets: [
         .target(
-            name: "BirthdayCore",
+            name: "RosterCore",
             linkerSettings: [
                 .linkedFramework("Contacts")
             ]
         ),
         .executableTarget(
-            name: "BirthdayApp",
-            dependencies: ["BirthdayCore"],
+            name: "RosterApp",
+            dependencies: ["RosterCore"],
             linkerSettings: [
                 .linkedFramework("SwiftUI"),
                 .linkedFramework("AppKit"),
@@ -31,12 +31,12 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "BirthdayCoreTests",
-            dependencies: ["BirthdayCore"]
+            name: "RosterCoreTests",
+            dependencies: ["RosterCore"]
         ),
         .testTarget(
-            name: "BirthdayAppTests",
-            dependencies: ["BirthdayApp"]
+            name: "RosterAppTests",
+            dependencies: ["RosterApp"]
         )
     ]
 )

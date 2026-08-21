@@ -5,31 +5,31 @@
   <key>CFBundleDevelopmentRegion</key>
   <string>en</string>
   <key>CFBundleExecutable</key>
-  <string>Birthday</string>
+  <string>Roster</string>
   <key>CFBundleIdentifier</key>
-  <string>dev.local.birthday</string>
+  <string>dev.local.roster</string>
   <key>CFBundleIconFile</key>
   <string>AppIcon</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
-  <string>Birthday</string>
+  <string>Roster</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.2.0</string>
+  <string>$(ROSTER_MARKETING_VERSION)</string>
   <key>CFBundleVersion</key>
-  <string>2</string>
+  <string>$(ROSTER_BUILD_NUMBER)</string>
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
   <key>NSContactsUsageDescription</key>
-  <string>Birthday reads and writes birthdays directly in macOS Contacts.</string>
+  <string>Roster reads and writes selected contact fields directly in macOS Contacts.</string>
   <key>NSMicrophoneUsageDescription</key>
-  <string>Birthday uses the microphone only when you start voice date input.</string>
+  <string>Roster uses the microphone only when you start voice date input.</string>
   <key>NSQuitAlwaysKeepsWindows</key>
   <false/>
   <key>NSSpeechRecognitionUsageDescription</key>
-  <string>Birthday uses speech recognition to convert spoken birthday dates into calendar dates.</string>
+  <string>Roster uses speech recognition to convert spoken birthday dates into calendar dates.</string>
   <key>NSPrincipalClass</key>
   <string>NSApplication</string>
 </dict>

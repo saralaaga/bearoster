@@ -20,7 +20,7 @@
 
 ### 2. ✅ 按钮添加 active 状态（已完成）
 
-**文件**: `Sources/BirthdayApp/Theme/BirthdayTheme.swift`
+**文件**: `Sources/RosterApp/Theme/RosterTheme.swift`
 
 **修改**:
 ```swift
@@ -43,7 +43,7 @@ private struct MCMPressButtonStyle: ButtonStyle {
 
 ### 3. ✅ 卡片改用双层阴影（已完成）
 
-**文件**: `Sources/BirthdayApp/Theme/BirthdayTheme.swift:97-122`
+**文件**: `Sources/RosterApp/Theme/RosterTheme.swift:97-122`
 
 **Before**:
 ```swift
@@ -74,7 +74,7 @@ private struct MCMPressButtonStyle: ButtonStyle {
 
 ### 4. ✅ 头像添加渐变（已完成）
 
-**文件**: `Sources/BirthdayApp/Components/BirthdayComponents.swift:6-39`
+**文件**: `Sources/RosterApp/Components/RosterComponents.swift:6-39`
 
 **修改**:
 ```swift
@@ -104,8 +104,8 @@ private struct MCMPressButtonStyle: ButtonStyle {
 ### 5. ✅ 刷新按钮添加加载状态（已完成）
 
 **文件**: 
-- `Sources/BirthdayApp/RootView.swift:265-271, 299-318`
-- `Sources/BirthdayApp/Views/Contacts/ContactsEditorView.swift:100-121`
+- `Sources/RosterApp/RootView.swift:265-271, 299-318`
+- `Sources/RosterApp/Views/Contacts/ContactsEditorView.swift:100-121`
 
 **修改**:
 
@@ -166,7 +166,7 @@ Button {
 
 ### 6. ✅ Toast 动画优化（已完成）
 
-**文件**: `Sources/BirthdayApp/RootView.swift:56-69`
+**文件**: `Sources/RosterApp/RootView.swift:56-69`
 
 **Before**:
 ```swift
@@ -196,7 +196,7 @@ Button {
 
 ### 7. ✅ 搜索框清除按钮（已完成）
 
-**文件**: `Sources/BirthdayApp/RootView.swift:275-306`
+**文件**: `Sources/RosterApp/RootView.swift:275-306`
 
 **修改**:
 ```swift
@@ -285,8 +285,8 @@ struct SearchField: View {
 
 ### 已完成的重构
 1. ✅ **文件模块化**
-   - `Theme/BirthdayTheme.swift` - 主题系统
-   - `Components/BirthdayComponents.swift` - 共享组件
+   - `Theme/RosterTheme.swift` - 主题系统
+   - `Components/RosterComponents.swift` - 共享组件
    - `Views/*/` - 按功能分离的视图
 
 2. ✅ **Design Tokens**

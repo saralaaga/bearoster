@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Birthday needs first-party contact tags that are independent from Apple Contacts groups. Tags help users organize contacts and filter birthday records without writing metadata back to macOS Contacts.
+Roster needs first-party contact tags that are independent from Apple Contacts groups. Tags help users organize contacts and filter birthday records without writing metadata back to macOS Contacts.
 
 This design replaces the earlier idea of showing tags as a sub-mode inside the Contacts view. Tags are a top-level management surface, visible in the main sidebar alongside Contacts.
 
@@ -13,7 +13,7 @@ Main sidebar:
 ```text
 Browse
 - Calendar
-- Birthdays
+- Rosters
 
 Manage
 - Contacts
@@ -35,7 +35,7 @@ Contacts remains the Apple Contacts-oriented area. It shows Apple Contacts data,
 
 ## Tag Model
 
-Tags are local Birthday metadata.
+Tags are local Roster metadata.
 
 Each tag has:
 
@@ -61,9 +61,9 @@ Selecting a leaf tag shows contacts directly assigned to that tag.
 
 Selecting a parent tag shows contacts assigned to the parent tag and contacts assigned to any descendant tag. For example, selecting `Family` includes contacts tagged `Family`, `Family / Parents`, and `Family / Relatives`.
 
-Selecting `Untagged` shows contacts with no Birthday tag assignments.
+Selecting `Untagged` shows contacts with no Roster tag assignments.
 
-Birthday list tag filtering uses the same descendant-inclusive semantics. The birthday list filter remains local to the birthday list view; selecting a tag in the sidebar does not silently alter the birthday list unless the user is in the Tags surface.
+Roster list tag filtering uses the same descendant-inclusive semantics. The birthday list filter remains local to the birthday list view; selecting a tag in the sidebar does not silently alter the birthday list unless the user is in the Tags surface.
 
 ## Main Sidebar Behavior
 
@@ -105,7 +105,7 @@ The confirmation explains:
 - Contact-tag assignments for that tag will be removed.
 - If the tag has child tags, those child tags and their assignments will also be deleted.
 - Contacts are not deleted.
-- Birthday records are not deleted.
+- Roster records are not deleted.
 - Apple Contacts is not modified.
 
 Only after confirmation does deletion execute.
@@ -137,9 +137,9 @@ Rules:
 - Bulk tagging does not remove tags.
 - Existing assignments are ignored without error.
 
-## Birthday List
+## Roster List
 
-Birthday list rows render contact tags next to contact names.
+Roster list rows render contact tags next to contact names.
 
 The birthday list toolbar includes a tag filter:
 
@@ -151,7 +151,7 @@ Specific tag filtering uses descendant-inclusive semantics for parent tags.
 
 ## Persistence
 
-Tags are stored in Birthday's local SQLite database. They are not written to `CNContact.note` or any Apple Contacts field.
+Tags are stored in Roster's local SQLite database. They are not written to `CNContact.note` or any Apple Contacts field.
 
 Deleting Apple Contacts contacts removes local assignments for those contact identifiers, but does not delete global tags.
 
@@ -170,8 +170,8 @@ Deleting Apple Contacts contacts removes local assignments for those contact ide
 - Contact-level tag removal does not delete the global tag.
 - Contacts selection mode has no Select All action.
 - Bulk tagging appends tags to selected contacts.
-- Birthday list rows show contact tags.
-- Birthday list supports tag filtering with descendant-inclusive parent tags.
+- Roster list rows show contact tags.
+- Roster list supports tag filtering with descendant-inclusive parent tags.
 
 ## Out Of Scope
 
@@ -189,7 +189,7 @@ Focused tests should cover:
 - SQLite tag persistence, parent-child relationships, assignments, and deletion cascades.
 - Descendant-inclusive filtering for parent tags.
 - Untagged filtering.
-- Birthday list tag filtering.
+- Roster list tag filtering.
 - Contact projection includes tag chips.
 - Delete tag does not delete contacts or birthday records.
 - Bulk append ignores duplicate assignments.

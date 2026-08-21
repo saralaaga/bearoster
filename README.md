@@ -1,11 +1,12 @@
-# Birthday
+# Roster / 名册
 
-Birthday is a local-first macOS Contacts birthday manager.
+Roster is a local-first macOS Contacts manager for organizing people with groups,
+tags, birthday data, and local edit history.
 
 The first version is intentionally small:
 
 - Reads birthdays from macOS Contacts.
-- Writes edits back to `CNContact.birthday` and `CNContact.nonGregorianBirthday`.
+- Writes edits back to `CNContact.birthday` and `CNContact.nonGregorianRoster`.
 - Supports Gregorian, Chinese lunar, Hebrew, and Islamic/Hijri birthdays.
 - Uses Foundation `Calendar` for date conversion and occurrence calculation.
 - Provides calendar, list, contact editor, permission/settings, and voice date conversion views.
@@ -22,7 +23,7 @@ scripts/build-app.sh
 The generated app is:
 
 ```text
-.build/Birthday.app
+.build/Roster.app
 ```
 
 Build a release version (optimized build, versioned zip in `dist/`):
@@ -31,7 +32,19 @@ Build a release version (optimized build, versioned zip in `dist/`):
 scripts/build-app.sh release
 ```
 
-Outputs `dist/Birthday.app` and `dist/Birthday-<version>.zip`.
+Outputs `dist/Roster.app` and `dist/Roster-<version>.zip`.
+
+Update the local install package after code changes:
+
+```bash
+scripts/update-local-package.sh
+```
+
+This bumps the build number in `Packaging/VERSION`, rebuilds the release zip, and installs the app to `/Applications/Roster.app`.
+
+The app version is defined once in `Packaging/VERSION`. The build script writes
+that version into debug and release app bundles and uses it for the release zip
+name.
 
 Run tests:
 
@@ -48,18 +61,20 @@ env CLANG_MODULE_CACHE_PATH="$PWD/.tmp-swift-cache" swift build --scratch-path "
 ## Architecture
 
 ```text
-BirthdayApp
+RosterApp
 - SwiftUI views
 - App state
 - Localization
 - Voice input service
 
-BirthdayCore
+RosterCore
 - ContactsRepository
-- Birthday models
-- BirthdayOccurrenceResolver
+- Roster models
+- RosterOccurrenceResolver
 - CalendarFormattingService
 - DatePhraseParser
 ```
 
-Contacts remains the source of truth. User defaults and future account services should store preferences, sharing metadata, or account state only, not a private copy of contact birthdays.
+Roster keeps a local working copy for pending contact edits, history, and
+trash state. macOS Contacts remains the external system of record for data that
+the user chooses to write back.

@@ -1,4 +1,4 @@
-# Birthday App - Emil Kowalski Design Engineering Audit
+# Roster App - Emil Kowalski Design Engineering Audit
 
 **审计日期**: 2026-08-10  
 **审计基准**: Emil Kowalski's Design Engineering Philosophy  
@@ -61,7 +61,7 @@ Group {
     case .calendar:
         CalendarDashboardView()
     case .list:
-        BirthdayRecordsView()
+        RosterRecordsView()
     case .contacts:
         ContactsEditorView()
     case .permissions:
@@ -195,7 +195,7 @@ private struct MCMButtonChrome: ViewModifier {
 // ✅ 改进的头像
 struct AvatarView: View {
     let name: String
-    var color: Color = BirthdayTheme.accent
+    var color: Color = RosterTheme.accent
     var size: CGFloat = 38
 
     var body: some View {
@@ -239,12 +239,12 @@ private struct MCMCardStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(
-                BirthdayTheme.cardBackground(colorScheme),
-                in: RoundedRectangle(cornerRadius: BirthdayTheme.cardCorner)
+                RosterTheme.cardBackground(colorScheme),
+                in: RoundedRectangle(cornerRadius: RosterTheme.cardCorner)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: BirthdayTheme.cardCorner)
-                    .strokeBorder(BirthdayTheme.separator(colorScheme))
+                RoundedRectangle(cornerRadius: RosterTheme.cardCorner)
+                    .strokeBorder(RosterTheme.separator(colorScheme))
             )
             // 双层阴影
             .shadow(
@@ -263,7 +263,7 @@ private struct MCMCardStyle: ViewModifier {
 
 ### 3.3 生日药丸 (Pill) 组件 ⚠️
 
-**RootView.swift:651-672 (BirthdayPill)**
+**RootView.swift:651-672 (RosterPill)**
 
 **问题**: 
 1. 从 `scale(0)` 出现 - 违反 Emil 原则
@@ -278,9 +278,9 @@ private struct MCMCardStyle: ViewModifier {
 
 ```swift
 // ✅ 改进的 Pill
-struct BirthdayPill: View {
-    @Environment(BirthdayAppModel.self) private var model
-    let occurrence: BirthdayOccurrence
+struct RosterPill: View {
+    @Environment(RosterAppModel.self) private var model
+    let occurrence: RosterOccurrence
     @State private var isHovered = false
     @State private var isPressed = false
 
@@ -339,8 +339,8 @@ let occurrences = model.records(on: date)
 **修复**: 在 Model 层预计算并缓存
 
 ```swift
-// ✅ 在 BirthdayAppModel 中
-@Published private(set) var filteredOccurrencesByDate: [Date: [BirthdayOccurrence]] = [:]
+// ✅ 在 RosterAppModel 中
+@Published private(set) var filteredOccurrencesByDate: [Date: [RosterOccurrence]] = [:]
 
 private func updateFilteredOccurrences() {
     // 只计算可见月份的前后一个月
@@ -350,7 +350,7 @@ private func updateFilteredOccurrences() {
 
 ### 4.2 列表滚动性能 ⚠️
 
-**RootView.swift:954-977 (BirthdayRecordsView ScrollView)**
+**RootView.swift:954-977 (RosterRecordsView ScrollView)**
 
 **问题**: 使用 `LazyVStack` 是对的，但每个 row 都有复杂的卡片样式和多层阴影
 
@@ -362,12 +362,12 @@ private func updateFilteredOccurrences() {
 ```swift
 // ✅ 优化后的列表项
 .background(
-    isToday ? BirthdayTheme.accent.opacity(0.08) : Color.clear,
-    in: RoundedRectangle(cornerRadius: BirthdayTheme.cardCorner)
+    isToday ? RosterTheme.accent.opacity(0.08) : Color.clear,
+    in: RoundedRectangle(cornerRadius: RosterTheme.cardCorner)
 )
 .overlay(
-    RoundedRectangle(cornerRadius: BirthdayTheme.cardCorner)
-        .strokeBorder(isToday ? BirthdayTheme.accent : Color.clear, lineWidth: 1.4)
+    RoundedRectangle(cornerRadius: RosterTheme.cardCorner)
+        .strokeBorder(isToday ? RosterTheme.accent : Color.clear, lineWidth: 1.4)
 )
 .drawingGroup() // 将整个 row 渲染为一个位图
 ```
@@ -404,8 +404,8 @@ struct SidebarItem: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(
                     isSelected 
-                        ? BirthdayTheme.selectedFill(colorScheme)
-                        : (isHovered ? BirthdayTheme.hoverFill(colorScheme) : Color.clear)
+                        ? RosterTheme.selectedFill(colorScheme)
+                        : (isHovered ? RosterTheme.hoverFill(colorScheme) : Color.clear)
                 )
                 .animation(.easeOut(duration: 0.15), value: isHovered)
                 .animation(.easeOut(duration: 0.15), value: isSelected)
@@ -614,14 +614,14 @@ struct EmilButton: View {
     
     private var backgroundColor: Color {
         if style == .primary {
-            return isPressed ? BirthdayTheme.accent.opacity(0.9) : BirthdayTheme.accent
+            return isPressed ? RosterTheme.accent.opacity(0.9) : RosterTheme.accent
         } else {
-            return isHovered ? BirthdayTheme.hoverFill(.light) : BirthdayTheme.controlBackground(.light)
+            return isHovered ? RosterTheme.hoverFill(.light) : RosterTheme.controlBackground(.light)
         }
     }
     
     private var borderColor: Color {
-        style == .primary ? .clear : BirthdayTheme.separator(.light)
+        style == .primary ? .clear : RosterTheme.separator(.light)
     }
 }
 ```
@@ -638,7 +638,7 @@ struct EmilButton: View {
 
 ## 九、Emil Kowalski 评分
 
-基于 Emil 的设计工程哲学，Birthday 应用的评分：
+基于 Emil 的设计工程哲学，Roster 应用的评分：
 
 | 维度 | 评分 | 说明 |
 | --- | --- | --- |

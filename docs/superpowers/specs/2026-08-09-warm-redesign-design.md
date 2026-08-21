@@ -1,4 +1,4 @@
-# Birthday 温暖风格重设计 · 设计文档
+# Roster 温暖风格重设计 · 设计文档
 
 日期：2026-08-09
 状态：已与用户确认方向（奶油橘调 / 四页全覆盖 / 单文件自包含 HTML demo）
@@ -6,8 +6,8 @@
 
 ## 1. 背景与目标
 
-Birthday 是一个 local-first 的 macOS 通讯录生日管理工具（SwiftUI，UI 集中在
-`Sources/BirthdayApp/RootView.swift`）。当前主题为粉红 + 橙，整体偏冷、偏工具感。
+Roster 是一个 local-first 的 macOS 通讯录生日管理工具（SwiftUI，UI 集中在
+`Sources/RosterApp/RootView.swift`）。当前主题为粉红 + 橙，整体偏冷、偏工具感。
 
 目标：以「温暖」为核心情绪重新设计视觉风格，覆盖全部四个主要界面（日历仪表盘、
 生日列表、联系人编辑、权限与设置），先以 HTML 静态 demo 验证方向，不改实现代码。
@@ -154,12 +154,12 @@ Birthday 是一个 local-first 的 macOS 通讯录生日管理工具（SwiftUI�
 
 ## 5. 后续落地 SwiftUI 的映射（仅说明，不在本次实施）
 
-- `BirthdayTheme` 扩展为语义化色板（light/dark 双套 asset 或动态 `Color`），
+- `RosterTheme` 扩展为语义化色板（light/dark 双套 asset 或动态 `Color`），
   替换现有硬编码 `accent/accentSecondary`。
 - `color(for:)` 历法色换成 §2.3 新值。
 - `cardStyle()` 圆角 12 → 16，描边与阴影改暖调。
 - 标题字体加 `.fontDesign(.rounded)`。
-- `NextBirthdayCard` 改渐变底样式（§2.5）。
+- `NextRosterCard` 改渐变底样式（§2.5）。
 - 其余组件（AvatarView / KindBadge / CountdownChip）结构不变，仅换色值。
 - 新增组件（§3.5）：`MiniCalendarPicker`（公历）、`MonthYearJumpPicker`、
   三列滚轮式历法日期选择器（农历/希伯来历/伊斯兰历复用同一结构）。
