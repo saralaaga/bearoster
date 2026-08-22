@@ -17,22 +17,6 @@ struct SidebarView: View {
         @Bindable var model = model
 
         VStack(alignment: .leading, spacing: 0) {
-            SidebarSectionTitle(model.l10n(.browse), isCollapsed: isCollapsed)
-            SidebarItem(
-                title: model.l10n(.calendar),
-                systemImage: "calendar",
-                badge: nil,
-                isSelected: model.selection == .calendar,
-                isCollapsed: isCollapsed
-            ) { model.selection = .calendar }
-            SidebarItem(
-                title: model.l10n(.list),
-                systemImage: "gift.fill",
-                badge: model.allRecords.count,
-                isSelected: model.selection == .list,
-                isCollapsed: isCollapsed
-            ) { model.selection = .list }
-
             SidebarSectionTitle(model.l10n(.manage), isCollapsed: isCollapsed)
             SidebarItem(
                 title: model.l10n(.contacts),
@@ -75,6 +59,22 @@ struct SidebarView: View {
                 isSelected: model.selection == .sync,
                 isCollapsed: isCollapsed
             ) { model.selection = .sync }
+
+            SidebarSectionTitle(model.l10n(.browse), isCollapsed: isCollapsed)
+            SidebarItem(
+                title: model.l10n(.calendar),
+                systemImage: "calendar",
+                badge: nil,
+                isSelected: model.selection == .calendar,
+                isCollapsed: isCollapsed
+            ) { model.selection = .calendar }
+            SidebarItem(
+                title: model.l10n(.list),
+                systemImage: "gift.fill",
+                badge: model.allRecords.count,
+                isSelected: model.selection == .list,
+                isCollapsed: isCollapsed
+            ) { model.selection = .list }
 
             SidebarSectionTitle(model.l10n(.settings), isCollapsed: isCollapsed)
             SidebarItem(
