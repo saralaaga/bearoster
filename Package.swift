@@ -6,7 +6,8 @@ let package = Package(
     name: "Roster",
     defaultLocalization: "en",
     platforms: [
-        .macOS(.v14)
+        .macOS(.v14),
+        .iOS(.v17)
     ],
     products: [
         .library(name: "RosterCore", targets: ["RosterCore"]),

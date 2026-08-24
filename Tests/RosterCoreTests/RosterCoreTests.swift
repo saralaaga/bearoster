@@ -1,4 +1,5 @@
 import Testing
+import Contacts
 import Foundation
 @testable import RosterCore
 
@@ -194,6 +195,17 @@ struct RosterCoreTests {
         )
         let text = CalendarFormattingService().originalDate(record, locale: .english)
         #expect(text.contains("رمضان"))
+    }
+
+    @Test("Contacts authorization handles limited access")
+    func contactsAuthorizationHandlesLimitedAccess() {
+        #if os(iOS)
+        if #available(iOS 18.0, *) {
+            #expect(ContactsRepository.mapAuthorization(.limited) == .authorized)
+        }
+        #else
+        #expect(ContactsRepository.mapAuthorization(.authorized) == .authorized)
+        #endif
     }
 
     @Test("Formatter exposes reusable localized calendar strings")
