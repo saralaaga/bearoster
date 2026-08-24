@@ -5,6 +5,7 @@
 .swiftpm/
 
 # Local caches and temporary artifacts
+.worktrees/
 .tmp-*/
 .tmp-swift-cache/
 .tmp-screenshots/
