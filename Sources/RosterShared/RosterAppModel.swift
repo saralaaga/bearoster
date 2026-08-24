@@ -315,6 +315,10 @@ package final class RosterAppModel {
         contactDraftsByID[contactID]?.profile ?? profileByID[contactID]
     }
 
+    package func profile(for contactID: String) -> ContactRosterProfile? {
+        editableProfile(for: contactID)
+    }
+
     package var failedContactOperationCount: Int {
         contactOperationLog.filter { $0.status == .failed }.count
     }

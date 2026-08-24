@@ -31,15 +31,6 @@ struct MobileRootView: View {
     }
 }
 
-struct MobileContactsView: View {
-    var body: some View {
-        NavigationStack {
-            Text("通讯录")
-                .navigationTitle("通讯录")
-        }
-    }
-}
-
 struct MobileTagsView: View {
     var body: some View {
         NavigationStack {
