@@ -12,7 +12,8 @@ let package = Package(
     products: [
         .library(name: "RosterCore", targets: ["RosterCore"]),
         .library(name: "RosterShared", targets: ["RosterShared"]),
-        .executable(name: "Roster", targets: ["RosterApp"])
+        .executable(name: "Roster", targets: ["RosterApp"]),
+        .executable(name: "RosterIOS", targets: ["RosterIOSApp"])
     ],
     targets: [
         .target(
@@ -37,6 +38,13 @@ let package = Package(
             linkerSettings: [
                 .linkedFramework("SwiftUI"),
                 .linkedFramework("AppKit")
+            ]
+        ),
+        .executableTarget(
+            name: "RosterIOSApp",
+            dependencies: ["RosterShared"],
+            linkerSettings: [
+                .linkedFramework("SwiftUI")
             ]
         ),
         .testTarget(
