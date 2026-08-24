@@ -31,29 +31,3 @@ struct MobileRootView: View {
     }
 }
 
-struct MobileTagsView: View {
-    var body: some View {
-        NavigationStack {
-            Text("标签")
-                .navigationTitle("标签")
-        }
-    }
-}
-
-struct MobileCalendarView: View {
-    var body: some View {
-        NavigationStack {
-            Text("日历")
-                .navigationTitle("日历")
-        }
-    }
-}
-
-struct MobileMoreView: View {
-    var body: some View {
-        NavigationStack {
-            Text("更多")
-                .navigationTitle("更多")
-        }
-    }
-}
