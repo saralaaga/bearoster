@@ -27,6 +27,9 @@ struct RosterDerivedDataRequest: Sendable {
     let contactTagAssignmentsByContactID: [String: Set<String>]
     let sort: RosterSort
     let language: AppLanguage
+    let showAge: Bool
+    let openContactText: String
+    let todayText: String
     let upcomingRange: Int
 }
 
@@ -35,6 +38,7 @@ struct RosterDerivedDataSnapshot: Sendable {
     let filteredRecords: [RosterRecord]
     let filteredRecordOccurrences: [RosterOccurrence]
     let filteredRecordGroups: [RosterRecordGroup]
+    let filteredRecordListGroups: [RosterOccurrenceListGroup]
     let cachedUpcomingOccurrences: [RosterOccurrence]
     let selectedDateOccurrences: [RosterOccurrence]
     let visibleMonthDates: [Date]
@@ -79,6 +83,15 @@ actor RosterDerivedDataWorker {
             sort: request.sort,
             locale: request.language.coreLocale
         )
+        let listGroups = service.listGroups(
+            from: groups,
+            contactTags: request.contactTags,
+            contactTagAssignmentsByContactID: request.contactTagAssignmentsByContactID,
+            language: request.language,
+            showAge: request.showAge,
+            openContactText: request.openContactText,
+            todayText: request.todayText
+        )
 
         progress(.active(message: "Calculating upcoming roster data", completed: 3, total: 6))
         let upcoming = service.upcomingOccurrences(
@@ -104,6 +117,7 @@ actor RosterDerivedDataWorker {
             filteredRecords: filtered.records,
             filteredRecordOccurrences: filtered.occurrences,
             filteredRecordGroups: groups,
+            filteredRecordListGroups: listGroups,
             cachedUpcomingOccurrences: upcoming,
             selectedDateOccurrences: visible.selectedDateOccurrences,
             visibleMonthDates: visible.dates,
@@ -136,6 +150,8 @@ actor RosterDerivedDataWorker {
 }
 
 private struct RosterDerivedDataCacheKey: Hashable, Sendable {
+    private static let calendar = Calendar(identifier: .gregorian)
+
     let generation: Int
     let searchText: String
     let selectedDate: Date
@@ -146,20 +162,22 @@ private struct RosterDerivedDataCacheKey: Hashable, Sendable {
     let tagAssignmentSignature: Int
     let sort: RosterSort
     let locale: CalendarFormattingService.AppLocale
+    let showAge: Bool
     let upcomingRange: Int
 
     init(_ request: RosterDerivedDataRequest) {
         generation = request.generation
         searchText = request.searchText
-        selectedDate = Calendar.current.startOfDay(for: request.selectedDate)
-        visibleMonth = Calendar.current.date(from: Calendar.current.dateComponents([.year, .month], from: request.visibleMonth))
-            ?? Calendar.current.startOfDay(for: request.visibleMonth)
+        selectedDate = Self.calendar.startOfDay(for: request.selectedDate)
+        visibleMonth = Self.calendar.date(from: Self.calendar.dateComponents([.year, .month], from: request.visibleMonth))
+            ?? Self.calendar.startOfDay(for: request.visibleMonth)
         filter = request.filter
         tagFilter = request.tagFilter
         tagSignature = Self.tagSignature(request.contactTags)
         tagAssignmentSignature = Self.assignmentSignature(request.contactTagAssignmentsByContactID)
         sort = request.sort
         locale = request.language.coreLocale
+        showAge = request.showAge
         upcomingRange = request.upcomingRange
     }
 

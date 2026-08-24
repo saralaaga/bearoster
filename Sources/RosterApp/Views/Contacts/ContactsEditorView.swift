@@ -60,8 +60,6 @@ struct ContactsEditorView: View {
                 ZStack {
                     ContactsNativeStyle.detailBackground(colorScheme)
                     VStack(spacing: 0) {
-                        TagDropRail()
-
                         if model.isContactSelectionMode {
                             BulkContactSelectionView()
                                 .transition(detailTransition)
@@ -1133,7 +1131,7 @@ struct ContactRosterEditor: View {
             .padding(.top, 34)
             .padding(.bottom, 60)
             .frame(maxWidth: 624)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, alignment: isEditing ? .leading : .center)
         }
         .background(ContactsNativeStyle.detailBackground(colorScheme))
     }
@@ -1902,7 +1900,7 @@ struct ContactTagPickerPopover: View {
             Text(title)
                 .font(.system(size: 14, weight: .semibold))
 
-            TextField(model.l10n(.newTag), text: $newTagName)
+            TextField(model.l10n(.newTagPathPlaceholder), text: $newTagName)
                 .textFieldStyle(.roundedBorder)
 
             if replacesExistingTags, !selectedTags.isEmpty {

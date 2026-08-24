@@ -92,6 +92,7 @@ struct L10n {
     static let addTags = Key(zhHans: "添加标签", zhHant: "新增標籤", en: "Add Tags")
     static let editTags = Key(zhHans: "编辑标签", zhHant: "編輯標籤", en: "Edit Tags")
     static let newTag = Key(zhHans: "新标签", zhHant: "新標籤", en: "New tag")
+    static let newTagPathPlaceholder = Key(zhHans: "新标签，子标签用 / 分隔", zhHant: "新標籤，子標籤用 / 分隔", en: "New tag, use / for child tags")
     static let newChildTag = Key(zhHans: "新建子标签", zhHant: "新增子標籤", en: "New Child Tag")
     static let renameTag = Key(zhHans: "重命名", zhHant: "重新命名", en: "Rename")
     static let changeColor = Key(zhHans: "更改颜色", zhHant: "更改顏色", en: "Change Color")
@@ -229,6 +230,7 @@ extension L10n.Key {
     static let addTags = L10n.addTags
     static let editTags = L10n.editTags
     static let newTag = L10n.newTag
+    static let newTagPathPlaceholder = L10n.newTagPathPlaceholder
     static let newChildTag = L10n.newChildTag
     static let renameTag = L10n.renameTag
     static let changeColor = L10n.changeColor

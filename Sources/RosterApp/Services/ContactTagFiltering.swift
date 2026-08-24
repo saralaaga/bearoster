@@ -36,8 +36,12 @@ enum ContactTagFilter: Hashable, Sendable {
     }
 
     func matchingTagIDs(in tags: [ContactTag]) -> Set<String>? {
+        matchingTagIDs(in: ContactTagTree(tags: tags))
+    }
+
+    func matchingTagIDs(in tree: ContactTagTree) -> Set<String>? {
         guard case let .tag(tagID) = self else { return nil }
-        return ContactTagTree(tags: tags).tagAndDescendantIDs(for: tagID)
+        return tree.tagAndDescendantIDs(for: tagID)
     }
 }
 
@@ -58,10 +62,12 @@ struct ContactTagTreeNode: Identifiable, Hashable, Sendable {
 
 struct ContactTagTree: Sendable {
     let tags: [ContactTag]
+    private let tagsByID: [String: ContactTag]
     private let childrenByParentID: [String: [ContactTag]]
 
     init(tags: [ContactTag]) {
         self.tags = tags
+        self.tagsByID = Dictionary(uniqueKeysWithValues: tags.map { ($0.id, $0) })
         let grouped = Dictionary(grouping: tags) { tag in
             tag.parentTagID ?? ""
         }
@@ -85,7 +91,6 @@ struct ContactTagTree: Sendable {
     }
 
     func displayPath(for tagID: String) -> String {
-        let tagsByID = Dictionary(uniqueKeysWithValues: tags.map { ($0.id, $0) })
         var parts: [String] = []
         var current = tagsByID[tagID]
         var visited = Set<String>()

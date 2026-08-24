@@ -9,9 +9,6 @@ struct RosterRecordsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        let locale = model.language.coreLocale
-        let openContactText = model.l10n(.openContact)
-        let todayText = model.l10n(.today)
         let filterSignature = "\(model.filter?.rawValue ?? "all")|\(model.rosterTagFilter.cacheKey)|\(model.sort.rawValue)"
 
         VStack(spacing: 0) {
@@ -21,11 +18,11 @@ struct RosterRecordsView: View {
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(model.filteredRecordGroups) { group in
+                        ForEach(model.filteredRecordListGroups) { group in
                             HStack(alignment: .firstTextBaseline, spacing: 9) {
                                 Text(group.title)
                                     .font(.system(size: 15, weight: .semibold))
-                                Text("\(group.occurrences.count)")
+                                Text("\(group.items.count)")
                                     .font(.system(size: 12, weight: .medium))
                                     .foregroundStyle(.secondary)
                             }
@@ -33,20 +30,19 @@ struct RosterRecordsView: View {
                             .padding(.top, 20)
                             .padding(.bottom, 9)
 
-                            ForEach(group.occurrences) { occurrence in
-                                let daysUntil = model.resolver.daysUntil(occurrence.date)
+                            ForEach(group.items) { item in
                                 RosterOccurrenceListRow(
-                                    contactName: occurrence.record.contactName,
-                                    tags: model.tags(for: occurrence.record.contactID),
-                                    kind: occurrence.record.kind,
-                                    kindTitle: shortKindName(occurrence.record.kind, model: model),
-                                    metaText: metaText(for: occurrence, locale: locale),
-                                    daysUntil: daysUntil,
-                                    daysUntilText: daysUntil == 0 ? todayText : daysLeftText(daysUntil, locale: locale),
-                                    isToday: Calendar.current.isDateInToday(occurrence.date),
-                                    accessibilityLabel: "\(openContactText): \(occurrence.record.contactName)"
+                                    contactName: item.contactName,
+                                    tags: item.tags,
+                                    kind: item.kind,
+                                    kindTitle: item.kindTitle,
+                                    metaText: item.metaText,
+                                    daysUntil: item.daysUntil,
+                                    daysUntilText: item.daysUntilText,
+                                    isToday: item.isToday,
+                                    accessibilityLabel: item.accessibilityLabel
                                 ) {
-                                    model.focusContact(occurrence.record.contactID)
+                                    model.focusContact(item.contactID)
                                 }
                             }
                         }
@@ -71,16 +67,6 @@ struct RosterRecordsView: View {
         return .opacity.combined(with: .offset(y: 5))
     }
 
-    private func metaText(for occurrence: RosterOccurrence, locale: CalendarFormattingService.AppLocale) -> String {
-        var parts = [
-            model.formatter.originalDate(occurrence.record, locale: locale),
-            model.formatter.occurrenceDate(occurrence.date, locale: locale)
-        ]
-        if model.showAge, let age = occurrence.age {
-            parts.append("\(age)")
-        }
-        return parts.joined(separator: " · ")
-    }
 }
 
 struct RosterOccurrenceListRow: View {

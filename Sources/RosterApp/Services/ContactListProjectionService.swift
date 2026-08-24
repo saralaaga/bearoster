@@ -148,7 +148,7 @@ struct ContactListProjectionService: Sendable {
             selectedTagFilter: selectedTagFilter
         )
         let tagsByID = Dictionary(uniqueKeysWithValues: contactTags.map { ($0.id, $0) })
-        let rows = profiles
+        let unsortedRows = profiles
             .filter { visibleIDs.contains($0.id) }
             .filter {
                 searchText.isEmpty ||
@@ -166,10 +166,16 @@ struct ContactListProjectionService: Sendable {
                     upcomingOccurrence: upcomingOccurrencesByContactID[$0.id]
                 )
             }
+
+        let sectionSortValues = Dictionary(
+            uniqueKeysWithValues: Set(unsortedRows.map(\.sectionKey)).map {
+                ($0, NameSortKey.sectionSortValue($0))
+            }
+        )
+        let rows = unsortedRows
             .sorted { lhs, rhs in
-                let sectionOrder = NameSortKey.sectionSortValue(lhs.sectionKey) < NameSortKey.sectionSortValue(rhs.sectionKey)
                 if lhs.sectionKey != rhs.sectionKey {
-                    return sectionOrder
+                    return (sectionSortValues[lhs.sectionKey] ?? Int.max) < (sectionSortValues[rhs.sectionKey] ?? Int.max)
                 }
                 let comparison = lhs.sortKey.localizedStandardCompare(rhs.sortKey)
                 if comparison != .orderedSame {

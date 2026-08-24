@@ -13,6 +13,7 @@ struct RosterVisibleMonthData: Sendable {
 struct RosterDerivedDataService: Sendable {
     private let resolver = RosterOccurrenceResolver()
     private let formatter = CalendarFormattingService()
+    private let calendar = Calendar(identifier: .gregorian)
 
     func allRecords(from profiles: [ContactRosterProfile]) -> [RosterRecord] {
         profiles.flatMap(\.records)
@@ -93,11 +94,52 @@ struct RosterDerivedDataService: Sendable {
         }
     }
 
+    func listGroups(
+        from groups: [RosterRecordGroup],
+        contactTags: [ContactTag],
+        contactTagAssignmentsByContactID: [String: Set<String>],
+        language: AppLanguage,
+        showAge: Bool,
+        openContactText: String,
+        todayText: String
+    ) -> [RosterOccurrenceListGroup] {
+        let tagsByID = Dictionary(uniqueKeysWithValues: contactTags.map { ($0.id, $0) })
+        return groups.map { group in
+            RosterOccurrenceListGroup(
+                id: group.id,
+                title: group.title,
+                items: group.occurrences.map {
+                    listItem(
+                        for: $0,
+                        tags: tags(for: $0.record.contactID, assignments: contactTagAssignmentsByContactID, tagsByID: tagsByID),
+                        language: language,
+                        showAge: showAge,
+                        openContactText: openContactText,
+                        todayText: todayText
+                    )
+                }
+            )
+        }
+    }
+
     private func sortedOccurrences(
         _ occurrences: [RosterOccurrence],
         sort: RosterSort
     ) -> [RosterOccurrence] {
-        occurrences.sorted { lhs, rhs in
+        if sort == .name {
+            return occurrences
+                .map { (occurrence: $0, nameKey: NameSortKey.romanized($0.record.contactName)) }
+                .sorted { lhs, rhs in
+                    let comparison = lhs.nameKey.localizedStandardCompare(rhs.nameKey)
+                    if comparison != .orderedSame {
+                        return comparison == .orderedAscending
+                    }
+                    return compareByNextDateThenID(lhs.occurrence, rhs.occurrence)
+                }
+                .map { $0.occurrence }
+        }
+
+        return occurrences.sorted { lhs, rhs in
             switch sort {
             case .next:
                 return compareByNextDate(lhs, rhs)
@@ -116,7 +158,7 @@ struct RosterDerivedDataService: Sendable {
         locale: CalendarFormattingService.AppLocale
     ) -> [RosterRecordGroup] {
         let grouped = Dictionary(grouping: occurrences) { occurrence in
-            let components = Calendar.current.dateComponents([.year, .month], from: occurrence.date)
+            let components = calendar.dateComponents([.year, .month], from: occurrence.date)
             guard let year = components.year, let month = components.month else {
                 return "unknown"
             }
@@ -127,7 +169,7 @@ struct RosterDerivedDataService: Sendable {
             guard let items = grouped[key], let first = items.first else { return nil }
             return RosterRecordGroup(
                 id: key,
-                title: monthTitle(for: first.date, locale: locale),
+                title: formatter.monthTitle(first.date, locale: locale),
                 occurrences: items
             )
         }
@@ -221,6 +263,62 @@ struct RosterDerivedDataService: Sendable {
         return lhs.id < rhs.id
     }
 
+    private func listItem(
+        for occurrence: RosterOccurrence,
+        tags: [ContactTag],
+        language: AppLanguage,
+        showAge: Bool,
+        openContactText: String,
+        todayText: String
+    ) -> RosterOccurrenceListItem {
+        let locale = language.coreLocale
+        let daysUntil = resolver.daysUntil(occurrence.date)
+        var metaParts = [
+            formatter.originalDate(occurrence.record, locale: locale),
+            formatter.occurrenceDate(occurrence.date, locale: locale)
+        ]
+        if showAge, let age = occurrence.age {
+            metaParts.append("\(age)")
+        }
+        return RosterOccurrenceListItem(
+            id: occurrence.id,
+            contactID: occurrence.record.contactID,
+            contactName: occurrence.record.contactName,
+            tags: tags,
+            kind: occurrence.record.kind,
+            kindTitle: shortKindName(occurrence.record.kind, language: language),
+            metaText: metaParts.joined(separator: " · "),
+            daysUntil: daysUntil,
+            daysUntilText: daysUntil == 0 ? todayText : daysLeftText(daysUntil, locale: locale),
+            isToday: calendar.isDateInToday(occurrence.date),
+            accessibilityLabel: "\(openContactText): \(occurrence.record.contactName)"
+        )
+    }
+
+    private func shortKindName(_ kind: RosterCalendarKind, language: AppLanguage) -> String {
+        switch kind {
+        case .gregorian: formatter.calendarName(kind, locale: language.coreLocale)
+        case .chinese: language.coreLocale == .english ? "Lunar" : formatter.calendarName(kind, locale: language.coreLocale)
+        case .hebrew: "עברי"
+        case .islamic: "هجري"
+        }
+    }
+
+    private func tags(
+        for contactID: String,
+        assignments: [String: Set<String>],
+        tagsByID: [String: ContactTag]
+    ) -> [ContactTag] {
+        (assignments[contactID] ?? [])
+            .compactMap { tagsByID[$0] }
+            .sorted {
+                if $0.sortOrder != $1.sortOrder {
+                    return $0.sortOrder < $1.sortOrder
+                }
+                return $0.name.localizedStandardCompare($1.name) == .orderedAscending
+            }
+    }
+
     func upcomingOccurrences(
         from allRecords: [RosterRecord],
         upcomingRange: Int,
@@ -254,8 +352,8 @@ struct RosterDerivedDataService: Sendable {
 
         return RosterVisibleMonthData(
             dates: dates,
-            title: monthTitle(for: visibleMonth, locale: locale),
-            weekdaySymbols: weekdaySymbols(locale: locale),
+            title: formatter.monthTitle(visibleMonth, locale: locale),
+            weekdaySymbols: formatter.weekdaySymbols(locale: locale),
             occurrencesByDay: occurrencesByDay,
             filteredOccurrencesByDay: filteredOccurrencesByDay,
             selectedDateOccurrences: selectedDateOccurrences
@@ -294,7 +392,6 @@ struct RosterDerivedDataService: Sendable {
     }
 
     private func visibleMonthDays(containing visibleMonth: Date) -> [Date] {
-        let calendar = Calendar.current
         guard let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: visibleMonth)) else {
             return []
         }
@@ -308,19 +405,6 @@ struct RosterDerivedDataService: Sendable {
     }
 
     private func dayKey(_ date: Date) -> Date {
-        Calendar.current.startOfDay(for: date)
-    }
-
-    private func weekdaySymbols(locale: CalendarFormattingService.AppLocale) -> [String] {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: locale.rawValue)
-        return formatter.shortStandaloneWeekdaySymbols
-    }
-
-    private func monthTitle(for date: Date, locale: CalendarFormattingService.AppLocale) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: locale.rawValue)
-        formatter.dateFormat = locale == .english ? "MMMM yyyy" : "yyyy年M月"
-        return formatter.string(from: date)
+        calendar.startOfDay(for: date)
     }
 }

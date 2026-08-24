@@ -39,6 +39,7 @@ struct MonthGridView: View {
     @Environment(RosterAppModel.self) private var model
     @Environment(\.colorScheme) private var colorScheme
     private static let columns = Array(repeating: GridItem(.flexible(minimum: 64), spacing: 6), count: 7)
+    private let calendar = Calendar(identifier: .gregorian)
 
     var body: some View {
         VStack(spacing: 0) {
@@ -62,7 +63,7 @@ struct MonthGridView: View {
                             date: date,
                             occurrences: model.filteredRecords(on: date),
                             inDisplayedMonth: isInDisplayedMonth(date),
-                            isSelected: Calendar.current.isDate(model.selectedDate, inSameDayAs: date)
+                            isSelected: calendar.isDate(model.selectedDate, inSameDayAs: date)
                         )
                             .frame(minHeight: 94)
                     }
@@ -75,7 +76,7 @@ struct MonthGridView: View {
     }
 
     private func isInDisplayedMonth(_ date: Date) -> Bool {
-        Calendar.current.component(.month, from: date) == Calendar.current.component(.month, from: model.visibleMonth)
+        calendar.component(.month, from: date) == calendar.component(.month, from: model.visibleMonth)
     }
 }
 
@@ -86,15 +87,16 @@ struct CalendarDayCell: View {
     let occurrences: [RosterOccurrence]
     let inDisplayedMonth: Bool
     let isSelected: Bool
+    private let calendar = Calendar(identifier: .gregorian)
 
-    private var isToday: Bool { Calendar.current.isDateInToday(date) }
+    private var isToday: Bool { calendar.isDateInToday(date) }
 
     var body: some View {
         Button {
             model.selectedDate = date
         } label: {
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(Calendar.current.component(.day, from: date))")
+                Text("\(calendar.component(.day, from: date))")
                     .font(.system(size: 12.5, weight: isToday ? .bold : .semibold))
                     .foregroundStyle(isToday ? .white : (inDisplayedMonth ? Color.primary : RosterTheme.inkTertiary))
                     .frame(width: 24, height: 24)
@@ -141,12 +143,10 @@ struct CalendarDayCell: View {
     }
 
     private var accessibilityLabel: String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: model.language.coreLocale.rawValue)
-        formatter.dateStyle = .full
+        let text = model.formatter.fullDate(date, locale: model.language.coreLocale)
         let count = occurrences.count
-        if count == 0 { return formatter.string(from: date) }
-        return "\(formatter.string(from: date)), \(count)"
+        if count == 0 { return text }
+        return "\(text), \(count)"
     }
 }
 
@@ -180,6 +180,7 @@ struct DayDetailView: View {
     @Environment(RosterAppModel.self) private var model
     @Environment(\.colorScheme) private var colorScheme
     let date: Date
+    private let calendar = Calendar(identifier: .gregorian)
 
     var body: some View {
         let occurrences = model.selectedDateOccurrences
@@ -207,7 +208,7 @@ struct DayDetailView: View {
                         .padding(14)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .cardStyle()
-                } else if Calendar.current.isDateInToday(date) {
+                } else if calendar.isDateInToday(date) {
                     Label(model.l10n(.today), systemImage: "asterisk")
                         .font(.system(size: 12.5, weight: .medium))
                         .foregroundStyle(RosterTheme.inkSecondary)
@@ -223,24 +224,17 @@ struct DayDetailView: View {
     }
 
     private var dayTitle: String {
-        let calendar = Calendar.current
         let month = calendar.component(.month, from: date)
         let day = calendar.component(.day, from: date)
         if model.language.coreLocale == .english {
-            let formatter = DateFormatter()
-            formatter.locale = Locale(identifier: model.language.coreLocale.rawValue)
-            formatter.dateFormat = "MMM d"
-            return formatter.string(from: date)
+            return model.formatter.monthDay(date, locale: model.language.coreLocale)
         }
         return "\(month)月\(day)日"
     }
 
     private var daySubtitle: String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: model.language.coreLocale.rawValue)
-        formatter.dateFormat = "EEEE"
-        let weekday = formatter.string(from: date)
-        if Calendar.current.isDateInToday(date) {
+        let weekday = model.formatter.weekdayName(date, locale: model.language.coreLocale)
+        if calendar.isDateInToday(date) {
             return "\(weekday) · \(model.l10n(.today))"
         }
         return weekday
@@ -250,6 +244,7 @@ struct DayDetailView: View {
 struct DayOccurrenceCard: View {
     @Environment(RosterAppModel.self) private var model
     let occurrence: RosterOccurrence
+    private let calendar = Calendar(identifier: .gregorian)
 
     var body: some View {
         Button {
@@ -280,7 +275,7 @@ struct DayOccurrenceCard: View {
         .cardStyle()
         .overlay(
             RoundedRectangle(cornerRadius: RosterTheme.cardCorner)
-                .strokeBorder(color(for: occurrence.record.kind), lineWidth: Calendar.current.isDateInToday(occurrence.date) ? 1.4 : 0)
+                .strokeBorder(color(for: occurrence.record.kind), lineWidth: calendar.isDateInToday(occurrence.date) ? 1.4 : 0)
         )
     }
 
@@ -321,6 +316,7 @@ struct UpcomingRostersView: View {
 struct RosterOccurrenceCard: View {
     @Environment(RosterAppModel.self) private var model
     let occurrence: RosterOccurrence
+    private let calendar = Calendar(identifier: .gregorian)
 
     var body: some View {
         Button {
@@ -363,7 +359,6 @@ struct RosterOccurrenceCard: View {
     }
 
     private var dateBlock: some View {
-        let calendar = Calendar.current
         return VStack(spacing: 1) {
             Text("\(calendar.component(.day, from: occurrence.date))")
                 .font(.title3.weight(.bold))
@@ -376,12 +371,6 @@ struct RosterOccurrenceCard: View {
     }
 
     private var monthSymbol: String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: model.language.coreLocale.rawValue)
-        let monthIndex = Calendar.current.component(.month, from: occurrence.date) - 1
-        if model.language.coreLocale == .english {
-            return formatter.shortStandaloneMonthSymbols[monthIndex]
-        }
-        return "\(monthIndex + 1)月"
+        model.formatter.monthSymbol(occurrence.date, locale: model.language.coreLocale)
     }
 }

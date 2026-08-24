@@ -196,6 +196,17 @@ struct RosterCoreTests {
         #expect(text.contains("رمضان"))
     }
 
+    @Test("Formatter exposes reusable localized calendar strings")
+    func formatterExposesReusableLocalizedCalendarStrings() throws {
+        let formatter = CalendarFormattingService()
+        let date = try #require(gregorianDate(year: 2026, month: 8, day: 20))
+
+        #expect(formatter.fullDate(date, locale: .english).contains("2026"))
+        #expect(formatter.monthTitle(date, locale: .english) == "August 2026")
+        #expect(formatter.monthTitle(date, locale: .simplifiedChinese) == "2026年8月")
+        #expect(formatter.weekdaySymbols(locale: .english).count == 7)
+    }
+
     private func gregorianDate(year: Int, month: Int, day: Int) -> Date? {
         Calendar(identifier: .gregorian).date(from: DateComponents(year: year, month: month, day: day))
     }

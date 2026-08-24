@@ -62,6 +62,26 @@ struct RosterRecordGroup: Identifiable, Hashable, Sendable {
     let occurrences: [RosterOccurrence]
 }
 
+struct RosterOccurrenceListItem: Identifiable, Hashable, Sendable {
+    let id: String
+    let contactID: String
+    let contactName: String
+    let tags: [ContactTag]
+    let kind: RosterCalendarKind
+    let kindTitle: String
+    let metaText: String
+    let daysUntil: Int
+    let daysUntilText: String
+    let isToday: Bool
+    let accessibilityLabel: String
+}
+
+struct RosterOccurrenceListGroup: Identifiable, Hashable, Sendable {
+    let id: String
+    let title: String
+    let items: [RosterOccurrenceListItem]
+}
+
 @MainActor
 @Observable
 final class RosterAppModel {
@@ -151,13 +171,19 @@ final class RosterAppModel {
     private(set) var filteredRecords: [RosterRecord] = []
     private(set) var filteredRecordOccurrences: [RosterOccurrence] = []
     private(set) var filteredRecordGroups: [RosterRecordGroup] = []
+    private(set) var filteredRecordListGroups: [RosterOccurrenceListGroup] = []
     private(set) var profiles: [ContactRosterProfile] = []
     private(set) var filteredProfiles: [ContactRosterProfile] = []
     private(set) var contactGrouping: ContactGroupingSnapshot = .empty
     private(set) var contactCollectionSections: [ContactCollectionSectionModel] = []
     private(set) var contactListSections: [ContactListSectionModel] = []
     private(set) var visibleContactCount = 0
-    private(set) var contactTags: [ContactTag] = []
+    private(set) var contactTags: [ContactTag] = [] {
+        didSet {
+            contactTagTree = ContactTagTree(tags: contactTags)
+            contactTagsByID = Dictionary(uniqueKeysWithValues: contactTags.map { ($0.id, $0) })
+        }
+    }
     private(set) var contactTagAssignmentsByContactID: [String: Set<String>] = [:]
     private(set) var contactTagFilterOptions: [ContactTagSelectionOption] = []
     private(set) var visibleTagContactCount = 0
@@ -184,6 +210,7 @@ final class RosterAppModel {
     private let derivedDataWorker = RosterDerivedDataWorker()
     private let contactProjectionWorker = ContactListProjectionWorker()
     private let voiceInput = VoiceInputService()
+    private let calendar = Calendar(identifier: .gregorian)
     private var saveTask: Task<Void, Never>?
     private var derivedDataTask: Task<Void, Never>?
     private var contactProjectionTask: Task<Void, Never>?
@@ -194,6 +221,9 @@ final class RosterAppModel {
     private var derivedRequestID = 0
     private var contactProjectionRequestID = 0
     private var profileByID: [String: ContactRosterProfile] = [:]
+    private var contactTagTree = ContactTagTree(tags: [])
+    private var contactTagsByID: [String: ContactTag] = [:]
+    private var contactTagCountsByFilterID: [String: Int] = [:]
     private var localDateSpecsByPersonID: [String: [RosterDateSpec]] = [:]
     private var rosterRecordSignature = 0
     private var calculationStartedAt: Date?
@@ -211,7 +241,7 @@ final class RosterAppModel {
     init(e2eFixture: RosterE2EFixture? = nil) {
         self.e2eFixture = e2eFixture
         observeContactsChanges()
-        scheduleDerivedDataRebuild(message: "Preparing roster data")
+        scheduleDerivedDataRebuild(message: "Preparing roster data", debounceNanoseconds: 150_000_000)
         if let e2eFixture {
             resetE2EArtifacts()
             applyE2EFixture(e2eFixture)
@@ -277,6 +307,9 @@ final class RosterAppModel {
             contactTagAssignmentsByContactID: contactTagAssignmentsByContactID,
             sort: sort,
             language: language,
+            showAge: showAge,
+            openContactText: l10n(.openContact),
+            todayText: l10n(.today),
             upcomingRange: upcomingRange
         )
         let worker = derivedDataWorker
@@ -310,6 +343,7 @@ final class RosterAppModel {
         filteredRecords = snapshot.filteredRecords
         filteredRecordOccurrences = snapshot.filteredRecordOccurrences
         filteredRecordGroups = snapshot.filteredRecordGroups
+        filteredRecordListGroups = snapshot.filteredRecordListGroups
         cachedUpcomingOccurrences = snapshot.cachedUpcomingOccurrences
         selectedDateOccurrences = snapshot.selectedDateOccurrences
         visibleMonthDates = snapshot.visibleMonthDates
@@ -323,7 +357,7 @@ final class RosterAppModel {
     }
 
     private func finishCalculationProgress(requestID: Int) {
-        let minimumVisibleSeconds: TimeInterval = 0.45
+        let minimumVisibleSeconds: TimeInterval = 0.15
         let elapsed = calculationStartedAt.map { Date().timeIntervalSince($0) } ?? minimumVisibleSeconds
         let remaining = max(0, minimumVisibleSeconds - elapsed)
 
@@ -361,26 +395,36 @@ final class RosterAppModel {
 
         markConflictsIfNeeded(using: snapshot)
         let mergedProfiles = profilesByApplyingLocalState(to: snapshot.profiles)
-        profiles = mergedProfiles
-        profileByID = Dictionary(uniqueKeysWithValues: mergedProfiles.map { ($0.id, $0) })
         contactGrouping = snapshot.grouping
         extendedProfilesByID = snapshot.extendedProfilesByID
         if !isContactCollectionSelectable(selectedContactCollectionID) {
             selectedContactCollectionID = ContactCollectionIdentifier.all
         }
-        rebuildContactProjection()
+        applyProfilesIfRosterChanged(mergedProfiles, message: "Calculating roster data", debounceNanoseconds: 150_000_000)
 
         if selectedContactID == nil {
             selectedContactID = filteredProfiles.first?.id ?? snapshot.profiles.first?.id
         } else if let currentSelectedContactID = selectedContactID, profileByID[currentSelectedContactID] == nil {
             selectedContactID = filteredProfiles.first?.id ?? snapshot.profiles.first?.id
         }
+    }
 
-        let nextSignature = Self.rosterSignature(for: mergedProfiles)
-        guard nextSignature != rosterRecordSignature else { return }
+    @discardableResult
+    private func applyProfilesIfRosterChanged(
+        _ nextProfiles: [ContactRosterProfile],
+        message: String,
+        debounceNanoseconds: UInt64 = 0
+    ) -> Bool {
+        profiles = nextProfiles
+        profileByID = Dictionary(uniqueKeysWithValues: nextProfiles.map { ($0.id, $0) })
+        rebuildContactProjection()
+
+        let nextSignature = Self.rosterSignature(for: nextProfiles)
+        guard nextSignature != rosterRecordSignature else { return false }
         rosterRecordSignature = nextSignature
         dataGeneration += 1
-        scheduleDerivedDataRebuild(message: "Calculating roster data")
+        scheduleDerivedDataRebuild(message: message, debounceNanoseconds: debounceNanoseconds)
+        return true
     }
 
     private func applyE2EFixture(_ fixture: RosterE2EFixture) {
@@ -557,7 +601,7 @@ final class RosterAppModel {
     }
 
     private func dayKey(_ date: Date) -> Date {
-        Calendar.current.startOfDay(for: date)
+        calendar.startOfDay(for: date)
     }
 
     private func rebuildContactProjection(debounceNanoseconds: UInt64 = 0) {
@@ -626,10 +670,11 @@ final class RosterAppModel {
             self.contactDraftsByID = snapshot.draftsByContactID
             self.contactOperationLog = snapshot.operations
             guard !self.profiles.isEmpty else { return }
-            self.profiles = self.profilesByApplyingLocalState(to: self.profiles)
-            self.profileByID = Dictionary(uniqueKeysWithValues: self.profiles.map { ($0.id, $0) })
-            self.rebuildContactProjection()
-            self.scheduleDerivedDataRebuild(message: "Updating local edits")
+            self.applyProfilesIfRosterChanged(
+                self.profilesByApplyingLocalState(to: self.profiles),
+                message: "Updating local edits",
+                debounceNanoseconds: 150_000_000
+            )
         }
     }
 
@@ -770,10 +815,11 @@ final class RosterAppModel {
         await MainActor.run {
             self.localDateSpecsByPersonID = specsByPersonID
             guard !self.profiles.isEmpty else { return }
-            self.profiles = self.profilesByApplyingLocalState(to: self.profiles)
-            self.profileByID = Dictionary(uniqueKeysWithValues: self.profiles.map { ($0.id, $0) })
-            self.rebuildContactProjection()
-            self.scheduleDerivedDataRebuild(message: "Calculating roster data")
+            self.applyProfilesIfRosterChanged(
+                self.profilesByApplyingLocalState(to: self.profiles),
+                message: "Calculating roster data",
+                debounceNanoseconds: 150_000_000
+            )
         }
     }
 
@@ -807,39 +853,40 @@ final class RosterAppModel {
     private func rebuildContactTagFilterOptions() {
         contactTagFilterOptions = Self.tagFilterOptions(
             tags: contactTags,
+            tree: contactTagTree,
             assignmentsByContactID: contactTagAssignmentsByContactID,
             visibleContactIDs: Set(profiles.map(\.id)),
             allText: l10n(.all),
             untaggedText: l10n(.untaggedContacts)
         )
+        contactTagCountsByFilterID = Dictionary(uniqueKeysWithValues: contactTagFilterOptions.map { ($0.filter.cacheKey, $0.count) })
     }
 
     func tags(for contactID: String) -> [ContactTag] {
         let tagIDs = contactTagAssignmentsByContactID[contactID] ?? []
-        return contactTags
-            .filter { tagIDs.contains($0.id) }
-            .sorted(by: Self.compareTags(_:_:))
+        return tagIDs.compactMap { contactTagsByID[$0] }.sorted(by: Self.compareTags(_:_:))
     }
 
     var contactTagTreeNodes: [ContactTagTreeNode] {
-        ContactTagTree(tags: contactTags).flattened
+        contactTagTree.flattened
     }
 
     func childTags(of tagID: String?) -> [ContactTag] {
-        ContactTagTree(tags: contactTags).children(of: tagID)
+        contactTagTree.children(of: tagID)
     }
 
     func tagPath(for tagID: String) -> String {
-        ContactTagTree(tags: contactTags).displayPath(for: tagID)
+        contactTagTree.displayPath(for: tagID)
     }
 
     func tagAndDescendantIDs(for tagID: String) -> Set<String> {
-        ContactTagTree(tags: contactTags).tagAndDescendantIDs(for: tagID)
+        contactTagTree.tagAndDescendantIDs(for: tagID)
     }
 
     func contactCount(for filter: ContactTagFilter) -> Int {
+        if let count = contactTagCountsByFilterID[filter.cacheKey] { return count }
         let visibleContactIDs = Set(profiles.map(\.id))
-        let matchingTagIDs = filter.matchingTagIDs(in: contactTags)
+        let matchingTagIDs = filter.matchingTagIDs(in: contactTagTree)
         return visibleContactIDs.filter {
             filter.contains(
                 contactID: $0,
@@ -860,6 +907,7 @@ final class RosterAppModel {
             for contactID in contactIDs {
                 self.contactTagAssignmentsByContactID[contactID, default: []].formUnion(tagIDs)
             }
+            self.rebuildContactTagFilterOptions()
             self.rebuildContactProjection()
             self.scheduleDerivedDataRebuild(message: "Filtering roster data")
             self.toast(self.bulkTagToast(count: contactIDs.count))
@@ -867,15 +915,13 @@ final class RosterAppModel {
     }
 
     func assignTags(named tagName: String, to contactIDs: Set<String>) async {
-        let tag = await ensureTag(named: tagName)
+        guard let tag = await tagFromNewTagName(tagName) else { return }
         await assignTags(tagIDs: [tag.id], to: contactIDs)
     }
 
     func assignTags(tagIDs: Set<String>, newTagName: String, to contactIDs: Set<String>) async {
         var ids = tagIDs
-        let trimmed = newTagName.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty {
-            let tag = await ensureTag(named: trimmed)
+        if let tag = await tagFromNewTagName(newTagName) {
             ids.insert(tag.id)
         }
         await assignTags(tagIDs: ids, to: contactIDs)
@@ -885,15 +931,14 @@ final class RosterAppModel {
         await contactTagStore.replaceAssignments(for: contactID, tagIDs: tagIDs)
         self.contactTagAssignmentsByContactID[contactID] = tagIDs.isEmpty ? nil : tagIDs
         await pruneEmptyContactTagsIfNeeded()
+        self.rebuildContactTagFilterOptions()
         self.rebuildContactProjection()
         self.scheduleDerivedDataRebuild(message: "Filtering roster data")
     }
 
     func replaceTags(for contactID: String, tagIDs: Set<String>, newTagName: String) async {
         var ids = tagIDs
-        let trimmed = newTagName.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty {
-            let tag = await ensureTag(named: trimmed)
+        if let tag = await tagFromNewTagName(newTagName) {
             ids.insert(tag.id)
         }
         await replaceTags(for: contactID, tagIDs: ids)
@@ -915,6 +960,7 @@ final class RosterAppModel {
             if case let .tag(selectedID) = self.rosterTagFilter, tagIDs.contains(selectedID) {
                 self.rosterTagFilter = .all
             }
+            self.rebuildContactTagFilterOptions()
             self.rebuildContactProjection()
             self.scheduleDerivedDataRebuild(message: "Filtering roster data")
         }
@@ -930,6 +976,7 @@ final class RosterAppModel {
         await MainActor.run {
             self.contactTags[index] = tag
             self.contactTags.sort(by: Self.compareTags(_:_:))
+            self.rebuildContactTagFilterOptions()
             self.rebuildContactProjection()
             self.scheduleDerivedDataRebuild(message: "Filtering roster data")
         }
@@ -944,9 +991,33 @@ final class RosterAppModel {
         await contactTagStore.saveTag(tag)
         await MainActor.run {
             self.contactTags[index] = tag
+            self.rebuildContactTagFilterOptions()
             self.rebuildContactProjection()
             self.scheduleDerivedDataRebuild(message: "Filtering roster data")
         }
+    }
+
+    nonisolated static func tagPathComponents(from rawName: String) -> [String] {
+        rawName
+            .split(separator: "/")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    private func tagFromNewTagName(_ rawName: String) async -> ContactTag? {
+        let components = Self.tagPathComponents(from: rawName)
+        guard !components.isEmpty else { return nil }
+        return await ensureTagPath(components)
+    }
+
+    private func ensureTagPath(_ names: [String]) async -> ContactTag? {
+        var parentTagID: String?
+        var tag: ContactTag?
+        for name in names {
+            tag = await ensureTag(named: name, parentTagID: parentTagID)
+            parentTagID = tag?.id
+        }
+        return tag
     }
 
     private func ensureTag(named rawName: String, parentTagID: String? = nil) async -> ContactTag {
@@ -967,6 +1038,7 @@ final class RosterAppModel {
         await MainActor.run {
             self.contactTags.append(tag)
             self.contactTags.sort(by: Self.compareTags(_:_:))
+            self.rebuildContactTagFilterOptions()
             self.rebuildContactProjection()
         }
         return tag
@@ -1023,10 +1095,7 @@ final class RosterAppModel {
         contactDraftsByID[contactID] = draft
         contactOperationLog.insert(operation, at: 0)
         localDateSpecsByPersonID[contactID] = payload.localOnlyDateSpecs
-        profiles = profilesByApplyingLocalState(to: profiles)
-        profileByID = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })
-        rebuildContactProjection()
-        scheduleDerivedDataRebuild(message: "Updating local edits")
+        applyProfilesIfRosterChanged(profilesByApplyingLocalState(to: profiles), message: "Updating local edits")
 
         if contactWritePolicy == .automatic {
             await writeBack(operation)
@@ -1081,10 +1150,7 @@ final class RosterAppModel {
         contactDraftsByID[contactID] = draft
         contactOperationLog.insert(operation, at: 0)
         localDateSpecsByPersonID[contactID] = editDraft.localOnlyDateSpecs(personID: contactID)
-        profiles = profilesByApplyingLocalState(to: profiles)
-        profileByID = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })
-        rebuildContactProjection()
-        scheduleDerivedDataRebuild(message: "Updating local edits")
+        applyProfilesIfRosterChanged(profilesByApplyingLocalState(to: profiles), message: "Updating local edits")
 
         if contactWritePolicy == .automatic {
             await writeBack(operation)
@@ -1135,10 +1201,7 @@ final class RosterAppModel {
 
         guard !operations.isEmpty else { return }
 
-        profiles = profilesByApplyingLocalState(to: profiles)
-        profileByID = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })
-        rebuildContactProjection()
-        scheduleDerivedDataRebuild(message: "Updating local edits")
+        applyProfilesIfRosterChanged(profilesByApplyingLocalState(to: profiles), message: "Updating local edits")
 
         if contactWritePolicy == .automatic {
             for operation in operations {
@@ -1205,10 +1268,7 @@ final class RosterAppModel {
             self.selectedContactID = nil
         }
         exitContactSelectionMode()
-        profiles = profilesByApplyingLocalState(to: profiles)
-        profileByID = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })
-        rebuildContactProjection()
-        scheduleDerivedDataRebuild(message: "Updating local edits")
+        applyProfilesIfRosterChanged(profilesByApplyingLocalState(to: profiles), message: "Updating local edits")
 
         if contactWritePolicy == .automatic {
             for operation in operations {
@@ -1259,10 +1319,7 @@ final class RosterAppModel {
         contactOperationLog.insert(operation, at: 0)
         await contactJournalStore.appendOperation(operation)
 
-        profiles = profilesByApplyingLocalState(to: profiles + [draft.profile])
-        profileByID = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })
-        rebuildContactProjection()
-        scheduleDerivedDataRebuild(message: "Restoring contact")
+        applyProfilesIfRosterChanged(profilesByApplyingLocalState(to: profiles + [draft.profile]), message: "Restoring contact")
         toast(contactRestoredText)
     }
 
@@ -1577,7 +1634,7 @@ final class RosterAppModel {
     }
 
     private func pruneEmptyContactTagsIfNeeded() async {
-        let emptyTagIDs = ContactTagTree(tags: contactTags)
+        let emptyTagIDs = contactTagTree
             .emptySubtreeTagIDs(assignmentsByContactID: contactTagAssignmentsByContactID)
         guard !emptyTagIDs.isEmpty else { return }
 
@@ -1588,6 +1645,7 @@ final class RosterAppModel {
             contactTagAssignmentsByContactID,
             keeping: Set(contactTags.map(\.id))
         )
+        rebuildContactTagFilterOptions()
         if case let .tag(selectedID) = selectedTagsFilter, emptyTagIDs.contains(selectedID) {
             selectedTagsFilter = .all
         }
@@ -1598,6 +1656,7 @@ final class RosterAppModel {
 
     private static func tagFilterOptions(
         tags: [ContactTag],
+        tree: ContactTagTree,
         assignmentsByContactID: [String: Set<String>],
         visibleContactIDs: Set<String>,
         allText: String,
@@ -1609,7 +1668,6 @@ final class RosterAppModel {
             ContactTagSelectionOption(id: "all", title: allText, filter: .all, count: visibleContactIDs.count, tag: nil),
             ContactTagSelectionOption(id: "untagged", title: untaggedText, filter: .untagged, count: untaggedCount, tag: nil)
         ]
-        let tree = ContactTagTree(tags: tags)
 
         options += sortedTags.map { tag in
             let matchingTagIDs = tree.tagAndDescendantIDs(for: tag.id)

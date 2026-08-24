@@ -505,6 +505,13 @@ struct RosterAppTests {
         #expect(loaded.assignmentsByContactID["ada"] == ["work"])
     }
 
+    @Test("Slash separated tag input creates a normalized tag path")
+    func slashSeparatedTagInputCreatesNormalizedPath() {
+        #expect(RosterAppModel.tagPathComponents(from: " 家人 / 亲戚 ") == ["家人", "亲戚"])
+        #expect(RosterAppModel.tagPathComponents(from: "家人//亲戚/") == ["家人", "亲戚"])
+        #expect(RosterAppModel.tagPathComponents(from: "") == [])
+    }
+
     @Test("Parent tag filter includes child tag contacts")
     func parentTagFilterIncludesChildTagContacts() {
         let profiles = [
@@ -604,6 +611,40 @@ struct RosterAppTests {
 
         #expect(filtered.records.map(\.contactID) == ["ada"])
         #expect(filtered.occurrences.map(\.record.contactID) == ["ada"])
+    }
+
+    @Test("Roster list groups expose precomputed row display fields")
+    func rosterListGroupsPrecomputeRowDisplayFields() throws {
+        let service = RosterDerivedDataService()
+        let record = rosterRecord(id: "ada", name: "Ada", year: 1990, month: 8, day: 30)
+        let occurrence = RosterOccurrence(
+            record: record,
+            date: Date().addingTimeInterval(86_400),
+            age: 36
+        )
+        let groups = [
+            RosterRecordGroup(id: "next", title: "Next", occurrences: [occurrence])
+        ]
+
+        let listGroups = service.listGroups(
+            from: groups,
+            contactTags: [ContactTag(id: "family", name: "Family")],
+            contactTagAssignmentsByContactID: ["ada": ["family"]],
+            language: .en,
+            showAge: true,
+            openContactText: "Open contact",
+            todayText: "Today"
+        )
+        let item = try #require(listGroups.first?.items.first)
+
+        #expect(listGroups.first?.items.count == 1)
+        #expect(item.contactID == "ada")
+        #expect(item.contactName == "Ada")
+        #expect(item.tags.map(\.name) == ["Family"])
+        #expect(item.kindTitle == "Gregorian")
+        #expect(item.metaText.contains("36"))
+        #expect(item.daysUntilText.isEmpty == false)
+        #expect(item.accessibilityLabel == "Open contact: Ada")
     }
 
     @Test("Contact drag uses full selection only when the dragged row is selected")

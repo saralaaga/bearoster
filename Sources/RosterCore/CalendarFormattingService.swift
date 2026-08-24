@@ -7,6 +7,9 @@ public struct CalendarFormattingService: Sendable {
         case english = "en"
     }
 
+    private static let formatterCache = DateFormatterCache()
+    private static let gregorianCalendar = Calendar(identifier: .gregorian)
+
     public init() {}
 
     public func calendarName(_ kind: RosterCalendarKind, locale: AppLocale) -> String {
@@ -44,12 +47,67 @@ public struct CalendarFormattingService: Sendable {
     }
 
     public func occurrenceDate(_ date: Date, locale: AppLocale) -> String {
+        dateString(date, locale: locale, key: "occurrence", dateStyle: .medium)
+    }
+
+    public func fullDate(_ date: Date, locale: AppLocale) -> String {
+        dateString(date, locale: locale, key: "full", dateStyle: .full)
+    }
+
+    public func monthTitle(_ date: Date, locale: AppLocale) -> String {
+        dateString(date, locale: locale, key: "monthTitle", dateFormat: locale == .english ? "MMMM yyyy" : "yyyy年M月")
+    }
+
+    public func monthDay(_ date: Date, locale: AppLocale) -> String {
+        dateString(date, locale: locale, key: "monthDay", dateFormat: "MMM d")
+    }
+
+    public func weekdayName(_ date: Date, locale: AppLocale) -> String {
+        dateString(date, locale: locale, key: "weekdayName", dateFormat: "EEEE")
+    }
+
+    public func weekdaySymbols(locale: AppLocale) -> [String] {
+        Self.formatterCache.symbols(key: "weekdaySymbols-\(locale.rawValue)") {
+            let formatter = Self.makeFormatter(locale: locale)
+            return formatter.shortStandaloneWeekdaySymbols
+        }
+    }
+
+    public func monthSymbol(_ date: Date, locale: AppLocale) -> String {
+        let month = Self.gregorianCalendar.component(.month, from: date)
+        guard locale == .english else { return "\(month)月" }
+        let symbols = Self.formatterCache.symbols(key: "monthSymbols-\(locale.rawValue)") {
+            let formatter = Self.makeFormatter(locale: locale)
+            return formatter.shortStandaloneMonthSymbols
+        }
+        return symbols.indices.contains(month - 1) ? symbols[month - 1] : "\(month)"
+    }
+
+    private func dateString(
+        _ date: Date,
+        locale: AppLocale,
+        key: String,
+        dateStyle: DateFormatter.Style? = nil,
+        dateFormat: String? = nil
+    ) -> String {
+        Self.formatterCache.string(key: "\(key)-\(locale.rawValue)", from: date) {
+            let formatter = Self.makeFormatter(locale: locale)
+            if let dateStyle {
+                formatter.dateStyle = dateStyle
+                formatter.timeStyle = .none
+            }
+            if let dateFormat {
+                formatter.dateFormat = dateFormat
+            }
+            return formatter
+        }
+    }
+
+    private static func makeFormatter(locale: AppLocale) -> DateFormatter {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: locale.rawValue)
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter.string(from: date)
+        formatter.calendar = gregorianCalendar
+        return formatter
     }
 
     private func localizedLeap(_ locale: AppLocale) -> String {
@@ -90,5 +148,31 @@ public struct CalendarFormattingService: Sendable {
             "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"
         ]
         return names.indices.contains(month) ? names[month] : "\(month)"
+    }
+}
+
+private final class DateFormatterCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var formatters: [String: DateFormatter] = [:]
+    private var cachedSymbols: [String: [String]] = [:]
+
+    func string(key: String, from date: Date, make: () -> DateFormatter) -> String {
+        lock.lock()
+        defer { lock.unlock() }
+        let formatter = formatters[key] ?? {
+            let formatter = make()
+            formatters[key] = formatter
+            return formatter
+        }()
+        return formatter.string(from: date)
+    }
+
+    func symbols(key: String, make: () -> [String]) -> [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        if let symbols = cachedSymbols[key] { return symbols }
+        let symbols = make()
+        cachedSymbols[key] = symbols
+        return symbols
     }
 }

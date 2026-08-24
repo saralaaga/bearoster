@@ -429,11 +429,13 @@ private struct SidebarTagRow: View {
                 .foregroundStyle(isSelected ? .white : .primary)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 5)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .background(rowBackground, in: RoundedRectangle(cornerRadius: 7))
                 .overlay(
                     RoundedRectangle(cornerRadius: 7)
                         .strokeBorder(isDropTargeted ? color.opacity(0.85) : Color.clear, lineWidth: 1.1)
                 )
+                .contentShape(RoundedRectangle(cornerRadius: 7))
             }
             .buttonStyle(.plain)
         }
