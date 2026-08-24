@@ -1,17 +1,17 @@
 import RosterCore
 import Foundation
 
-enum ContactTagFilter: Hashable, Sendable {
+package enum ContactTagFilter: Hashable, Sendable {
     case all
     case untagged
     case tag(String)
 
-    var selectedTagID: String? {
+    package var selectedTagID: String? {
         guard case let .tag(id) = self else { return nil }
         return id
     }
 
-    var cacheKey: String {
+    package var cacheKey: String {
         switch self {
         case .all: "all"
         case .untagged: "untagged"
@@ -19,7 +19,7 @@ enum ContactTagFilter: Hashable, Sendable {
         }
     }
 
-    func contains(
+    package func contains(
         contactID: String,
         assignments: [String: Set<String>],
         matchingTagIDs: Set<String>? = nil
@@ -35,37 +35,37 @@ enum ContactTagFilter: Hashable, Sendable {
         }
     }
 
-    func matchingTagIDs(in tags: [ContactTag]) -> Set<String>? {
+    package func matchingTagIDs(in tags: [ContactTag]) -> Set<String>? {
         matchingTagIDs(in: ContactTagTree(tags: tags))
     }
 
-    func matchingTagIDs(in tree: ContactTagTree) -> Set<String>? {
+    package func matchingTagIDs(in tree: ContactTagTree) -> Set<String>? {
         guard case let .tag(tagID) = self else { return nil }
         return tree.tagAndDescendantIDs(for: tagID)
     }
 }
 
-struct ContactTagSelectionOption: Identifiable, Hashable, Sendable {
-    let id: String
-    let title: String
-    let filter: ContactTagFilter
-    let count: Int
-    let tag: ContactTag?
+package struct ContactTagSelectionOption: Identifiable, Hashable, Sendable {
+    package let id: String
+    package let title: String
+    package let filter: ContactTagFilter
+    package let count: Int
+    package let tag: ContactTag?
 }
 
-struct ContactTagTreeNode: Identifiable, Hashable, Sendable {
-    let tag: ContactTag
-    let depth: Int
+package struct ContactTagTreeNode: Identifiable, Hashable, Sendable {
+    package let tag: ContactTag
+    package let depth: Int
 
-    var id: String { tag.id }
+    package var id: String { tag.id }
 }
 
-struct ContactTagTree: Sendable {
-    let tags: [ContactTag]
+package struct ContactTagTree: Sendable {
+    package let tags: [ContactTag]
     private let tagsByID: [String: ContactTag]
     private let childrenByParentID: [String: [ContactTag]]
 
-    init(tags: [ContactTag]) {
+    package init(tags: [ContactTag]) {
         self.tags = tags
         self.tagsByID = Dictionary(uniqueKeysWithValues: tags.map { ($0.id, $0) })
         let grouped = Dictionary(grouping: tags) { tag in
@@ -76,21 +76,21 @@ struct ContactTagTree: Sendable {
         }
     }
 
-    var flattened: [ContactTagTreeNode] {
+    package var flattened: [ContactTagTreeNode] {
         flatten(parentID: nil, depth: 0)
     }
 
-    func children(of parentID: String?) -> [ContactTag] {
+    package func children(of parentID: String?) -> [ContactTag] {
         childrenByParentID[parentID ?? ""] ?? []
     }
 
-    func tagAndDescendantIDs(for tagID: String) -> Set<String> {
+    package func tagAndDescendantIDs(for tagID: String) -> Set<String> {
         var result = Set([tagID])
         appendDescendants(of: tagID, into: &result)
         return result
     }
 
-    func displayPath(for tagID: String) -> String {
+    package func displayPath(for tagID: String) -> String {
         var parts: [String] = []
         var current = tagsByID[tagID]
         var visited = Set<String>()
@@ -102,7 +102,7 @@ struct ContactTagTree: Sendable {
         return parts.reversed().joined(separator: " / ")
     }
 
-    func emptySubtreeTagIDs(assignmentsByContactID: [String: Set<String>]) -> Set<String> {
+    package func emptySubtreeTagIDs(assignmentsByContactID: [String: Set<String>]) -> Set<String> {
         let assignedTagIDs = Set(assignmentsByContactID.values.flatMap { $0 })
         return Set(tags.compactMap { tag in
             tagAndDescendantIDs(for: tag.id).isDisjoint(with: assignedTagIDs) ? tag.id : nil

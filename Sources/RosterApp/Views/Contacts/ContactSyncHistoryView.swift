@@ -1,4 +1,5 @@
 import SwiftUI
+import RosterShared
 
 struct ContactSyncHistoryView: View {
     @Environment(RosterAppModel.self) private var model

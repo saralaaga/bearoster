@@ -2,18 +2,18 @@ import RosterCore
 import Foundation
 import SQLite3
 
-actor ContactSnapshotCache {
+package actor ContactSnapshotCache {
     private let databaseURL: URL
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
-    init(
+    package init(
         databaseURL: URL = AppSupportPaths.database(named: "contacts-cache.sqlite3")
     ) {
         self.databaseURL = databaseURL
     }
 
-    func load(
+    package func load(
         fieldAccessLevel: ContactFieldAccessLevel,
         accessScope: ContactAccessScope = .all
     ) -> ContactDataSnapshot? {
@@ -69,7 +69,7 @@ actor ContactSnapshotCache {
         return nil
     }
 
-    func save(_ snapshot: ContactDataSnapshot, accessScope: ContactAccessScope = .all) {
+    package func save(_ snapshot: ContactDataSnapshot, accessScope: ContactAccessScope = .all) {
         do {
             let database = try openDatabase()
             defer { sqlite3_close(database) }

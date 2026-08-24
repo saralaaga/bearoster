@@ -2,18 +2,17 @@ import RosterCore
 import CoreTransferable
 import Foundation
 import UniformTypeIdentifiers
-import AppKit
 
-struct ContactAssignmentDragPayload: Codable, Transferable, Sendable {
-    let contactIDs: [String]
+package struct ContactAssignmentDragPayload: Codable, Transferable, Sendable {
+    package let contactIDs: [String]
 
-    static var transferRepresentation: some TransferRepresentation {
+    package static var transferRepresentation: some TransferRepresentation {
         CodableRepresentation(contentType: .rosterContactAssignmentPayload)
     }
 }
 
-enum ContactDragSelectionResolver {
-    static func draggedContactIDs(
+package enum ContactDragSelectionResolver {
+    package static func draggedContactIDs(
         draggedContactID: String,
         selectedContactIDs: Set<String>,
         isSelectionMode: Bool
@@ -28,8 +27,8 @@ enum ContactDragSelectionResolver {
     }
 }
 
-enum ContactAssignmentTargetResolver {
-    static func groupDropCollections(
+package enum ContactAssignmentTargetResolver {
+    package static func groupDropCollections(
         from sections: [ContactCollectionSectionModel]
     ) -> [ContactCollectionSummary] {
         sections
@@ -37,14 +36,14 @@ enum ContactAssignmentTargetResolver {
             .filter { $0.kind == .group }
     }
 
-    static func droppedContactIDs(
+    package static func droppedContactIDs(
         from payloads: [ContactAssignmentDragPayload]
     ) -> Set<String> {
         Set(payloads.flatMap(\.contactIDs))
     }
 
     @MainActor
-    static func loadDroppedContactIDs(
+    package static func loadDroppedContactIDs(
         from providers: [NSItemProvider],
         completion: @escaping @MainActor (Set<String>) -> Void
     ) {
@@ -81,12 +80,12 @@ private final class ContactDropLoadState {
     private var remaining: Int
     private let completion: @MainActor (Set<String>) -> Void
 
-    init(remaining: Int, completion: @escaping @MainActor (Set<String>) -> Void) {
+    package init(remaining: Int, completion: @escaping @MainActor (Set<String>) -> Void) {
         self.remaining = remaining
         self.completion = completion
     }
 
-    func append(_ contactIDs: Set<String>) {
+    package func append(_ contactIDs: Set<String>) {
         result.formUnion(contactIDs)
         remaining -= 1
         if remaining == 0 {
@@ -95,7 +94,7 @@ private final class ContactDropLoadState {
     }
 }
 
-extension UTType {
+package extension UTType {
     static let rosterContactAssignmentPayload = UTType(exportedAs: "com.carlos.roster.contact-assignment")
     static let legacyContactAssignmentPayload = UTType(importedAs: "com.carlos.birthday.contact-assignment")
 }

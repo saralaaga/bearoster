@@ -1,10 +1,10 @@
 import Foundation
 
-enum AppSupportPaths {
+package enum AppSupportPaths {
     private static let currentDirectoryName = "Roster"
     private static let legacyDirectoryName = "Birthday"
 
-    static func database(named fileName: String) -> URL {
+    package static func database(named fileName: String) -> URL {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let currentDirectory = support.appendingPathComponent(currentDirectoryName, isDirectory: true)
         let legacyDirectory = support.appendingPathComponent(legacyDirectoryName, isDirectory: true)

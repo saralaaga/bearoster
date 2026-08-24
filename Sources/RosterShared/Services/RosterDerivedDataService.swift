@@ -1,25 +1,25 @@
 import RosterCore
 import Foundation
 
-struct RosterVisibleMonthData: Sendable {
-    let dates: [Date]
-    let title: String
-    let weekdaySymbols: [String]
-    let occurrencesByDay: [Date: [RosterOccurrence]]
-    let filteredOccurrencesByDay: [Date: [RosterOccurrence]]
-    let selectedDateOccurrences: [RosterOccurrence]
+package struct RosterVisibleMonthData: Sendable {
+    package let dates: [Date]
+    package let title: String
+    package let weekdaySymbols: [String]
+    package let occurrencesByDay: [Date: [RosterOccurrence]]
+    package let filteredOccurrencesByDay: [Date: [RosterOccurrence]]
+    package let selectedDateOccurrences: [RosterOccurrence]
 }
 
-struct RosterDerivedDataService: Sendable {
+package struct RosterDerivedDataService: Sendable {
     private let resolver = RosterOccurrenceResolver()
     private let formatter = CalendarFormattingService()
     private let calendar = Calendar(identifier: .gregorian)
 
-    func allRecords(from profiles: [ContactRosterProfile]) -> [RosterRecord] {
+    package func allRecords(from profiles: [ContactRosterProfile]) -> [RosterRecord] {
         profiles.flatMap(\.records)
     }
 
-    func filteredRecords(
+    package func filteredRecords(
         from allRecords: [RosterRecord],
         searchText: String,
         filter: RosterCalendarKind?,
@@ -71,7 +71,7 @@ struct RosterDerivedDataService: Sendable {
         return (records, occurrences)
     }
 
-    func recordGroups(
+    package func recordGroups(
         from occurrences: [RosterOccurrence],
         sort: RosterSort,
         locale: CalendarFormattingService.AppLocale
@@ -94,7 +94,7 @@ struct RosterDerivedDataService: Sendable {
         }
     }
 
-    func listGroups(
+    package func listGroups(
         from groups: [RosterRecordGroup],
         contactTags: [ContactTag],
         contactTagAssignmentsByContactID: [String: Set<String>],
@@ -319,7 +319,7 @@ struct RosterDerivedDataService: Sendable {
             }
     }
 
-    func upcomingOccurrences(
+    package func upcomingOccurrences(
         from allRecords: [RosterRecord],
         upcomingRange: Int,
         now: Date = Date()
@@ -329,7 +329,7 @@ struct RosterDerivedDataService: Sendable {
             .sorted { $0.date == $1.date ? $0.record.contactName < $1.record.contactName : $0.date < $1.date }
     }
 
-    func visibleMonthData(
+    package func visibleMonthData(
         allRecords: [RosterRecord],
         visibleMonth: Date,
         selectedDate: Date,
@@ -360,7 +360,7 @@ struct RosterDerivedDataService: Sendable {
         )
     }
 
-    func filterVisibleOccurrences(
+    package func filterVisibleOccurrences(
         _ occurrencesByDay: [Date: [RosterOccurrence]],
         searchText: String
     ) -> [Date: [RosterOccurrence]] {
@@ -371,11 +371,11 @@ struct RosterDerivedDataService: Sendable {
         }
     }
 
-    func occurrences(on date: Date, allRecords: [RosterRecord], cachedByDay: [Date: [RosterOccurrence]]) -> [RosterOccurrence] {
+    package func occurrences(on date: Date, allRecords: [RosterRecord], cachedByDay: [Date: [RosterOccurrence]]) -> [RosterOccurrence] {
         cachedByDay[dayKey(date)] ?? resolver.occurrences(on: date, records: allRecords)
     }
 
-    func filteredOccurrences(
+    package func filteredOccurrences(
         on date: Date,
         searchText: String,
         allRecords: [RosterRecord],

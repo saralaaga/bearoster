@@ -1,7 +1,7 @@
 import RosterCore
 import Foundation
 import Testing
-@testable import RosterApp
+@testable import RosterShared
 
 @Suite("Contact architecture")
 struct RosterAppTests {

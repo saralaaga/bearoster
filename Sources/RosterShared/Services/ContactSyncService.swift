@@ -1,11 +1,11 @@
 import RosterCore
 import Foundation
 
-actor ContactSyncService {
+package actor ContactSyncService {
     private let repository: ContactsRepository
     private let cache: ContactSnapshotCache
 
-    init(
+    package init(
         repository: ContactsRepository = ContactsRepository(),
         cache: ContactSnapshotCache = ContactSnapshotCache()
     ) {
@@ -21,18 +21,18 @@ actor ContactSyncService {
         ContactsRepository.didChangeNotification
     }
 
-    func requestAccess() async throws -> Bool {
+    package func requestAccess() async throws -> Bool {
         try await repository.requestAccess()
     }
 
-    func cachedSnapshot(
+    package func cachedSnapshot(
         fieldAccessLevel: ContactFieldAccessLevel,
         accessScope: ContactAccessScope
     ) async -> ContactDataSnapshot? {
         await cache.load(fieldAccessLevel: fieldAccessLevel, accessScope: accessScope)
     }
 
-    func refreshSnapshot(
+    package func refreshSnapshot(
         fieldAccessLevel: ContactFieldAccessLevel,
         accessScope: ContactAccessScope
     ) async throws -> ContactDataSnapshot {
@@ -44,19 +44,19 @@ actor ContactSyncService {
         return snapshot
     }
 
-    func saveRosters(contactID: String, payload: RosterEditPayload) async throws {
+    package func saveRosters(contactID: String, payload: RosterEditPayload) async throws {
         try await repository.saveRosters(contactID: contactID, payload: payload)
     }
 
-    func saveContact(contactID: String, profile: ContactRosterProfile) async throws {
+    package func saveContact(contactID: String, profile: ContactRosterProfile) async throws {
         try await repository.saveContact(contactID: contactID, profile: profile)
     }
 
-    func deleteContacts(contactIDs: [String]) async throws {
+    package func deleteContacts(contactIDs: [String]) async throws {
         try await repository.deleteContacts(contactIDs: contactIDs)
     }
 
-    func addContacts(contactIDs: [String], toGroupID groupID: String) async throws {
+    package func addContacts(contactIDs: [String], toGroupID groupID: String) async throws {
         try await repository.addContacts(contactIDs: contactIDs, toGroupID: groupID)
     }
 }

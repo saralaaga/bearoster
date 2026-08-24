@@ -2,18 +2,18 @@ import RosterCore
 import Foundation
 import SQLite3
 
-actor LocalRosterStore {
+package actor LocalRosterStore {
     private let databaseURL: URL
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
-    init(
+    package init(
         databaseURL: URL = AppSupportPaths.database(named: "local-birthdays.sqlite3")
     ) {
         self.databaseURL = databaseURL
     }
 
-    func loadAll() -> [String: [RosterDateSpec]] {
+    package func loadAll() -> [String: [RosterDateSpec]] {
         do {
             let database = try openDatabase()
             defer { sqlite3_close(database) }
@@ -45,7 +45,7 @@ actor LocalRosterStore {
         }
     }
 
-    func saveLocalOnlySpecs(_ specs: [RosterDateSpec], for personID: String) {
+    package func saveLocalOnlySpecs(_ specs: [RosterDateSpec], for personID: String) {
         do {
             let database = try openDatabase()
             defer { sqlite3_close(database) }
@@ -83,7 +83,7 @@ actor LocalRosterStore {
         }
     }
 
-    func deleteLocalOnlySpecs(for personIDs: Set<String>) {
+    package func deleteLocalOnlySpecs(for personIDs: Set<String>) {
         guard !personIDs.isEmpty else { return }
         do {
             let database = try openDatabase()
