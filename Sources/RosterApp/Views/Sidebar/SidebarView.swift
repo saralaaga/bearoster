@@ -510,19 +510,14 @@ struct NextRosterCard: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
 
-                HStack(spacing: 10) {
-                    AvatarView(name: occurrence.record.contactName, color: color(for: occurrence.record.kind), size: 34)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(occurrence.record.contactName)
-                            .font(.system(size: 13, weight: .semibold))
-                            .lineLimit(1)
-                        Text(model.formatter.occurrenceDate(occurrence.date, locale: model.language.coreLocale))
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                    Spacer(minLength: 0)
-                    CountdownChip(days: model.resolver.daysUntil(occurrence.date))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(occurrence.record.contactName)
+                        .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1)
+                    Text(model.formatter.occurrenceDate(occurrence.date, locale: model.language.coreLocale))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
             }
             .foregroundStyle(.primary)
