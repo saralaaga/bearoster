@@ -1,4 +1,5 @@
 import RosterCore
+import RosterShared
 import SwiftUI
 
 struct TagsView: View {

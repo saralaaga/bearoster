@@ -3,102 +3,102 @@ import SwiftUI
 
 // MARK: - Theme
 
-enum RosterTheme {
-    static let brandPrimary = Color(hex: 0x007AFF)
-    static let brandSecondary = Color(hex: 0x34C759)
-    static let calendarGregorian = Color(hex: 0x007AFF)
-    static let calendarLunar = Color(hex: 0xFF3B30)
-    static let calendarHebrew = Color(hex: 0x5856D6)
-    static let calendarIslamic = Color(hex: 0x34C759)
-    static let mustard = Color(hex: 0xFF9500)
-    static let walnut = Color(hex: 0x8E8E93)
-    static let teak = Color(hex: 0x636366)
-    static let ink = Color.primary
-    static let inkSecondary = Color.secondary
-    static let inkTertiary = Color.secondary.opacity(0.78)
+package enum RosterTheme {
+    package static let brandPrimary = Color(hex: 0x007AFF)
+    package static let brandSecondary = Color(hex: 0x34C759)
+    package static let calendarGregorian = Color(hex: 0x007AFF)
+    package static let calendarLunar = Color(hex: 0xFF3B30)
+    package static let calendarHebrew = Color(hex: 0x5856D6)
+    package static let calendarIslamic = Color(hex: 0x34C759)
+    package static let mustard = Color(hex: 0xFF9500)
+    package static let walnut = Color(hex: 0x8E8E93)
+    package static let teak = Color(hex: 0x636366)
+    package static let ink = Color.primary
+    package static let inkSecondary = Color.secondary
+    package static let inkTertiary = Color.secondary.opacity(0.78)
 
-    static let accent = brandPrimary
-    static let olive = calendarIslamic
-    static let blue = calendarHebrew
-    static let coral = calendarLunar
-    static let cardCorner: CGFloat = CornerRadius.md
-    static let controlCorner: CGFloat = CornerRadius.sm
+    package static let accent = brandPrimary
+    package static let olive = calendarIslamic
+    package static let blue = calendarHebrew
+    package static let coral = calendarLunar
+    package static let cardCorner: CGFloat = CornerRadius.md
+    package static let controlCorner: CGFloat = CornerRadius.sm
 
-    enum Layout {
-        static let sidebarWidth: CGFloat = 224
-        static let sidebarCollapsedWidth: CGFloat = 64
-        static let dayDetailWidth: CGFloat = 296
-        static let contactListWidth: CGFloat = 260
-        static let minWindowWidth: CGFloat = 1100
-        static let minWindowHeight: CGFloat = 720
-        static let contentMaxWidth: CGFloat = 760
+    package enum Layout {
+        package static let sidebarWidth: CGFloat = 224
+        package static let sidebarCollapsedWidth: CGFloat = 64
+        package static let dayDetailWidth: CGFloat = 296
+        package static let contactListWidth: CGFloat = 260
+        package static let minWindowWidth: CGFloat = 1100
+        package static let minWindowHeight: CGFloat = 720
+        package static let contentMaxWidth: CGFloat = 760
     }
 
-    enum Spacing {
-        static let xs: CGFloat = 4
-        static let sm: CGFloat = 8
-        static let md: CGFloat = 12
-        static let lg: CGFloat = 16
-        static let xl: CGFloat = 24
+    package enum Spacing {
+        package static let xs: CGFloat = 4
+        package static let sm: CGFloat = 8
+        package static let md: CGFloat = 12
+        package static let lg: CGFloat = 16
+        package static let xl: CGFloat = 24
     }
 
-    enum CornerRadius {
-        static let xs: CGFloat = 5
-        static let sm: CGFloat = 8
-        static let md: CGFloat = 12
-        static let lg: CGFloat = 16
-        static let full: CGFloat = 999
+    package enum CornerRadius {
+        package static let xs: CGFloat = 5
+        package static let sm: CGFloat = 8
+        package static let md: CGFloat = 12
+        package static let lg: CGFloat = 16
+        package static let full: CGFloat = 999
     }
 
-    enum Motion {
-        static let press = Animation.easeOut(duration: 0.10)
-        static let hover = Animation.easeOut(duration: 0.12)
-        static let quickFade = Animation.easeOut(duration: 0.14)
-        static let stateChange = Animation.easeOut(duration: 0.16)
-        static let paneSwitch = Animation.easeOut(duration: 0.18)
-        static let sectionReveal = Animation.easeOut(duration: 0.18)
-        static let toastIn = Animation.easeOut(duration: 0.24)
-        static let toastOut = Animation.easeOut(duration: 0.14)
+    package enum Motion {
+        package static let press = Animation.easeOut(duration: 0.10)
+        package static let hover = Animation.easeOut(duration: 0.12)
+        package static let quickFade = Animation.easeOut(duration: 0.14)
+        package static let stateChange = Animation.easeOut(duration: 0.16)
+        package static let paneSwitch = Animation.easeOut(duration: 0.18)
+        package static let sectionReveal = Animation.easeOut(duration: 0.18)
+        package static let toastIn = Animation.easeOut(duration: 0.24)
+        package static let toastOut = Animation.easeOut(duration: 0.14)
 
-        static func allowed(_ animation: Animation, reduceMotion: Bool) -> Animation? {
+        package static func allowed(_ animation: Animation, reduceMotion: Bool) -> Animation? {
             reduceMotion ? nil : animation
         }
     }
 
-    static func pageBackground(_ scheme: ColorScheme) -> Color {
+    package static func pageBackground(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? Color(nsColor: .underPageBackgroundColor) : Color(hex: 0xF5F5F7)
     }
 
-    static func windowBackground(_ scheme: ColorScheme) -> Color {
+    package static func windowBackground(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? Color(nsColor: .windowBackgroundColor) : Color.white
     }
 
-    static func sidebarBackground(_ scheme: ColorScheme) -> Color {
+    package static func sidebarBackground(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? Color(nsColor: .underPageBackgroundColor) : Color(hex: 0xF2F2F7)
     }
 
-    static func cardBackground(_ scheme: ColorScheme) -> Color {
+    package static func cardBackground(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? Color(nsColor: .controlBackgroundColor) : .white
     }
 
-    static func controlBackground(_ scheme: ColorScheme) -> Color {
+    package static func controlBackground(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? Color.white.opacity(0.08) : .white
     }
 
-    static func separator(_ scheme: ColorScheme) -> Color {
+    package static func separator(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? Color.white.opacity(0.13) : Color.black.opacity(0.10)
     }
 
-    static func selectedFill(_ scheme: ColorScheme) -> Color {
+    package static func selectedFill(_ scheme: ColorScheme) -> Color {
         brandPrimary
     }
 
-    static func hoverFill(_ scheme: ColorScheme) -> Color {
+    package static func hoverFill(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? Color.white.opacity(0.07) : Color.black.opacity(0.06)
     }
 }
 
-extension View {
+package extension View {
     func cardStyle() -> some View {
         modifier(MCMCardStyle())
     }
@@ -165,7 +165,7 @@ private struct MCMPressButtonStyle: ButtonStyle {
     }
 }
 
-func color(for kind: RosterCalendarKind) -> Color {
+package func color(for kind: RosterCalendarKind) -> Color {
     switch kind {
     case .gregorian: RosterTheme.calendarGregorian
     case .chinese: RosterTheme.calendarLunar
@@ -174,7 +174,7 @@ func color(for kind: RosterCalendarKind) -> Color {
     }
 }
 
-func daysLeftText(_ days: Int, locale: CalendarFormattingService.AppLocale) -> String {
+package func daysLeftText(_ days: Int, locale: CalendarFormattingService.AppLocale) -> String {
     switch locale {
     case .english: days == 1 ? "in 1 day" : "in \(days) days"
     case .simplifiedChinese: "\(days) 天后"
@@ -182,7 +182,7 @@ func daysLeftText(_ days: Int, locale: CalendarFormattingService.AppLocale) -> S
     }
 }
 
-extension Color {
+package extension Color {
     init(hex: UInt, opacity: Double = 1) {
         self.init(
             .sRGB,
@@ -195,7 +195,7 @@ extension Color {
 }
 
 @MainActor
-func shortKindName(_ kind: RosterCalendarKind, model: RosterAppModel) -> String {
+package func shortKindName(_ kind: RosterCalendarKind, model: RosterAppModel) -> String {
     switch kind {
     case .gregorian: model.formatter.calendarName(kind, locale: model.language.coreLocale)
     case .chinese: model.language.coreLocale == .english ? "Lunar" : model.formatter.calendarName(kind, locale: model.language.coreLocale)

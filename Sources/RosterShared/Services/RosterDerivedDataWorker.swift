@@ -1,59 +1,59 @@
 import RosterCore
 import Foundation
 
-struct RosterCalculationProgress: Equatable, Sendable {
-    var isActive: Bool
-    var message: String
-    var completed: Int
-    var total: Int
+package struct RosterCalculationProgress: Equatable, Sendable {
+    package var isActive: Bool
+    package var message: String
+    package var completed: Int
+    package var total: Int
 
-    var fraction: Double {
+    package var fraction: Double {
         guard total > 0 else { return 0 }
         return min(1, max(0, Double(completed) / Double(total)))
     }
 
-    static let inactive = RosterCalculationProgress(isActive: false, message: "", completed: 0, total: 1)
+    package static let inactive = RosterCalculationProgress(isActive: false, message: "", completed: 0, total: 1)
 }
 
-struct RosterDerivedDataRequest: Sendable {
-    let generation: Int
-    let profiles: [ContactRosterProfile]
-    let searchText: String
-    let selectedDate: Date
-    let visibleMonth: Date
-    let filter: RosterCalendarKind?
-    let tagFilter: ContactTagFilter
-    let contactTags: [ContactTag]
-    let contactTagAssignmentsByContactID: [String: Set<String>]
-    let sort: RosterSort
-    let language: AppLanguage
-    let showAge: Bool
-    let openContactText: String
-    let todayText: String
-    let upcomingRange: Int
+package struct RosterDerivedDataRequest: Sendable {
+    package let generation: Int
+    package let profiles: [ContactRosterProfile]
+    package let searchText: String
+    package let selectedDate: Date
+    package let visibleMonth: Date
+    package let filter: RosterCalendarKind?
+    package let tagFilter: ContactTagFilter
+    package let contactTags: [ContactTag]
+    package let contactTagAssignmentsByContactID: [String: Set<String>]
+    package let sort: RosterSort
+    package let language: AppLanguage
+    package let showAge: Bool
+    package let openContactText: String
+    package let todayText: String
+    package let upcomingRange: Int
 }
 
-struct RosterDerivedDataSnapshot: Sendable {
-    let allRecords: [RosterRecord]
-    let filteredRecords: [RosterRecord]
-    let filteredRecordOccurrences: [RosterOccurrence]
-    let filteredRecordGroups: [RosterRecordGroup]
-    let filteredRecordListGroups: [RosterOccurrenceListGroup]
-    let cachedUpcomingOccurrences: [RosterOccurrence]
-    let selectedDateOccurrences: [RosterOccurrence]
-    let visibleMonthDates: [Date]
-    let visibleMonthTitle: String
-    let weekdaySymbols: [String]
-    let visibleOccurrencesByDay: [Date: [RosterOccurrence]]
-    let visibleFilteredOccurrencesByDay: [Date: [RosterOccurrence]]
+package struct RosterDerivedDataSnapshot: Sendable {
+    package let allRecords: [RosterRecord]
+    package let filteredRecords: [RosterRecord]
+    package let filteredRecordOccurrences: [RosterOccurrence]
+    package let filteredRecordGroups: [RosterRecordGroup]
+    package let filteredRecordListGroups: [RosterOccurrenceListGroup]
+    package let cachedUpcomingOccurrences: [RosterOccurrence]
+    package let selectedDateOccurrences: [RosterOccurrence]
+    package let visibleMonthDates: [Date]
+    package let visibleMonthTitle: String
+    package let weekdaySymbols: [String]
+    package let visibleOccurrencesByDay: [Date: [RosterOccurrence]]
+    package let visibleFilteredOccurrencesByDay: [Date: [RosterOccurrence]]
 }
 
-actor RosterDerivedDataWorker {
+package actor RosterDerivedDataWorker {
     private var cache: [RosterDerivedDataCacheKey: RosterDerivedDataSnapshot] = [:]
     private let service = RosterDerivedDataService()
     private let maxCacheEntries = 24
 
-    func snapshot(
+    package func snapshot(
         for request: RosterDerivedDataRequest,
         progress: @escaping @Sendable (RosterCalculationProgress) -> Void
     ) -> RosterDerivedDataSnapshot {
@@ -133,7 +133,7 @@ actor RosterDerivedDataWorker {
         return snapshot
     }
 
-    func filteredVisibleOccurrences(
+    package func filteredVisibleOccurrences(
         occurrencesByDay: [Date: [RosterOccurrence]],
         searchText: String
     ) -> [Date: [RosterOccurrence]] {
@@ -152,20 +152,20 @@ actor RosterDerivedDataWorker {
 private struct RosterDerivedDataCacheKey: Hashable, Sendable {
     private static let calendar = Calendar(identifier: .gregorian)
 
-    let generation: Int
-    let searchText: String
-    let selectedDate: Date
-    let visibleMonth: Date
-    let filter: RosterCalendarKind?
-    let tagFilter: ContactTagFilter
-    let tagSignature: Int
-    let tagAssignmentSignature: Int
-    let sort: RosterSort
-    let locale: CalendarFormattingService.AppLocale
-    let showAge: Bool
-    let upcomingRange: Int
+    package let generation: Int
+    package let searchText: String
+    package let selectedDate: Date
+    package let visibleMonth: Date
+    package let filter: RosterCalendarKind?
+    package let tagFilter: ContactTagFilter
+    package let tagSignature: Int
+    package let tagAssignmentSignature: Int
+    package let sort: RosterSort
+    package let locale: CalendarFormattingService.AppLocale
+    package let showAge: Bool
+    package let upcomingRange: Int
 
-    init(_ request: RosterDerivedDataRequest) {
+    package init(_ request: RosterDerivedDataRequest) {
         generation = request.generation
         searchText = request.searchText
         selectedDate = Self.calendar.startOfDay(for: request.selectedDate)

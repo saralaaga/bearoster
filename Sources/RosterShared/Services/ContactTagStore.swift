@@ -2,16 +2,16 @@ import RosterCore
 import Foundation
 import SQLite3
 
-actor ContactTagStore {
+package actor ContactTagStore {
     private let databaseURL: URL
 
-    init(
+    package init(
         databaseURL: URL = AppSupportPaths.database(named: "contact-tags.sqlite3")
     ) {
         self.databaseURL = databaseURL
     }
 
-    func load() -> (tags: [ContactTag], assignmentsByContactID: [String: Set<String>]) {
+    package func load() -> (tags: [ContactTag], assignmentsByContactID: [String: Set<String>]) {
         do {
             let database = try openDatabase()
             defer { sqlite3_close(database) }
@@ -26,7 +26,7 @@ actor ContactTagStore {
         }
     }
 
-    func saveTag(_ tag: ContactTag) {
+    package func saveTag(_ tag: ContactTag) {
         do {
             let database = try openDatabase()
             defer { sqlite3_close(database) }
@@ -57,7 +57,7 @@ actor ContactTagStore {
         }
     }
 
-    func assign(tagIDs: Set<String>, to contactIDs: Set<String>) {
+    package func assign(tagIDs: Set<String>, to contactIDs: Set<String>) {
         guard !tagIDs.isEmpty, !contactIDs.isEmpty else { return }
         do {
             let database = try openDatabase()
@@ -88,7 +88,7 @@ actor ContactTagStore {
         }
     }
 
-    func replaceAssignments(for contactID: String, tagIDs: Set<String>) {
+    package func replaceAssignments(for contactID: String, tagIDs: Set<String>) {
         do {
             let database = try openDatabase()
             defer { sqlite3_close(database) }
@@ -101,7 +101,7 @@ actor ContactTagStore {
         }
     }
 
-    func deleteAssignments(for contactIDs: Set<String>) {
+    package func deleteAssignments(for contactIDs: Set<String>) {
         guard !contactIDs.isEmpty else { return }
         do {
             let database = try openDatabase()
@@ -113,7 +113,7 @@ actor ContactTagStore {
         }
     }
 
-    func deleteTags(tagIDs: Set<String>) {
+    package func deleteTags(tagIDs: Set<String>) {
         guard !tagIDs.isEmpty else { return }
         do {
             let database = try openDatabase()

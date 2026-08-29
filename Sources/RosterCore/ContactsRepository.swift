@@ -184,12 +184,15 @@ public final class ContactsRepository: @unchecked Sendable {
         }
     }
 
-    private static func mapAuthorization(_ status: CNAuthorizationStatus) -> ContactsPermissionState {
+    static func mapAuthorization(_ status: CNAuthorizationStatus) -> ContactsPermissionState {
         switch status {
         case .notDetermined: return .notDetermined
         case .authorized: return .authorized
         case .denied: return .denied
         case .restricted: return .restricted
+        #if os(iOS)
+        case .limited: return .authorized
+        #endif
         @unknown default: return .unknown
         }
     }

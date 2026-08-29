@@ -1,5 +1,6 @@
 import Foundation
 import RosterCore
+import RosterShared
 import SwiftUI
 
 // MARK: - Root

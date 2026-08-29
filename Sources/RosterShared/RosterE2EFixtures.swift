@@ -1,15 +1,15 @@
 import RosterCore
 import Foundation
 
-struct RosterE2EFixture: Sendable {
-    let snapshot: ContactDataSnapshot
-    let tags: [ContactTag]
-    let assignmentsByContactID: [String: Set<String>]
-    let initialSelection: SidebarSelection
+package struct RosterE2EFixture: Sendable {
+    package let snapshot: ContactDataSnapshot
+    package let tags: [ContactTag]
+    package let assignmentsByContactID: [String: Set<String>]
+    package let initialSelection: SidebarSelection
 }
 
-enum RosterE2EFixtures {
-    static let contactDragAndDrop = RosterE2EFixture(
+package enum RosterE2EFixtures {
+    package static let contactDragAndDrop = RosterE2EFixture(
         snapshot: ContactDataSnapshot(
             profiles: [
                 contact(id: "e2e-ada", name: "Ada Lovelace", organization: "Analytical Engines", month: 12, day: 10),

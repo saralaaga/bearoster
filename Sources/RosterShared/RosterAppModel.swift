@@ -1,10 +1,13 @@
-import AppKit
 import RosterCore
 import Foundation
 import Observation
+import SwiftUI
 import UniformTypeIdentifiers
+#if os(macOS)
+import AppKit
+#endif
 
-enum SidebarSelection: String, CaseIterable, Identifiable {
+package enum SidebarSelection: String, CaseIterable, Identifiable {
     case calendar
     case list
     case contacts
@@ -12,80 +15,112 @@ enum SidebarSelection: String, CaseIterable, Identifiable {
     case sync
     case permissions
 
-    var id: String { rawValue }
+    package var id: String { rawValue }
 }
 
-enum ContactBatchFillPolicy: String, CaseIterable, Identifiable, Sendable {
+package enum ContactBatchFillPolicy: String, CaseIterable, Identifiable, Sendable {
     case onlyEmpty
     case overwriteExisting
 
-    var id: String { rawValue }
+    package var id: String { rawValue }
 }
 
-enum ContactBatchRenameMode: String, CaseIterable, Identifiable, Sendable {
+package enum ContactBatchRenameMode: String, CaseIterable, Identifiable, Sendable {
     case replace
     case prefix
     case suffix
 
-    var id: String { rawValue }
+    package var id: String { rawValue }
 }
 
-struct ContactBatchEditDraft: Equatable, Sendable {
-    var renameMode: ContactBatchRenameMode = .replace
-    var renameFind = ""
-    var renameReplacement = ""
-    var renamePrefix = ""
-    var renameSuffix = ""
-    var givenName = ""
-    var familyName = ""
-    var nickname = ""
-    var organizationName = ""
-    var departmentName = ""
-    var jobTitle = ""
-    var phoneNumbers = ""
-    var emailAddresses = ""
-    var postalAddresses = ""
+package struct ContactBatchEditDraft: Equatable, Sendable {
+    package var renameMode: ContactBatchRenameMode = .replace
+    package var renameFind = ""
+    package var renameReplacement = ""
+    package var renamePrefix = ""
+    package var renameSuffix = ""
+    package var givenName = ""
+    package var familyName = ""
+    package var nickname = ""
+    package var organizationName = ""
+    package var departmentName = ""
+    package var jobTitle = ""
+    package var phoneNumbers = ""
+    package var emailAddresses = ""
+    package var postalAddresses = ""
+
+    package init(
+        renameMode: ContactBatchRenameMode = .replace,
+        renameFind: String = "",
+        renameReplacement: String = "",
+        renamePrefix: String = "",
+        renameSuffix: String = "",
+        givenName: String = "",
+        familyName: String = "",
+        nickname: String = "",
+        organizationName: String = "",
+        departmentName: String = "",
+        jobTitle: String = "",
+        phoneNumbers: String = "",
+        emailAddresses: String = "",
+        postalAddresses: String = ""
+    ) {
+        self.renameMode = renameMode
+        self.renameFind = renameFind
+        self.renameReplacement = renameReplacement
+        self.renamePrefix = renamePrefix
+        self.renameSuffix = renameSuffix
+        self.givenName = givenName
+        self.familyName = familyName
+        self.nickname = nickname
+        self.organizationName = organizationName
+        self.departmentName = departmentName
+        self.jobTitle = jobTitle
+        self.phoneNumbers = phoneNumbers
+        self.emailAddresses = emailAddresses
+        self.postalAddresses = postalAddresses
+    }
 }
 
-enum RosterSort: String, CaseIterable, Identifiable, Sendable {
+package enum RosterSort: String, CaseIterable, Identifiable, Sendable {
     case next
     case name
     case age
     case calendar
 
-    var id: String { rawValue }
+    package var id: String { rawValue }
 }
 
-struct RosterRecordGroup: Identifiable, Hashable, Sendable {
-    let id: String
-    let title: String
-    let occurrences: [RosterOccurrence]
+package struct RosterRecordGroup: Identifiable, Hashable, Sendable {
+    package let id: String
+    package let title: String
+    package let occurrences: [RosterOccurrence]
 }
 
-struct RosterOccurrenceListItem: Identifiable, Hashable, Sendable {
-    let id: String
-    let contactID: String
-    let contactName: String
-    let tags: [ContactTag]
-    let kind: RosterCalendarKind
-    let kindTitle: String
-    let metaText: String
-    let daysUntil: Int
-    let daysUntilText: String
-    let isToday: Bool
-    let accessibilityLabel: String
+package struct RosterOccurrenceListItem: Identifiable, Hashable, Sendable {
+    package let id: String
+    package let contactID: String
+    package let contactName: String
+    package let tags: [ContactTag]
+    package let kind: RosterCalendarKind
+    package let kindTitle: String
+    package let metaText: String
+    package let daysUntil: Int
+    package let daysUntilText: String
+    package let isToday: Bool
+    package let accessibilityLabel: String
 }
 
-struct RosterOccurrenceListGroup: Identifiable, Hashable, Sendable {
-    let id: String
-    let title: String
-    let items: [RosterOccurrenceListItem]
+package struct RosterOccurrenceListGroup: Identifiable, Hashable, Sendable {
+    package let id: String
+    package let title: String
+    package let items: [RosterOccurrenceListItem]
 }
 
 @MainActor
 @Observable
-final class RosterAppModel {
-    var selection: SidebarSelection = .permissions {
+package final class RosterAppModel {
+    package var selection: SidebarSelection = .permissions {
         didSet {
             guard selection != oldValue else { return }
             if selection == .contacts || selection == .tags {
@@ -93,129 +128,129 @@ final class RosterAppModel {
             }
         }
     }
-    var permissionState: ContactsPermissionState = .notDetermined
-    var selectedContactID: String?
-    var searchText = "" {
+    package var permissionState: ContactsPermissionState = .notDetermined
+    package var selectedContactID: String?
+    package var searchText = "" {
         didSet {
             scheduleDerivedDataRebuild(message: "Searching roster data", debounceNanoseconds: 250_000_000)
         }
     }
-    var contactSearchText = "" {
+    package var contactSearchText = "" {
         didSet {
             guard contactSearchText != oldValue else { return }
             guard selection == .contacts || selection == .tags else { return }
             rebuildContactProjection(debounceNanoseconds: 180_000_000)
         }
     }
-    var contactFilters: [ContactFilterCondition] = [] {
+    package var contactFilters: [ContactFilterCondition] = [] {
         didSet {
             guard contactFilters != oldValue else { return }
             guard selection == .contacts || selection == .tags else { return }
             rebuildContactProjection()
         }
     }
-    var contactFilterMatchMode: ContactFilterMatchMode = .all {
+    package var contactFilterMatchMode: ContactFilterMatchMode = .all {
         didSet {
             guard contactFilterMatchMode != oldValue else { return }
             guard selection == .contacts || selection == .tags else { return }
             rebuildContactProjection()
         }
     }
-    var selectedDate = Date() {
+    package var selectedDate = Date() {
         didSet { selectedDateOccurrences = cachedRecords(on: selectedDate) }
     }
-    var visibleMonth = Date() {
+    package var visibleMonth = Date() {
         didSet { scheduleDerivedDataRebuild(message: "Calculating month") }
     }
-    var filter: RosterCalendarKind? {
+    package var filter: RosterCalendarKind? {
         didSet { scheduleDerivedDataRebuild(message: "Filtering roster data") }
     }
-    var sort: RosterSort = .next {
+    package var sort: RosterSort = .next {
         didSet { scheduleDerivedDataRebuild(message: "Sorting roster data") }
     }
-    var isLoading = false
-    var errorMessage: String?
-    var toastMessage: String?
-    var language: AppLanguage = .system {
+    package var isLoading = false
+    package var errorMessage: String?
+    package var toastMessage: String?
+    package var language: AppLanguage = .system {
         didSet {
             rebuildContactProjection()
             scheduleDerivedDataRebuild(message: "Updating language")
         }
     }
-    var showAge = true
-    var upcomingRange = 30 {
+    package var showAge = true
+    package var upcomingRange = 30 {
         didSet { scheduleDerivedDataRebuild(message: "Calculating upcoming roster data") }
     }
-    var selectedContactCollectionID = ContactCollectionIdentifier.all {
+    package var selectedContactCollectionID = ContactCollectionIdentifier.all {
         didSet {
             guard selectedContactCollectionID != oldValue else { return }
             guard selection == .contacts else { return }
             rebuildContactProjection()
         }
     }
-    var selectedTagsFilter: ContactTagFilter = .all {
+    package var selectedTagsFilter: ContactTagFilter = .all {
         didSet {
             guard selectedTagsFilter != oldValue else { return }
             guard selection == .tags else { return }
             rebuildContactProjection()
         }
     }
-    var rosterTagFilter: ContactTagFilter = .all {
+    package var rosterTagFilter: ContactTagFilter = .all {
         didSet {
             scheduleDerivedDataRebuild(message: "Filtering roster data")
         }
     }
-    private(set) var contactAccessScope: ContactAccessScope = RosterAppModel.loadContactAccessScope()
-    var contactFieldAccessLevel: ContactFieldAccessLevel = RosterAppModel.loadContactFieldAccessLevel() {
+    package private(set) var contactAccessScope: ContactAccessScope = RosterAppModel.loadContactAccessScope()
+    package var contactFieldAccessLevel: ContactFieldAccessLevel = RosterAppModel.loadContactFieldAccessLevel() {
         didSet {
             guard contactFieldAccessLevel != oldValue else { return }
             Self.saveContactFieldAccessLevel(contactFieldAccessLevel)
             Task { await refreshContacts() }
         }
     }
-    var voiceText = ""
-    var voiceResult: String?
-    var isListening = false
-    var isContactSelectionMode = false
-    var selectedContactIDs: Set<String> = []
-    var isShowingContactAssignmentTargets = false
-    var isDeletingContacts = false
+    package var voiceText = ""
+    package var voiceResult: String?
+    package var isListening = false
+    package var isContactSelectionMode = false
+    package var selectedContactIDs: Set<String> = []
+    package var isShowingContactAssignmentTargets = false
+    package var isDeletingContacts = false
 
-    private(set) var allRecords: [RosterRecord] = []
-    private(set) var filteredRecords: [RosterRecord] = []
-    private(set) var filteredRecordOccurrences: [RosterOccurrence] = []
-    private(set) var filteredRecordGroups: [RosterRecordGroup] = []
-    private(set) var filteredRecordListGroups: [RosterOccurrenceListGroup] = []
-    private(set) var profiles: [ContactRosterProfile] = []
-    private(set) var filteredProfiles: [ContactRosterProfile] = []
-    private(set) var contactGrouping: ContactGroupingSnapshot = .empty
-    private(set) var contactCollectionSections: [ContactCollectionSectionModel] = []
-    private(set) var contactListSections: [ContactListSectionModel] = []
-    private(set) var visibleContactCount = 0
-    private(set) var contactTags: [ContactTag] = [] {
+    package private(set) var allRecords: [RosterRecord] = []
+    package private(set) var filteredRecords: [RosterRecord] = []
+    package private(set) var filteredRecordOccurrences: [RosterOccurrence] = []
+    package private(set) var filteredRecordGroups: [RosterRecordGroup] = []
+    package private(set) var filteredRecordListGroups: [RosterOccurrenceListGroup] = []
+    package private(set) var profiles: [ContactRosterProfile] = []
+    package private(set) var filteredProfiles: [ContactRosterProfile] = []
+    package private(set) var contactGrouping: ContactGroupingSnapshot = .empty
+    package private(set) var contactCollectionSections: [ContactCollectionSectionModel] = []
+    package private(set) var contactListSections: [ContactListSectionModel] = []
+    package private(set) var visibleContactCount = 0
+    package private(set) var contactTags: [ContactTag] = [] {
         didSet {
             contactTagTree = ContactTagTree(tags: contactTags)
             contactTagsByID = Dictionary(uniqueKeysWithValues: contactTags.map { ($0.id, $0) })
         }
     }
-    private(set) var contactTagAssignmentsByContactID: [String: Set<String>] = [:]
-    private(set) var contactTagFilterOptions: [ContactTagSelectionOption] = []
-    private(set) var visibleTagContactCount = 0
-    private(set) var contactWritePolicy: ContactWritePolicy = .confirmBeforeWrite
-    private(set) var contactDraftsByID: [String: LocalContactDraft] = [:]
-    private(set) var contactOperationLog: [ContactOperationLog] = []
-    var expandedTagIDs: Set<String> = []
-    private(set) var extendedProfilesByID: [String: ContactExtendedProfile] = [:]
-    private(set) var cachedUpcomingOccurrences: [RosterOccurrence] = []
-    private(set) var selectedDateOccurrences: [RosterOccurrence] = []
-    private(set) var visibleMonthDates: [Date] = []
-    private(set) var visibleMonthTitle = ""
-    private(set) var weekdaySymbols: [String] = []
-    private(set) var calculationProgress: RosterCalculationProgress = .inactive
+    package private(set) var contactTagAssignmentsByContactID: [String: Set<String>] = [:]
+    package private(set) var contactTagFilterOptions: [ContactTagSelectionOption] = []
+    package private(set) var visibleTagContactCount = 0
+    package private(set) var contactWritePolicy: ContactWritePolicy = .confirmBeforeWrite
+    package private(set) var contactDraftsByID: [String: LocalContactDraft] = [:]
+    package private(set) var contactOperationLog: [ContactOperationLog] = []
+    package var expandedTagIDs: Set<String> = []
+    package private(set) var extendedProfilesByID: [String: ContactExtendedProfile] = [:]
+    package private(set) var cachedUpcomingOccurrences: [RosterOccurrence] = []
+    package private(set) var selectedDateOccurrences: [RosterOccurrence] = []
+    package private(set) var visibleMonthDates: [Date] = []
+    package private(set) var visibleMonthTitle = ""
+    package private(set) var weekdaySymbols: [String] = []
+    package private(set) var calculationProgress: RosterCalculationProgress = .inactive
 
-    let formatter = CalendarFormattingService()
-    let resolver = RosterOccurrenceResolver()
-    let parser = DatePhraseParser()
+    package let formatter = CalendarFormattingService()
+    package let resolver = RosterOccurrenceResolver()
+    package let parser = DatePhraseParser()
 
     private let contactSyncService = ContactSyncService()
     private let localRosterStore = LocalRosterStore()
@@ -246,13 +281,13 @@ final class RosterAppModel {
     private let e2eFixture: RosterE2EFixture?
     private var e2eFrames: [String: CGRect] = [:]
 
-    var l10n: L10n { L10n(language: language) }
-    var extendedContactFieldsEnabled: Bool {
+    package var l10n: L10n { L10n(language: language) }
+    package var extendedContactFieldsEnabled: Bool {
         get { contactFieldAccessLevel == .extended }
         set { contactFieldAccessLevel = newValue ? .extended : .birthdayOnly }
     }
 
-    init(e2eFixture: RosterE2EFixture? = nil) {
+    package init(e2eFixture: RosterE2EFixture? = nil) {
         self.e2eFixture = e2eFixture
         observeContactsChanges()
         scheduleDerivedDataRebuild(message: "Preparing roster data", debounceNanoseconds: 150_000_000)
@@ -267,42 +302,46 @@ final class RosterAppModel {
         }
     }
 
-    var selectedProfile: ContactRosterProfile? {
+    package var selectedProfile: ContactRosterProfile? {
         guard !isContactSelectionMode else { return nil }
         guard let selectedContactID else { return filteredProfiles.first }
         return profileByID[selectedContactID]
     }
 
-    var selectedEditableProfiles: [ContactRosterProfile] {
+    package var selectedEditableProfiles: [ContactRosterProfile] {
         selectedContactIDs.compactMap { editableProfile(for: $0) }
             .sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
     }
 
-    var selectedContactSelectionCount: Int {
+    package var selectedContactSelectionCount: Int {
         selectedContactIDs.count
     }
 
-    var isE2EEnabled: Bool {
+    package var isE2EEnabled: Bool {
         e2eFixture != nil
     }
 
-    var pendingContactOperationCount: Int {
+    package var pendingContactOperationCount: Int {
         contactOperationLog.filter { $0.status == .pending }.count
     }
 
-    func editableProfile(for contactID: String) -> ContactRosterProfile? {
+    package func editableProfile(for contactID: String) -> ContactRosterProfile? {
         contactDraftsByID[contactID]?.profile ?? profileByID[contactID]
     }
 
-    var failedContactOperationCount: Int {
+    package func profile(for contactID: String) -> ContactRosterProfile? {
+        editableProfile(for: contactID)
+    }
+
+    package var failedContactOperationCount: Int {
         contactOperationLog.filter { $0.status == .failed }.count
     }
 
-    var conflictedContactOperationCount: Int {
+    package var conflictedContactOperationCount: Int {
         contactOperationLog.filter { $0.status == .conflict }.count
     }
 
-    var trashedContactCount: Int {
+    package var trashedContactCount: Int {
         contactDraftsByID.values.filter(\.isDeleted).count
     }
 
@@ -525,7 +564,7 @@ final class RosterAppModel {
         return hasher.finalize()
     }
 
-    func refreshContacts() async {
+    package func refreshContacts() async {
         if let e2eFixture {
             applyE2EFixture(e2eFixture)
             return
@@ -563,7 +602,7 @@ final class RosterAppModel {
         }
     }
 
-    func requestContactsAccess() async {
+    package func requestContactsAccess() async {
         do {
             _ = try await contactSyncService.requestAccess()
             await refreshContacts()
@@ -572,40 +611,42 @@ final class RosterAppModel {
         }
     }
 
-    func openContactsSettings() {
+    package func openContactsSettings() {
+        #if os(macOS)
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Contacts") {
             NSWorkspace.shared.open(url)
         }
+        #endif
     }
 
     /// 跳转到联系人页并聚焦指定联系人（生日条目点击跳转，见设计文档 §6.3）
-    func focusContact(_ contactID: String) {
+    package func focusContact(_ contactID: String) {
         contactSearchText = ""
         contactFilters = []
         selectedContactID = contactID
         selection = .contacts
     }
 
-    func addContactFilter(_ filter: ContactFilterCondition) {
+    package func addContactFilter(_ filter: ContactFilterCondition) {
         guard !contactFilters.contains(where: { $0.id == filter.id }) else { return }
         contactFilters.append(filter)
     }
 
-    func updateContactFilter(_ filter: ContactFilterCondition) {
+    package func updateContactFilter(_ filter: ContactFilterCondition) {
         guard let index = contactFilters.firstIndex(where: { $0.id == filter.id }) else { return }
         contactFilters[index] = filter
     }
 
-    func removeContactFilter(_ filter: ContactFilterCondition) {
+    package func removeContactFilter(_ filter: ContactFilterCondition) {
         contactFilters.removeAll { $0.id == filter.id }
     }
 
-    func clearContactFilters() {
+    package func clearContactFilters() {
         contactFilters = []
         contactFilterMatchMode = .all
     }
 
-    func selectTagFilter(_ filter: ContactTagFilter) {
+    package func selectTagFilter(_ filter: ContactTagFilter) {
         selectedTagsFilter = filter
         if !contactSearchText.isEmpty {
             contactSearchText = ""
@@ -613,12 +654,12 @@ final class RosterAppModel {
         selection = .tags
     }
 
-    func selectContactCollection(_ collectionID: String) {
+    package func selectContactCollection(_ collectionID: String) {
         selectedContactCollectionID = collectionID
         selection = .contacts
     }
 
-    func createContactGroup(named name: String, inContainerID containerID: String) async {
+    package func createContactGroup(named name: String, inContainerID containerID: String) async {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { return }
         let operation = ContactOperationLog(
@@ -632,12 +673,12 @@ final class RosterAppModel {
         await queueGroupOperation(operation)
     }
 
-    func deleteContactGroup(collectionID: String) async {
+    package func deleteContactGroup(collectionID: String) async {
         guard let groupID = ContactCollectionIdentifier.groupID(from: collectionID) else { return }
         await deleteContactGroup(groupID: groupID)
     }
 
-    func deleteContactGroup(groupID: String) async {
+    package func deleteContactGroup(groupID: String) async {
         let groupName = contactGrouping.groups.first(where: { $0.id == groupID })?.name ?? l10n(.group)
         let operation = ContactOperationLog(
             contactID: ContactCollectionIdentifier.group(groupID),
@@ -660,7 +701,7 @@ final class RosterAppModel {
         }
     }
 
-    func toggleTagExpansion(_ tagID: String) {
+    package func toggleTagExpansion(_ tagID: String) {
         if expandedTagIDs.contains(tagID) {
             expandedTagIDs.remove(tagID)
         } else {
@@ -668,11 +709,11 @@ final class RosterAppModel {
         }
     }
 
-    func records(on date: Date) -> [RosterOccurrence] {
+    package func records(on date: Date) -> [RosterOccurrence] {
         cachedRecords(on: date)
     }
 
-    func filteredRecords(on date: Date) -> [RosterOccurrence] {
+    package func filteredRecords(on date: Date) -> [RosterOccurrence] {
         let key = dayKey(date)
         return visibleFilteredOccurrencesByDay[key] ?? []
     }
@@ -850,7 +891,7 @@ final class RosterAppModel {
         Task { await refreshContacts() }
     }
 
-    func setContactAccessMode(_ mode: ContactAccessScope.Mode) {
+    package func setContactAccessMode(_ mode: ContactAccessScope.Mode) {
         var scope = contactAccessScope
         scope.mode = mode
         if mode == .selectedGroups, scope.allowedGroupIDs.isEmpty, !contactGrouping.groups.isEmpty {
@@ -859,7 +900,7 @@ final class RosterAppModel {
         updateContactAccessScope(scope)
     }
 
-    func setContactAccessGroup(_ groupID: String, isAllowed: Bool) {
+    package func setContactAccessGroup(_ groupID: String, isAllowed: Bool) {
         var scope = contactAccessScope
         scope.mode = .selectedGroups
         if isAllowed {
@@ -870,14 +911,14 @@ final class RosterAppModel {
         updateContactAccessScope(scope)
     }
 
-    func setIncludeUngroupedContacts(_ include: Bool) {
+    package func setIncludeUngroupedContacts(_ include: Bool) {
         var scope = contactAccessScope
         scope.mode = .selectedGroups
         scope.includeUngroupedContacts = include
         updateContactAccessScope(scope)
     }
 
-    func selectAllContactAccessGroups() {
+    package func selectAllContactAccessGroups() {
         updateContactAccessScope(ContactAccessScope(
             mode: .selectedGroups,
             allowedGroupIDs: Set(contactGrouping.groups.map(\.id)),
@@ -885,7 +926,7 @@ final class RosterAppModel {
         ))
     }
 
-    func clearContactAccessGroups() {
+    package func clearContactAccessGroups() {
         updateContactAccessScope(ContactAccessScope(
             mode: .selectedGroups,
             allowedGroupIDs: [],
@@ -945,35 +986,35 @@ final class RosterAppModel {
         contactTagCountsByFilterID = Dictionary(uniqueKeysWithValues: contactTagFilterOptions.map { ($0.filter.cacheKey, $0.count) })
     }
 
-    func tags(for contactID: String) -> [ContactTag] {
+    package func tags(for contactID: String) -> [ContactTag] {
         let tagIDs = contactTagAssignmentsByContactID[contactID] ?? []
         return tagIDs.compactMap { contactTagsByID[$0] }.sorted(by: Self.compareTags(_:_:))
     }
 
-    var contactTagTreeNodes: [ContactTagTreeNode] {
+    package var contactTagTreeNodes: [ContactTagTreeNode] {
         contactTagTree.flattened
     }
 
-    func childTags(of tagID: String?) -> [ContactTag] {
+    package func childTags(of tagID: String?) -> [ContactTag] {
         contactTagTree.children(of: tagID)
     }
 
-    func tagPath(for tagID: String) -> String {
+    package func tagPath(for tagID: String) -> String {
         contactTagTree.displayPath(for: tagID)
     }
 
-    func tagAndDescendantIDs(for tagID: String) -> Set<String> {
+    package func tagAndDescendantIDs(for tagID: String) -> Set<String> {
         contactTagTree.tagAndDescendantIDs(for: tagID)
     }
 
-    var taggedContactCount: Int {
+    package var taggedContactCount: Int {
         Self.taggedContactCount(
             assignmentsByContactID: contactTagAssignmentsByContactID,
             visibleContactIDs: Set(profiles.map(\.id))
         )
     }
 
-    nonisolated static func taggedContactCount(
+    package nonisolated static func taggedContactCount(
         assignmentsByContactID: [String: Set<String>],
         visibleContactIDs: Set<String>
     ) -> Int {
@@ -982,7 +1023,7 @@ final class RosterAppModel {
         }.count
     }
 
-    func contactCount(for filter: ContactTagFilter) -> Int {
+    package func contactCount(for filter: ContactTagFilter) -> Int {
         if let count = contactTagCountsByFilterID[filter.cacheKey] { return count }
         let visibleContactIDs = Set(profiles.map(\.id))
         let matchingTagIDs = filter.matchingTagIDs(in: contactTagTree)
@@ -995,11 +1036,11 @@ final class RosterAppModel {
         }.count
     }
 
-    func createTag(name: String, parentTagID: String? = nil) async {
+    package func createTag(name: String, parentTagID: String? = nil) async {
         _ = await ensureTag(named: name, parentTagID: parentTagID)
     }
 
-    func assignTags(tagIDs: Set<String>, to contactIDs: Set<String>) async {
+    package func assignTags(tagIDs: Set<String>, to contactIDs: Set<String>) async {
         guard !tagIDs.isEmpty, !contactIDs.isEmpty else { return }
         await contactTagStore.assign(tagIDs: tagIDs, to: contactIDs)
         await MainActor.run {
@@ -1013,12 +1054,12 @@ final class RosterAppModel {
         }
     }
 
-    func assignTags(named tagName: String, to contactIDs: Set<String>) async {
+    package func assignTags(named tagName: String, to contactIDs: Set<String>) async {
         guard let tag = await tagFromNewTagName(tagName) else { return }
         await assignTags(tagIDs: [tag.id], to: contactIDs)
     }
 
-    func assignTags(tagIDs: Set<String>, newTagName: String, to contactIDs: Set<String>) async {
+    package func assignTags(tagIDs: Set<String>, newTagName: String, to contactIDs: Set<String>) async {
         var ids = tagIDs
         if let tag = await tagFromNewTagName(newTagName) {
             ids.insert(tag.id)
@@ -1026,7 +1067,7 @@ final class RosterAppModel {
         await assignTags(tagIDs: ids, to: contactIDs)
     }
 
-    func replaceTags(for contactID: String, tagIDs: Set<String>) async {
+    package func replaceTags(for contactID: String, tagIDs: Set<String>) async {
         await contactTagStore.replaceAssignments(for: contactID, tagIDs: tagIDs)
         self.contactTagAssignmentsByContactID[contactID] = tagIDs.isEmpty ? nil : tagIDs
         await pruneEmptyContactTagsIfNeeded()
@@ -1035,7 +1076,7 @@ final class RosterAppModel {
         self.scheduleDerivedDataRebuild(message: "Filtering roster data")
     }
 
-    func replaceTags(for contactID: String, tagIDs: Set<String>, newTagName: String) async {
+    package func replaceTags(for contactID: String, tagIDs: Set<String>, newTagName: String) async {
         var ids = tagIDs
         if let tag = await tagFromNewTagName(newTagName) {
             ids.insert(tag.id)
@@ -1043,7 +1084,7 @@ final class RosterAppModel {
         await replaceTags(for: contactID, tagIDs: ids)
     }
 
-    func deleteTagAndDescendants(_ tagID: String) async {
+    package func deleteTagAndDescendants(_ tagID: String) async {
         let tagIDs = tagAndDescendantIDs(for: tagID)
         await contactTagStore.deleteTags(tagIDs: tagIDs)
         await MainActor.run {
@@ -1065,7 +1106,7 @@ final class RosterAppModel {
         }
     }
 
-    func renameTag(_ tagID: String, name rawName: String) async {
+    package func renameTag(_ tagID: String, name rawName: String) async {
         let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty, let index = contactTags.firstIndex(where: { $0.id == tagID }) else { return }
         var tag = contactTags[index]
@@ -1081,7 +1122,7 @@ final class RosterAppModel {
         }
     }
 
-    func cycleTagColor(_ tagID: String) async {
+    package func cycleTagColor(_ tagID: String) async {
         guard let index = contactTags.firstIndex(where: { $0.id == tagID }) else { return }
         var tag = contactTags[index]
         let currentIndex = Self.defaultTagColors.firstIndex(of: tag.color) ?? -1
@@ -1143,7 +1184,7 @@ final class RosterAppModel {
         return tag
     }
 
-    func scheduleSave(contactID: String, draft: RosterEditDraft) {
+    package func scheduleSave(contactID: String, draft: RosterEditDraft) {
         guard let payload = draft.payload(personID: contactID) else { return }
         saveTask?.cancel()
         saveTask = Task {
@@ -1153,7 +1194,7 @@ final class RosterAppModel {
         }
     }
 
-    func save(contactID: String, payload: RosterEditPayload) async {
+    package func save(contactID: String, payload: RosterEditPayload) async {
         guard let profile = profileByID[contactID] else { return }
         let birthdaySpecs = payload.journalRosterSpecs(personID: contactID)
         var draft = contactDraftsByID[contactID] ?? LocalContactDraft(
@@ -1203,7 +1244,7 @@ final class RosterAppModel {
         }
     }
 
-    func save(contactID: String, draft editDraft: RosterEditDraft) async {
+    package func save(contactID: String, draft editDraft: RosterEditDraft) async {
         guard let profile = profileByID[contactID],
               let updatedProfile = editDraft.profile(personID: contactID, fallback: profile)
         else { return }
@@ -1258,7 +1299,7 @@ final class RosterAppModel {
         }
     }
 
-    func applyBatchContactEdits(
+    package func applyBatchContactEdits(
         _ draft: ContactBatchEditDraft,
         fillPolicy: ContactBatchFillPolicy,
         contactIDs: Set<String>
@@ -1311,17 +1352,17 @@ final class RosterAppModel {
         }
     }
 
-    func enterContactSelectionMode() {
+    package func enterContactSelectionMode() {
         isContactSelectionMode = true
         selectedContactIDs = []
     }
 
-    func exitContactSelectionMode() {
+    package func exitContactSelectionMode() {
         isContactSelectionMode = false
         selectedContactIDs = []
     }
 
-    func toggleContactSelection(_ contactID: String) {
+    package func toggleContactSelection(_ contactID: String) {
         if selectedContactIDs.contains(contactID) {
             selectedContactIDs.remove(contactID)
         } else {
@@ -1329,7 +1370,7 @@ final class RosterAppModel {
         }
     }
 
-    func deleteSelectedContacts() async {
+    package func deleteSelectedContacts() async {
         let contactIDs = selectedContactIDs
         guard !contactIDs.isEmpty, !isDeletingContacts else { return }
 
@@ -1378,7 +1419,7 @@ final class RosterAppModel {
         }
     }
 
-    func setContactWritePolicy(_ policy: ContactWritePolicy) {
+    package func setContactWritePolicy(_ policy: ContactWritePolicy) {
         guard contactWritePolicy != policy else { return }
         contactWritePolicy = policy
         Task { await contactJournalStore.setWritePolicy(policy) }
@@ -1387,7 +1428,7 @@ final class RosterAppModel {
         }
     }
 
-    func writeBackPendingContactOperations() async {
+    package func writeBackPendingContactOperations() async {
         let pending = contactOperationLog
             .filter { $0.status == .pending }
             .sorted { $0.createdAt < $1.createdAt }
@@ -1398,7 +1439,7 @@ final class RosterAppModel {
         }
     }
 
-    func restoreContactFromTrash(_ contactID: String) async {
+    package func restoreContactFromTrash(_ contactID: String) async {
         guard var draft = contactDraftsByID[contactID], draft.isDeleted else { return }
         draft.isDeleted = false
         draft.deletedAt = nil
@@ -1422,7 +1463,7 @@ final class RosterAppModel {
         toast(contactRestoredText)
     }
 
-    func acceptMacOSVersion(for operationID: String) async {
+    package func acceptMacOSVersion(for operationID: String) async {
         guard let operation = contactOperationLog.first(where: { $0.id == operationID }) else { return }
         await contactJournalStore.deleteDraft(contactID: operation.contactID)
         contactDraftsByID[operation.contactID] = nil
@@ -1435,7 +1476,7 @@ final class RosterAppModel {
         await refreshContacts()
     }
 
-    func overwriteMacOSVersion(for operationID: String) async {
+    package func overwriteMacOSVersion(for operationID: String) async {
         guard let operation = contactOperationLog.first(where: { $0.id == operationID }) else { return }
         var pending = operation
         pending.status = .pending
@@ -1509,7 +1550,7 @@ final class RosterAppModel {
         Task { await contactJournalStore.updateOperation(updated) }
     }
 
-    func convertVoiceText() {
+    package func convertVoiceText() {
         guard let parsed = parser.parse(voiceText) else {
             voiceResult = L10n(language: language)(.invalidDatePhrase)
             return
@@ -1540,7 +1581,7 @@ final class RosterAppModel {
         voiceResult = "\(formatter.calendarName(parsed.calendarKind, locale: language.coreLocale)) \(original) → \(converted)"
     }
 
-    func toggleVoiceInput() async {
+    package func toggleVoiceInput() async {
         if isListening {
             voiceInput.stop()
             isListening = false
@@ -1559,7 +1600,7 @@ final class RosterAppModel {
         }
     }
 
-    func draggedContactIDs(for contactID: String) -> Set<String> {
+    package func draggedContactIDs(for contactID: String) -> Set<String> {
         ContactDragSelectionResolver.draggedContactIDs(
             draggedContactID: contactID,
             selectedContactIDs: selectedContactIDs,
@@ -1567,7 +1608,7 @@ final class RosterAppModel {
         )
     }
 
-    func beginContactDrag() {
+    package func beginContactDrag() {
         isShowingContactAssignmentTargets = true
         recordE2EEvent("drag-began")
         contactAssignmentTargetTask?.cancel()
@@ -1580,21 +1621,21 @@ final class RosterAppModel {
         }
     }
 
-    func recordE2EContactRowTap(_ contactID: String) {
+    package func recordE2EContactRowTap(_ contactID: String) {
         recordE2EEvent("row-tap contact=\(contactID)")
     }
 
-    func clearContactAssignmentTargets() {
+    package func clearContactAssignmentTargets() {
         contactAssignmentTargetTask?.cancel()
         contactAssignmentTargetTask = nil
         isShowingContactAssignmentTargets = false
     }
 
-    func dragPayload(for contactID: String) -> ContactAssignmentDragPayload {
+    package func dragPayload(for contactID: String) -> ContactAssignmentDragPayload {
         return ContactAssignmentDragPayload(contactIDs: draggedContactIDs(for: contactID).sorted())
     }
 
-    func dragItemProvider(for contactID: String) -> NSItemProvider {
+    package func dragItemProvider(for contactID: String) -> NSItemProvider {
         let payload = dragPayload(for: contactID)
         let provider = NSItemProvider()
         if let data = try? JSONEncoder().encode(payload) {
@@ -1610,7 +1651,7 @@ final class RosterAppModel {
         return provider
     }
 
-    func assignDroppedContacts(_ payloads: [ContactAssignmentDragPayload], toTagID tagID: String) {
+    package func assignDroppedContacts(_ payloads: [ContactAssignmentDragPayload], toTagID tagID: String) {
         let contactIDs = ContactAssignmentTargetResolver.droppedContactIDs(from: payloads)
         guard !contactIDs.isEmpty else { return }
         clearContactAssignmentTargets()
@@ -1620,7 +1661,7 @@ final class RosterAppModel {
         }
     }
 
-    func assignDroppedContacts(from providers: [NSItemProvider], toTagID tagID: String) -> Bool {
+    package func assignDroppedContacts(from providers: [NSItemProvider], toTagID tagID: String) -> Bool {
         guard providers.contains(where: { provider in
             UTType.contactAssignmentDropTypes.contains {
                 provider.hasItemConformingToTypeIdentifier($0.identifier)
@@ -1640,7 +1681,7 @@ final class RosterAppModel {
         return true
     }
 
-    func assignDroppedContacts(_ payloads: [ContactAssignmentDragPayload], toGroupID groupID: String) {
+    package func assignDroppedContacts(_ payloads: [ContactAssignmentDragPayload], toGroupID groupID: String) {
         let contactIDs = ContactAssignmentTargetResolver.droppedContactIDs(from: payloads)
         guard !contactIDs.isEmpty else { return }
         clearContactAssignmentTargets()
@@ -1650,7 +1691,7 @@ final class RosterAppModel {
         }
     }
 
-    func assignDroppedContacts(from providers: [NSItemProvider], toGroupID groupID: String) -> Bool {
+    package func assignDroppedContacts(from providers: [NSItemProvider], toGroupID groupID: String) -> Bool {
         guard providers.contains(where: { provider in
             UTType.contactAssignmentDropTypes.contains {
                 provider.hasItemConformingToTypeIdentifier($0.identifier)
@@ -1670,7 +1711,7 @@ final class RosterAppModel {
         return true
     }
 
-    func recordE2EFrame(identifier: String, screenRect: CGRect) {
+    package func recordE2EFrame(identifier: String, screenRect: CGRect) {
         guard isE2EEnabled, !screenRect.isEmpty else { return }
         e2eFrames[identifier] = screenRect
         let lines = e2eFrames
@@ -1682,11 +1723,11 @@ final class RosterAppModel {
         try? "\(lines)\n".write(toFile: Self.e2eFramesPath, atomically: true, encoding: .utf8)
     }
 
-    func visibleGroupDropCollections() -> [ContactCollectionSummary] {
+    package func visibleGroupDropCollections() -> [ContactCollectionSummary] {
         ContactAssignmentTargetResolver.groupDropCollections(from: contactCollectionSections)
     }
 
-    func toast(_ message: String) {
+    package func toast(_ message: String) {
         toastMessage = message
         Task {
             try? await Task.sleep(for: .seconds(2))
@@ -2047,21 +2088,21 @@ final class RosterAppModel {
     ]
 }
 
-struct RosterEditDraft: Equatable {
-    var entries: [RosterEditEntry]
-    var originalDisplayName: String
-    var givenName: String
-    var familyName: String
-    var nickname: String
-    var organizationName: String
-    var departmentName: String
-    var jobTitle: String
-    var phoneNumbersText: String
-    var emailAddressesText: String
-    var postalAddressesText: String
-    var imageData: Data?
+package struct RosterEditDraft: Equatable {
+    package var entries: [RosterEditEntry]
+    package var originalDisplayName: String
+    package var givenName: String
+    package var familyName: String
+    package var nickname: String
+    package var organizationName: String
+    package var departmentName: String
+    package var jobTitle: String
+    package var phoneNumbersText: String
+    package var emailAddressesText: String
+    package var postalAddressesText: String
+    package var imageData: Data?
 
-    init(profile: ContactRosterProfile) {
+    package init(profile: ContactRosterProfile) {
         entries = profile.records.map(RosterEditEntry.init(record:))
         originalDisplayName = profile.displayName
         givenName = profile.givenName
@@ -2076,15 +2117,15 @@ struct RosterEditDraft: Equatable {
         imageData = profile.imageData
     }
 
-    mutating func addEntry(personID: String, kind: RosterCalendarKind = .gregorian) {
+    package mutating func addEntry(personID: String, kind: RosterCalendarKind = .gregorian) {
         entries.append(RosterEditEntry(personID: personID, kind: kind))
     }
 
-    mutating func removeEntry(id: String) {
+    package mutating func removeEntry(id: String) {
         entries.removeAll { $0.id == id }
     }
 
-    func payload(personID: String) -> RosterEditPayload? {
+    package func payload(personID: String) -> RosterEditPayload? {
         let parsed = entries.map { entry in
             (entry: entry, spec: entry.dateSpec(personID: personID))
         }
@@ -2110,11 +2151,11 @@ struct RosterEditDraft: Equatable {
         )
     }
 
-    func localOnlyDateSpecs(personID: String) -> [RosterDateSpec] {
+    package func localOnlyDateSpecs(personID: String) -> [RosterDateSpec] {
         payload(personID: personID)?.localOnlyDateSpecs ?? []
     }
 
-    func profile(personID: String, fallback: ContactRosterProfile) -> ContactRosterProfile? {
+    package func profile(personID: String, fallback: ContactRosterProfile) -> ContactRosterProfile? {
         guard let payload = payload(personID: personID) else { return nil }
         let specs = payload.journalRosterSpecs(personID: personID)
         let displayName = Self.displayName(
@@ -2149,7 +2190,7 @@ struct RosterEditDraft: Equatable {
         )
     }
 
-    var displayNamePreview: String {
+    package var displayNamePreview: String {
         Self.displayName(
             givenName: givenName,
             familyName: familyName,
@@ -2189,16 +2230,16 @@ struct RosterEditDraft: Equatable {
     }
 }
 
-struct RosterEditEntry: Identifiable, Equatable {
-    var id: String
-    var kind: RosterCalendarKind
-    var year: String
-    var month: String
-    var day: String
-    var isLeapMonth: Bool
-    var source: RosterDateSpecSource
+package struct RosterEditEntry: Identifiable, Equatable {
+    package var id: String
+    package var kind: RosterCalendarKind
+    package var year: String
+    package var month: String
+    package var day: String
+    package var isLeapMonth: Bool
+    package var source: RosterDateSpecSource
 
-    init(record: RosterRecord) {
+    package init(record: RosterRecord) {
         id = record.id
         kind = record.kind
         year = record.year.map(String.init) ?? ""
@@ -2212,7 +2253,7 @@ struct RosterEditEntry: Identifiable, Equatable {
         }
     }
 
-    init(personID: String, kind: RosterCalendarKind) {
+    package init(personID: String, kind: RosterCalendarKind) {
         id = "local:\(personID):\(UUID().uuidString)"
         self.kind = kind
         year = ""
@@ -2222,7 +2263,7 @@ struct RosterEditEntry: Identifiable, Equatable {
         source = .local
     }
 
-    func dateSpec(personID: String) -> RosterDateSpec? {
+    package func dateSpec(personID: String) -> RosterDateSpec? {
         guard let monthValue = Int(month), let dayValue = Int(day),
               (1...13).contains(monthValue), (1...31).contains(dayValue)
         else { return nil }

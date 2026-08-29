@@ -3,12 +3,12 @@ import Foundation
 import Speech
 
 @MainActor
-final class VoiceInputService {
+package final class VoiceInputService {
     private let audioEngine = AVAudioEngine()
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
 
-    func start(locale: Locale, onText: @escaping @MainActor (String) -> Void) async throws {
+    package func start(locale: Locale, onText: @escaping @MainActor (String) -> Void) async throws {
         let speechGranted = await requestSpeechAccess()
         let micGranted = await AVCaptureDevice.requestAccess(for: .audio)
         guard speechGranted, micGranted else {
@@ -52,7 +52,7 @@ final class VoiceInputService {
         try audioEngine.start()
     }
 
-    func stop() {
+    package func stop() {
         if audioEngine.isRunning {
             audioEngine.stop()
             audioEngine.inputNode.removeTap(onBus: 0)

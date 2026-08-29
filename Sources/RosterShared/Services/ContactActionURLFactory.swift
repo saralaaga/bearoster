@@ -1,14 +1,14 @@
 import Foundation
 
-enum ContactQuickAction: Sendable {
+package enum ContactQuickAction: Sendable {
     case message
     case call
     case video
     case email
 }
 
-enum ContactActionURLFactory {
-    static func url(
+package enum ContactActionURLFactory {
+    package static func url(
         for action: ContactQuickAction,
         phoneNumbers: [String],
         emailAddresses: [String]

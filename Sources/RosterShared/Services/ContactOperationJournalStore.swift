@@ -2,15 +2,15 @@ import RosterCore
 import Foundation
 import SQLite3
 
-enum ContactWritePolicy: String, Codable, CaseIterable, Identifiable, Sendable {
+package enum ContactWritePolicy: String, Codable, CaseIterable, Identifiable, Sendable {
     case localOnly
     case confirmBeforeWrite
     case automatic
 
-    var id: String { rawValue }
+    package var id: String { rawValue }
 }
 
-enum ContactOperationKind: String, Codable, Sendable {
+package enum ContactOperationKind: String, Codable, Sendable {
     case create
     case update
     case delete
@@ -19,7 +19,7 @@ enum ContactOperationKind: String, Codable, Sendable {
     case deleteGroup
 }
 
-enum ContactOperationStatus: String, Codable, Sendable {
+package enum ContactOperationStatus: String, Codable, Sendable {
     case pending
     case applied
     case failed
@@ -27,34 +27,34 @@ enum ContactOperationStatus: String, Codable, Sendable {
     case reverted
 }
 
-struct ContactFieldChange: Codable, Hashable, Sendable {
-    var field: String
-    var previousValue: String
-    var nextValue: String
+package struct ContactFieldChange: Codable, Hashable, Sendable {
+    package var field: String
+    package var previousValue: String
+    package var nextValue: String
 }
 
-struct LocalContactDraft: Codable, Identifiable, Hashable, Sendable {
-    var id: String
-    var appleContactID: String?
-    var displayName: String
-    var givenName: String
-    var familyName: String
-    var nickname: String
-    var organizationName: String
-    var departmentName: String
-    var jobTitle: String
-    var note: String
-    var phoneNumbers: [String]
-    var emailAddresses: [String]
-    var postalAddresses: [String]
-    var birthdaySpecs: [RosterDateSpec]
-    var imageData: Data?
-    var isDeleted: Bool
-    var deletedAt: Date?
-    var baseSignature: Int
-    var updatedAt: Date
+package struct LocalContactDraft: Codable, Identifiable, Hashable, Sendable {
+    package var id: String
+    package var appleContactID: String?
+    package var displayName: String
+    package var givenName: String
+    package var familyName: String
+    package var nickname: String
+    package var organizationName: String
+    package var departmentName: String
+    package var jobTitle: String
+    package var note: String
+    package var phoneNumbers: [String]
+    package var emailAddresses: [String]
+    package var postalAddresses: [String]
+    package var birthdaySpecs: [RosterDateSpec]
+    package var imageData: Data?
+    package var isDeleted: Bool
+    package var deletedAt: Date?
+    package var baseSignature: Int
+    package var updatedAt: Date
 
-    init(
+    package init(
         id: String,
         appleContactID: String?,
         displayName: String,
@@ -96,7 +96,7 @@ struct LocalContactDraft: Codable, Identifiable, Hashable, Sendable {
         self.updatedAt = updatedAt
     }
 
-    init(profile: ContactRosterProfile, extended: ContactExtendedProfile?, birthdaySpecs: [RosterDateSpec]) {
+    package init(profile: ContactRosterProfile, extended: ContactExtendedProfile?, birthdaySpecs: [RosterDateSpec]) {
         self.init(
             id: profile.id,
             appleContactID: profile.id,
@@ -116,7 +116,7 @@ struct LocalContactDraft: Codable, Identifiable, Hashable, Sendable {
         )
     }
 
-    var profile: ContactRosterProfile {
+    package var profile: ContactRosterProfile {
         let person = RosterPerson(
             id: id,
             displayName: displayName,
@@ -141,7 +141,7 @@ struct LocalContactDraft: Codable, Identifiable, Hashable, Sendable {
         )
     }
 
-    static func signature(profile: ContactRosterProfile, extended: ContactExtendedProfile?) -> Int {
+    package static func signature(profile: ContactRosterProfile, extended: ContactExtendedProfile?) -> Int {
         var hasher = Hasher()
         hasher.combine(profile.id)
         hasher.combine(profile.displayName)
@@ -161,28 +161,28 @@ struct LocalContactDraft: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
-struct ContactGroupOperationPayload: Codable, Hashable, Sendable {
-    var containerID: String?
-    var groupID: String?
-    var name: String
+package struct ContactGroupOperationPayload: Codable, Hashable, Sendable {
+    package var containerID: String?
+    package var groupID: String?
+    package var name: String
 }
 
-struct ContactOperationLog: Codable, Identifiable, Hashable, Sendable {
-    var id: String
-    var contactID: String
-    var appleContactID: String?
-    var displayName: String
-    var kind: ContactOperationKind
-    var status: ContactOperationStatus
-    var summary: String
-    var fieldChanges: [ContactFieldChange]
-    var draft: LocalContactDraft?
-    var contactGroup: ContactGroupOperationPayload?
-    var errorMessage: String?
-    var createdAt: Date
-    var updatedAt: Date
+package struct ContactOperationLog: Codable, Identifiable, Hashable, Sendable {
+    package var id: String
+    package var contactID: String
+    package var appleContactID: String?
+    package var displayName: String
+    package var kind: ContactOperationKind
+    package var status: ContactOperationStatus
+    package var summary: String
+    package var fieldChanges: [ContactFieldChange]
+    package var draft: LocalContactDraft?
+    package var contactGroup: ContactGroupOperationPayload?
+    package var errorMessage: String?
+    package var createdAt: Date
+    package var updatedAt: Date
 
-    init(
+    package init(
         id: String = UUID().uuidString,
         contactID: String,
         appleContactID: String?,
@@ -213,24 +213,24 @@ struct ContactOperationLog: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
-struct ContactJournalSnapshot: Sendable {
-    var draftsByContactID: [String: LocalContactDraft]
-    var operations: [ContactOperationLog]
-    var writePolicy: ContactWritePolicy
+package struct ContactJournalSnapshot: Sendable {
+    package var draftsByContactID: [String: LocalContactDraft]
+    package var operations: [ContactOperationLog]
+    package var writePolicy: ContactWritePolicy
 }
 
-actor ContactOperationJournalStore {
+package actor ContactOperationJournalStore {
     private let databaseURL: URL
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
-    init(
+    package init(
         databaseURL: URL = AppSupportPaths.database(named: "contact-journal.sqlite3")
     ) {
         self.databaseURL = databaseURL
     }
 
-    func load() -> ContactJournalSnapshot {
+    package func load() -> ContactJournalSnapshot {
         do {
             let database = try openDatabase()
             defer { sqlite3_close(database) }
@@ -246,7 +246,7 @@ actor ContactOperationJournalStore {
         }
     }
 
-    func setWritePolicy(_ policy: ContactWritePolicy) {
+    package func setWritePolicy(_ policy: ContactWritePolicy) {
         do {
             let database = try openDatabase()
             defer { sqlite3_close(database) }
@@ -257,7 +257,7 @@ actor ContactOperationJournalStore {
         }
     }
 
-    func saveDraft(_ draft: LocalContactDraft) {
+    package func saveDraft(_ draft: LocalContactDraft) {
         do {
             let database = try openDatabase()
             defer { sqlite3_close(database) }
@@ -268,7 +268,7 @@ actor ContactOperationJournalStore {
         }
     }
 
-    func deleteDraft(contactID: String) {
+    package func deleteDraft(contactID: String) {
         do {
             let database = try openDatabase()
             defer { sqlite3_close(database) }
@@ -284,7 +284,7 @@ actor ContactOperationJournalStore {
         }
     }
 
-    func appendOperation(_ operation: ContactOperationLog) {
+    package func appendOperation(_ operation: ContactOperationLog) {
         do {
             let database = try openDatabase()
             defer { sqlite3_close(database) }
@@ -295,11 +295,11 @@ actor ContactOperationJournalStore {
         }
     }
 
-    func updateOperation(_ operation: ContactOperationLog) {
+    package func updateOperation(_ operation: ContactOperationLog) {
         appendOperation(operation)
     }
 
-    func updateOperations(_ operations: [ContactOperationLog]) {
+    package func updateOperations(_ operations: [ContactOperationLog]) {
         guard !operations.isEmpty else { return }
         do {
             let database = try openDatabase()

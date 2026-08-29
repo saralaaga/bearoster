@@ -6,11 +6,14 @@ let package = Package(
     name: "Roster",
     defaultLocalization: "en",
     platforms: [
-        .macOS(.v14)
+        .macOS(.v14),
+        .iOS(.v17)
     ],
     products: [
         .library(name: "RosterCore", targets: ["RosterCore"]),
-        .executable(name: "Roster", targets: ["RosterApp"])
+        .library(name: "RosterShared", targets: ["RosterShared"]),
+        .executable(name: "Roster", targets: ["RosterApp"]),
+        .executable(name: "RosterIOS", targets: ["RosterIOSApp"])
     ],
     targets: [
         .target(
@@ -19,15 +22,29 @@ let package = Package(
                 .linkedFramework("Contacts")
             ]
         ),
-        .executableTarget(
-            name: "RosterApp",
+        .target(
+            name: "RosterShared",
             dependencies: ["RosterCore"],
             linkerSettings: [
                 .linkedFramework("SwiftUI"),
-                .linkedFramework("AppKit"),
                 .linkedFramework("Speech"),
                 .linkedFramework("AVFoundation"),
                 .linkedLibrary("sqlite3")
+            ]
+        ),
+        .executableTarget(
+            name: "RosterApp",
+            dependencies: ["RosterShared"],
+            linkerSettings: [
+                .linkedFramework("SwiftUI"),
+                .linkedFramework("AppKit")
+            ]
+        ),
+        .executableTarget(
+            name: "RosterIOSApp",
+            dependencies: ["RosterShared"],
+            linkerSettings: [
+                .linkedFramework("SwiftUI")
             ]
         ),
         .testTarget(
@@ -36,7 +53,7 @@ let package = Package(
         ),
         .testTarget(
             name: "RosterAppTests",
-            dependencies: ["RosterApp"]
+            dependencies: ["RosterShared"]
         )
     ]
 )

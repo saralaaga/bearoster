@@ -1,62 +1,62 @@
 import RosterCore
 import Foundation
 
-struct ContactListRowModel: Identifiable, Hashable, Sendable {
-    let id: String
-    let displayName: String
-    let subtitle: String
-    let tags: [ContactTag]
-    let kind: RosterCalendarKind?
-    let kindTitle: String?
-    let hasRecords: Bool
-    let daysUntil: Int?
-    let daysUntilText: String?
-    let nextRosterText: String?
-    let ageText: String?
-    let sectionKey: String
-    let sortKey: String
+package struct ContactListRowModel: Identifiable, Hashable, Sendable {
+    package let id: String
+    package let displayName: String
+    package let subtitle: String
+    package let tags: [ContactTag]
+    package let kind: RosterCalendarKind?
+    package let kindTitle: String?
+    package let hasRecords: Bool
+    package let daysUntil: Int?
+    package let daysUntilText: String?
+    package let nextRosterText: String?
+    package let ageText: String?
+    package let sectionKey: String
+    package let sortKey: String
 }
 
-struct ContactListSectionModel: Identifiable, Hashable, Sendable {
-    let id: String
-    let title: String
-    let rows: [ContactListRowModel]
+package struct ContactListSectionModel: Identifiable, Hashable, Sendable {
+    package let id: String
+    package let title: String
+    package let rows: [ContactListRowModel]
 }
 
-struct ContactCollectionSectionModel: Identifiable, Hashable, Sendable {
-    let id: String
-    let title: String
-    let collections: [ContactCollectionSummary]
+package struct ContactCollectionSectionModel: Identifiable, Hashable, Sendable {
+    package let id: String
+    package let title: String
+    package let collections: [ContactCollectionSummary]
 }
 
-enum ContactFilterMatchMode: String, CaseIterable, Hashable, Identifiable, Sendable {
+package enum ContactFilterMatchMode: String, CaseIterable, Hashable, Identifiable, Sendable {
     case all
     case any
 
-    var id: String { rawValue }
+    package var id: String { rawValue }
 }
 
-enum ContactBirthdayFilter: String, CaseIterable, Hashable, Identifiable, Sendable {
+package enum ContactBirthdayFilter: String, CaseIterable, Hashable, Identifiable, Sendable {
     case hasBirthday
     case missingBirthday
     case upcomingBirthday
 
-    var id: String { rawValue }
+    package var id: String { rawValue }
 }
 
-enum ContactMissingField: String, CaseIterable, Hashable, Identifiable, Sendable {
+package enum ContactMissingField: String, CaseIterable, Hashable, Identifiable, Sendable {
     case phone
     case email
     case organization
 
-    var id: String { rawValue }
+    package var id: String { rawValue }
 }
 
-enum ContactFilterCondition: Hashable, Identifiable, Sendable {
+package enum ContactFilterCondition: Hashable, Identifiable, Sendable {
     case birthday(ContactBirthdayFilter)
     case missingField(ContactMissingField)
 
-    var id: String {
+    package var id: String {
         switch self {
         case .birthday: "birthday"
         case .missingField: "missingField"
@@ -64,29 +64,29 @@ enum ContactFilterCondition: Hashable, Identifiable, Sendable {
     }
 }
 
-struct ContactListProjectionSnapshot: Hashable, Sendable {
-    let collectionSections: [ContactCollectionSectionModel]
-    let contactSections: [ContactListSectionModel]
-    let visibleContactCount: Int
+package struct ContactListProjectionSnapshot: Hashable, Sendable {
+    package let collectionSections: [ContactCollectionSectionModel]
+    package let contactSections: [ContactListSectionModel]
+    package let visibleContactCount: Int
 }
 
-struct ContactListProjectionRequest: Hashable, Sendable {
-    var profiles: [ContactRosterProfile]
-    var grouping: ContactGroupingSnapshot
-    var contactTags: [ContactTag]
-    var tagIDsByContactID: [String: Set<String>]
-    var accessScope: ContactAccessScope
-    var selectedCollectionID: String
-    var selectedTagFilter: ContactTagFilter?
-    var searchText: String
-    var contactFilters: [ContactFilterCondition]
-    var contactFilterMatchMode: ContactFilterMatchMode
-    var language: AppLanguage
-    var noRostersText: String
-    var todayText: String
-    var upcomingOccurrencesByContactID: [String: RosterOccurrence]
+package struct ContactListProjectionRequest: Hashable, Sendable {
+    package var profiles: [ContactRosterProfile]
+    package var grouping: ContactGroupingSnapshot
+    package var contactTags: [ContactTag]
+    package var tagIDsByContactID: [String: Set<String>]
+    package var accessScope: ContactAccessScope
+    package var selectedCollectionID: String
+    package var selectedTagFilter: ContactTagFilter?
+    package var searchText: String
+    package var contactFilters: [ContactFilterCondition]
+    package var contactFilterMatchMode: ContactFilterMatchMode
+    package var language: AppLanguage
+    package var noRostersText: String
+    package var todayText: String
+    package var upcomingOccurrencesByContactID: [String: RosterOccurrence]
 
-    init(
+    package init(
         profiles: [ContactRosterProfile],
         grouping: ContactGroupingSnapshot,
         contactTags: [ContactTag] = [],
@@ -119,16 +119,16 @@ struct ContactListProjectionRequest: Hashable, Sendable {
     }
 }
 
-actor ContactListProjectionWorker {
+package actor ContactListProjectionWorker {
     private let service = ContactListProjectionService()
     private var cache: [ContactListProjectionRequest: ContactListProjectionSnapshot] = [:]
     private let maxCacheEntries = 16
 
-    var cacheEntryCount: Int {
+    package var cacheEntryCount: Int {
         cache.count
     }
 
-    func snapshot(for request: ContactListProjectionRequest) -> ContactListProjectionSnapshot {
+    package func snapshot(for request: ContactListProjectionRequest) -> ContactListProjectionSnapshot {
         if let cached = cache[request] {
             return cached
         }
@@ -163,10 +163,10 @@ actor ContactListProjectionWorker {
     }
 }
 
-struct ContactListProjectionService: Sendable {
+package struct ContactListProjectionService: Sendable {
     private let formatter = CalendarFormattingService()
 
-    func snapshot(
+    package func snapshot(
         profiles: [ContactRosterProfile],
         grouping: ContactGroupingSnapshot,
         contactTags: [ContactTag] = [],
