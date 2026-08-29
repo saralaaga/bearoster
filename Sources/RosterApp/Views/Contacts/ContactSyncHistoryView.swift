@@ -280,6 +280,8 @@ private struct ContactOperationRow: View {
         case .update: "pencil"
         case .delete: "trash"
         case .restore: "arrow.uturn.backward"
+        case .createGroup: "folder.badge.plus"
+        case .deleteGroup: "folder.badge.minus"
         }
     }
 

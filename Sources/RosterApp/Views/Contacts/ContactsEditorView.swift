@@ -1,7 +1,6 @@
 import RosterCore
 import AppKit
 import SwiftUI
-import UniformTypeIdentifiers
 
 // MARK: - Contacts editor
 
@@ -17,11 +16,6 @@ struct ContactsEditorView: View {
 
         VStack(spacing: 0) {
             HStack(spacing: 0) {
-                ContactCollectionsPane()
-                    .fixedContactColumn(width: ContactsLayout.collectionsWidth, priority: 3)
-
-                KimiSeparator(axis: .vertical)
-
                 VStack(spacing: 0) {
                     ContactListHeader(count: model.visibleContactCount)
 
@@ -94,95 +88,7 @@ struct ContactsEditorView: View {
 }
 
 private enum ContactsLayout {
-    static let collectionsWidth: CGFloat = 210
     static let listWidth: CGFloat = 300
-}
-
-private struct TagDropRail: View {
-    @Environment(RosterAppModel.self) private var model
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        let nodes = model.contactTagTreeNodes
-
-        HStack(spacing: 8) {
-            Image(systemName: "tag")
-                .font(.system(size: 12, weight: .semibold))
-            Text(model.l10n(.tags))
-                .font(.system(size: 12.5, weight: .medium))
-            Spacer(minLength: 8)
-            if nodes.isEmpty {
-                Text(model.l10n(.noTags))
-                    .font(.system(size: 11.5, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            } else {
-                ScrollView(.horizontal) {
-                    HStack(spacing: 8) {
-                        ForEach(nodes) { node in
-                            TagDropChip(tag: node.tag)
-                        }
-                    }
-                }
-                .scrollIndicators(.hidden)
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity)
-        .background(ContactsNativeStyle.windowBackground(colorScheme))
-        .overlay(alignment: .bottom) {
-            ContactsNativeStyle.separator(colorScheme)
-                .frame(height: 0.5)
-        }
-    }
-}
-
-private struct TagDropChip: View {
-    @Environment(RosterAppModel.self) private var model
-    @Environment(\.colorScheme) private var colorScheme
-    @State private var isDropTargeted = false
-    let tag: ContactTag
-
-    var body: some View {
-        Text(model.tagPath(for: tag.id))
-            .font(.system(size: 11, weight: .semibold))
-            .lineLimit(1)
-            .frame(maxWidth: 160)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(chipBackground, in: Capsule())
-            .overlay(
-                Capsule()
-                    .strokeBorder(chipBorder, lineWidth: isDropTargeted ? 2 : 1)
-            )
-            .shadow(color: isDropTargeted ? Color(hex: tag.color).opacity(0.28) : Color.clear, radius: 5, y: 1)
-            .onDrop(of: [UTType.rosterContactAssignmentPayload, .legacyContactAssignmentPayload], isTargeted: $isDropTargeted) { providers in
-                model.assignDroppedContacts(from: providers, toTagID: tag.id)
-            }
-            .accessibilityIdentifier("contact-tag-drop-\(tag.id)")
-            .e2eFrame(identifier: "contact-tag-drop-\(tag.id)")
-    }
-
-    private var chipBackground: Color {
-        if isDropTargeted {
-            return Color(hex: tag.color).opacity(colorScheme == .dark ? 0.38 : 0.22)
-        }
-        if model.isShowingContactAssignmentTargets {
-            return Color(hex: tag.color).opacity(colorScheme == .dark ? 0.20 : 0.10)
-        }
-        return Color.secondary.opacity(0.10)
-    }
-
-    private var chipBorder: Color {
-        if isDropTargeted {
-            return Color(hex: tag.color)
-        }
-        if model.isShowingContactAssignmentTargets {
-            return Color(hex: tag.color).opacity(0.55)
-        }
-        return Color.clear
-    }
 }
 
 // MARK: - Toolbar
@@ -236,6 +142,8 @@ struct ContactsToolbar: View {
             }
             .font(.system(size: 12.5, weight: .medium))
             .buttonStyle(.bordered)
+
+            ContactFiltersButton()
 
             SearchField(text: $model.contactSearchText, prompt: model.l10n(.search))
             .frame(width: 240)
@@ -318,148 +226,184 @@ struct ContactsToolbar: View {
     }
 }
 
-// MARK: - Source list
-
-struct ContactCollectionsPane: View {
+struct ContactFiltersButton: View {
     @Environment(RosterAppModel.self) private var model
-    @Environment(\.colorScheme) private var colorScheme
+    @State private var isShowingPopover = false
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(model.contactCollectionSections) { section in
-                    ContactSourceSectionTitle(title: sectionTitle(section))
-                    ForEach(section.collections) { collection in
-                        ContactCollectionRow(
-                            collection: collection,
-                            isSelected: model.selectedContactCollectionID == collection.id
-                        ) {
-                            model.selectedContactCollectionID = collection.id
-                        }
+        Button {
+            isShowingPopover.toggle()
+        } label: {
+            Label(label, systemImage: model.contactFilters.isEmpty ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+        }
+        .font(.system(size: 12.5, weight: .medium))
+        .buttonStyle(.bordered)
+        .popover(isPresented: $isShowingPopover, arrowEdge: .bottom) {
+            ContactFiltersPopover()
+        }
+        .accessibilityLabel(label)
+    }
+
+    private var label: String {
+        if model.contactFilters.isEmpty { return model.l10n(.filterContacts) }
+        return "\(model.l10n(.filterContacts)) \(model.contactFilters.count)"
+    }
+}
+
+private struct ContactFiltersPopover: View {
+    @Environment(RosterAppModel.self) private var model
+
+    var body: some View {
+        @Bindable var model = model
+
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(model.l10n(.filterContacts))
+                    .font(.system(size: 14, weight: .semibold))
+                Spacer(minLength: 0)
+                Button(model.l10n(.clearFilters)) {
+                    model.clearContactFilters()
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(RosterTheme.accent)
+                .disabled(model.contactFilters.isEmpty)
+            }
+
+            Picker("", selection: $model.contactFilterMatchMode) {
+                Text(model.l10n(.matchAllConditions)).tag(ContactFilterMatchMode.all)
+                Text(model.l10n(.matchAnyCondition)).tag(ContactFilterMatchMode.any)
+            }
+            .pickerStyle(.segmented)
+            .disabled(model.contactFilters.count < 2)
+
+            if model.contactFilters.isEmpty {
+                Text(model.l10n(.addCondition))
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 6)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(model.contactFilters) { filter in
+                        ContactFilterConditionRow(filter: filter)
                     }
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 12)
-        }
-        .background(ContactsNativeStyle.sourceListBackground(colorScheme))
-    }
 
-    private func sectionTitle(_ section: ContactCollectionSectionModel) -> String {
-        if section.id == "all" {
-            return model.l10n(.library)
-        }
-        return section.title
-    }
-}
+            Menu {
+                Button(model.l10n(.birthdayStatus)) {
+                    model.addContactFilter(.birthday(.missingBirthday))
+                }
+                .disabled(hasFilter(.birthday(.missingBirthday)))
 
-struct ContactSourceSectionTitle: View {
-    let title: String
-
-    var body: some View {
-        Text(title)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 8)
-            .padding(.top, 10)
-            .padding(.bottom, 6)
-    }
-}
-
-struct ContactCollectionRow: View {
-    @Environment(RosterAppModel.self) private var model
-    @Environment(\.colorScheme) private var colorScheme
-    @State private var isDropTargeted = false
-    let collection: ContactCollectionSummary
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                collectionIcon
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 18, height: 18)
-                    .background(iconColor, in: RoundedRectangle(cornerRadius: 5))
-
-                Text(collection.title)
-                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-                    .lineLimit(1)
-
-                Spacer(minLength: 0)
-
-                Text("\(collection.contactCount)")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(isSelected ? .white.opacity(0.78) : .secondary)
+                Button(model.l10n(.missingField)) {
+                    model.addContactFilter(.missingField(.email))
+                }
+                .disabled(hasFilter(.missingField(.email)))
+            } label: {
+                Label(model.l10n(.addCondition), systemImage: "plus")
+                    .frame(maxWidth: .infinity)
             }
-            .foregroundStyle(isSelected ? .white : .primary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                rowBackground,
-                in: RoundedRectangle(cornerRadius: 7)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 7)
-                    .strokeBorder(isDropTargeted ? ContactsNativeStyle.accent.opacity(0.75) : Color.clear, lineWidth: 1.2)
-            )
-            .contentShape(Rectangle())
+            .menuStyle(.borderlessButton)
+            .buttonStyle(.bordered)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(collection.title)
-        .accessibilityIdentifier("contact-group-drop-\(collection.id)")
-        .e2eFrame(identifier: "contact-group-drop-\(collection.id)")
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .onDrop(of: [UTType.rosterContactAssignmentPayload, .legacyContactAssignmentPayload], isTargeted: $isDropTargeted) { providers in
-            guard acceptsDrop, let groupID else { return false }
-            return model.assignDroppedContacts(from: providers, toGroupID: groupID)
+        .padding(14)
+        .frame(width: 320)
+    }
+
+    private func hasFilter(_ filter: ContactFilterCondition) -> Bool {
+        model.contactFilters.contains { $0.id == filter.id }
+    }
+}
+
+private struct ContactFilterConditionRow: View {
+    @Environment(RosterAppModel.self) private var model
+    let filter: ContactFilterCondition
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(kindTitle)
+                .font(.system(size: 12.5, weight: .medium))
+                .lineLimit(1)
+                .frame(width: 78, alignment: .leading)
+
+            valuePicker
+
+            Spacer(minLength: 0)
+
+            Button {
+                model.removeContactFilter(filter)
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(model.l10n(.clearFilters))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 7))
+    }
+
+    @ViewBuilder
+    private var valuePicker: some View {
+        switch filter {
+        case let .birthday(value):
+            Picker("", selection: birthdayBinding(value)) {
+                ForEach(ContactBirthdayFilter.allCases) { option in
+                    Text(birthdayTitle(option)).tag(option)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+        case let .missingField(value):
+            Picker("", selection: missingFieldBinding(value)) {
+                ForEach(ContactMissingField.allCases) { option in
+                    Text(missingFieldTitle(option)).tag(option)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
         }
     }
 
-    private var collectionIcon: Image {
-        switch collection.kind {
-        case .all: Image(systemName: "person.2.fill")
-        case .container: Image(systemName: "tray.full.fill")
-        case .group: Image(systemName: "folder.fill")
-        case .ungrouped: Image(systemName: "person.crop.circle.badge.questionmark")
-        case .tag: Image(systemName: "tag.fill")
-        case .untagged: Image(systemName: "tag.slash.fill")
+    private var kindTitle: String {
+        switch filter {
+        case .birthday: model.l10n(.birthdayStatus)
+        case .missingField: model.l10n(.missingField)
         }
     }
 
-    private var iconColor: Color {
-        switch collection.kind {
-        case .all: ContactsNativeStyle.accent
-        case .container: Color(hex: 0x8E8E93)
-        case .group: Color(hex: 0xFF9500)
-        case .ungrouped: Color(hex: 0x8E8E93)
-        case .tag: Color(hex: 0x5856D6)
-        case .untagged: Color(hex: 0x8E8E93)
+    private func birthdayBinding(_ value: ContactBirthdayFilter) -> Binding<ContactBirthdayFilter> {
+        Binding(
+            get: { value },
+            set: { model.updateContactFilter(.birthday($0)) }
+        )
+    }
+
+    private func missingFieldBinding(_ value: ContactMissingField) -> Binding<ContactMissingField> {
+        Binding(
+            get: { value },
+            set: { model.updateContactFilter(.missingField($0)) }
+        )
+    }
+
+    private func birthdayTitle(_ value: ContactBirthdayFilter) -> String {
+        switch value {
+        case .hasBirthday: model.l10n(.hasBirthday)
+        case .missingBirthday: model.l10n(.missingBirthday)
+        case .upcomingBirthday: model.l10n(.upcomingBirthday)
         }
     }
 
-    private var rowBackground: Color {
-        if isDropTargeted {
-            return ContactsNativeStyle.accent.opacity(colorScheme == .dark ? 0.28 : 0.15)
+    private func missingFieldTitle(_ value: ContactMissingField) -> String {
+        switch value {
+        case .phone: model.l10n(.missingPhone)
+        case .email: model.l10n(.missingEmail)
+        case .organization: model.l10n(.missingOrganization)
         }
-        if acceptsDrop && model.isShowingContactAssignmentTargets {
-            return ContactsNativeStyle.accent.opacity(colorScheme == .dark ? 0.14 : 0.08)
-        }
-        return isSelected ? ContactsNativeStyle.accent : ContactsNativeStyle.sourceRowHover(colorScheme)
     }
-
-    private var acceptsDrop: Bool {
-        collection.kind == .group
-    }
-
-    private var groupID: String? {
-        let prefix = "group:"
-        guard collection.id.hasPrefix(prefix) else { return nil }
-        return String(collection.id.dropFirst(prefix.count))
-    }
-
 }
 
 // MARK: - Contact list
@@ -1162,7 +1106,15 @@ struct ContactRosterEditor: View {
 
     private var hero: some View {
         VStack(spacing: 10) {
-            ContactAvatarImageView(name: profile.displayName, imageData: profile.imageData, color: heroColor, size: 96)
+            Button {
+                chooseAndQueueAvatarImage()
+            } label: {
+                ContactAvatarImageView(name: profile.displayName, imageData: profile.imageData, color: heroColor, size: 96)
+            }
+            .buttonStyle(.plain)
+            .help(model.l10n(.chooseImage))
+            .accessibilityLabel(model.l10n(.chooseImage))
+
             VStack(spacing: 3) {
                 Text(isEditing ? model.l10n(.editContact) : profile.displayName)
                     .font(.system(size: 24, weight: .bold))
@@ -1173,6 +1125,10 @@ struct ContactRosterEditor: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
+            }
+
+            if !isEditing {
+                ContactQuickActionBar(profile: profile)
             }
         }
         .frame(maxWidth: .infinity)
@@ -1240,12 +1196,6 @@ struct ContactRosterEditor: View {
                         }
                         RosterRecordSummaryRow(record: record)
                     }
-                }
-
-                NativeDivider()
-                NativeInfoRow(label: model.l10n(.group)) {
-                    Text(groupText)
-                        .foregroundStyle(groupText == model.l10n(.notFilled) ? .tertiary : .primary)
                 }
 
                 NativeDivider()
@@ -1325,11 +1275,15 @@ struct ContactRosterEditor: View {
     private var contactNameRows: some View {
         NativeInfoRow(label: model.l10n(.avatar)) {
             HStack(spacing: 10) {
-                ContactAvatarImageView(name: draft.displayNamePreview, imageData: draft.imageData, color: heroColor, size: 36)
-                Button(model.l10n(.chooseImage)) {
+                Button {
                     chooseAvatarImage()
+                } label: {
+                    ContactAvatarImageView(name: draft.displayNamePreview, imageData: draft.imageData, color: heroColor, size: 36)
                 }
-                .buttonStyle(KimiActionButtonStyle(kind: .regular))
+                .buttonStyle(.plain)
+                .help(model.l10n(.chooseImage))
+                .accessibilityLabel(model.l10n(.chooseImage))
+
                 Spacer(minLength: 0)
             }
         }
@@ -1532,15 +1486,103 @@ struct ContactRosterEditor: View {
     }
 
     private func chooseAvatarImage() {
+        guard let data = selectedAvatarImageData() else { return }
+        draft.imageData = data
+    }
+
+    private func chooseAndQueueAvatarImage() {
+        guard let data = selectedAvatarImageData() else { return }
+        var avatarDraft = RosterEditDraft(profile: profile)
+        avatarDraft.imageData = data
+        Task { await model.save(contactID: profile.id, draft: avatarDraft) }
+    }
+
+    private func selectedAvatarImageData() -> Data? {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.image]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         guard panel.runModal() == .OK,
-              let url = panel.url,
-              let data = try? Data(contentsOf: url)
-        else { return }
-        draft.imageData = data
+              let url = panel.url
+        else { return nil }
+        return try? Data(contentsOf: url)
+    }
+}
+
+private struct ContactQuickActionBar: View {
+    @Environment(RosterAppModel.self) private var model
+    let profile: ContactRosterProfile
+
+    var body: some View {
+        HStack(spacing: 14) {
+            ContactQuickActionButton(
+                action: .message,
+                title: model.l10n(.message),
+                systemImage: "message.fill",
+                profile: profile
+            )
+            ContactQuickActionButton(
+                action: .call,
+                title: model.l10n(.phone),
+                systemImage: "phone.fill",
+                profile: profile
+            )
+            ContactQuickActionButton(
+                action: .video,
+                title: model.l10n(.videoCall),
+                systemImage: "video.fill",
+                profile: profile
+            )
+            ContactQuickActionButton(
+                action: .email,
+                title: model.l10n(.email),
+                systemImage: "envelope.fill",
+                profile: profile
+            )
+        }
+        .padding(.top, 2)
+    }
+}
+
+private struct ContactQuickActionButton: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let action: ContactQuickAction
+    let title: String
+    let systemImage: String
+    let profile: ContactRosterProfile
+
+    var body: some View {
+        Button {
+            if let url {
+                NSWorkspace.shared.open(url)
+            }
+        } label: {
+            Image(systemName: systemImage)
+                .font(.system(size: 14, weight: .semibold))
+                .frame(width: 34, height: 34)
+                .foregroundStyle(url == nil ? .secondary.opacity(0.55) : ContactsNativeStyle.accent)
+                .background(buttonBackground, in: Circle())
+                .overlay(
+                    Circle()
+                        .strokeBorder(ContactsNativeStyle.separator(colorScheme), lineWidth: 0.5)
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(url == nil)
+        .help(title)
+        .accessibilityLabel(title)
+    }
+
+    private var url: URL? {
+        ContactActionURLFactory.url(
+            for: action,
+            phoneNumbers: profile.phoneNumbers,
+            emailAddresses: profile.emailAddresses
+        )
+    }
+
+    private var buttonBackground: Color {
+        colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.82)
     }
 }
 
@@ -1572,8 +1614,6 @@ struct RosterRecordSummaryRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            StaticKindBadge(kind: record.kind, title: shortKindName(record.kind, model: model))
-
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(model.formatter.calendarName(record.kind, locale: model.language.coreLocale))

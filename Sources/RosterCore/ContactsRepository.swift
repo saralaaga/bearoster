@@ -14,12 +14,14 @@ public enum ContactsRepositoryError: LocalizedError, Sendable {
     case permissionDenied
     case invalidNonGregorianCalendar
     case invalidDateComponents
+    case invalidGroupName
 
     public var errorDescription: String? {
         switch self {
         case .permissionDenied: "Contacts permission is not granted."
         case .invalidNonGregorianCalendar: "Contacts only supports Chinese, Hebrew, or Islamic alternate birthdays."
         case .invalidDateComponents: "Roster dates need at least a valid month and day."
+        case .invalidGroupName: "Contact group name cannot be empty."
         }
     }
 }
@@ -123,6 +125,57 @@ public final class ContactsRepository: @unchecked Sendable {
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
                     try Self.addContactsSync(store: store, contactIDs: contactIDs, toGroupID: groupID)
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    public func moveContacts(
+        contactIDsToAdd: [String],
+        toGroupID groupID: String,
+        contactIDsByGroupIDToRemove: [String: [String]]
+    ) async throws {
+        let store = store
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    try Self.moveContactsSync(
+                        store: store,
+                        contactIDsToAdd: contactIDsToAdd,
+                        toGroupID: groupID,
+                        contactIDsByGroupIDToRemove: contactIDsByGroupIDToRemove
+                    )
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    public func createGroup(named name: String, inContainerID containerID: String) async throws {
+        let store = store
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    try Self.createGroupSync(store: store, name: name, containerID: containerID)
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    public func deleteGroup(groupID: String) async throws {
+        let store = store
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    try Self.deleteGroupSync(store: store, groupID: groupID)
                     continuation.resume()
                 } catch {
                     continuation.resume(throwing: error)
@@ -270,13 +323,73 @@ public final class ContactsRepository: @unchecked Sendable {
 
         let saveRequest = CNSaveRequest()
         for contactID in contactIDs {
-            let contact = try store.unifiedContact(
-                withIdentifier: contactID,
-                keysToFetch: [CNContactIdentifierKey as CNKeyDescriptor]
-            )
-            saveRequest.addMember(contact, to: group)
+            saveRequest.addMember(try contact(store: store, id: contactID), to: group)
         }
         try store.execute(saveRequest)
+    }
+
+    private static func moveContactsSync(
+        store: CNContactStore,
+        contactIDsToAdd: [String],
+        toGroupID groupID: String,
+        contactIDsByGroupIDToRemove: [String: [String]]
+    ) throws {
+        guard canReadContacts else {
+            throw ContactsRepositoryError.permissionDenied
+        }
+        guard !contactIDsToAdd.isEmpty || !contactIDsByGroupIDToRemove.isEmpty else { return }
+
+        let groupIDs = Array(Set(contactIDsByGroupIDToRemove.keys).union([groupID]))
+        let groups = try store.groups(matching: CNGroup.predicateForGroups(withIdentifiers: groupIDs))
+        let groupsByID = Dictionary(uniqueKeysWithValues: groups.map { ($0.identifier, $0) })
+        guard let targetGroup = groupsByID[groupID] else { return }
+
+        let saveRequest = CNSaveRequest()
+        for (sourceGroupID, contactIDs) in contactIDsByGroupIDToRemove {
+            guard let sourceGroup = groupsByID[sourceGroupID] else { continue }
+            for contactID in contactIDs {
+                saveRequest.removeMember(try contact(store: store, id: contactID), from: sourceGroup)
+            }
+        }
+        for contactID in contactIDsToAdd {
+            saveRequest.addMember(try contact(store: store, id: contactID), to: targetGroup)
+        }
+        try store.execute(saveRequest)
+    }
+
+    private static func createGroupSync(store: CNContactStore, name: String, containerID: String) throws {
+        guard canReadContacts else {
+            throw ContactsRepositoryError.permissionDenied
+        }
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else {
+            throw ContactsRepositoryError.invalidGroupName
+        }
+
+        let group = CNMutableGroup()
+        group.name = trimmedName
+        let saveRequest = CNSaveRequest()
+        saveRequest.add(group, toContainerWithIdentifier: containerID)
+        try store.execute(saveRequest)
+    }
+
+    private static func deleteGroupSync(store: CNContactStore, groupID: String) throws {
+        guard canReadContacts else {
+            throw ContactsRepositoryError.permissionDenied
+        }
+        let groups = try store.groups(matching: CNGroup.predicateForGroups(withIdentifiers: [groupID]))
+        guard let mutableGroup = groups.first?.mutableCopy() as? CNMutableGroup else { return }
+
+        let saveRequest = CNSaveRequest()
+        saveRequest.delete(mutableGroup)
+        try store.execute(saveRequest)
+    }
+
+    private static func contact(store: CNContactStore, id contactID: String) throws -> CNContact {
+        try store.unifiedContact(
+            withIdentifier: contactID,
+            keysToFetch: [CNContactIdentifierKey as CNKeyDescriptor]
+        )
     }
 
     private static func validate(_ components: DateComponents) throws {
@@ -333,7 +446,7 @@ public final class ContactsRepository: @unchecked Sendable {
             phoneNumbers: contact.phoneNumbers.map { $0.value.stringValue },
             emailAddresses: contact.emailAddresses.map { String($0.value) },
             postalAddresses: contact.postalAddresses.map { CNPostalAddressFormatter.string(from: $0.value, style: .mailingAddress) },
-            imageData: fieldAccessLevel == .extended ? contact.imageData : nil
+            imageData: contact.imageData
         )
     }
 
@@ -355,7 +468,8 @@ public final class ContactsRepository: @unchecked Sendable {
             CNContactEmailAddressesKey as CNKeyDescriptor,
             CNContactPostalAddressesKey as CNKeyDescriptor,
             CNContactBirthdayKey as CNKeyDescriptor,
-            CNContactNonGregorianBirthdayKey as CNKeyDescriptor
+            CNContactNonGregorianBirthdayKey as CNKeyDescriptor,
+            CNContactImageDataKey as CNKeyDescriptor
         ]
 
         if fieldAccessLevel == .extended {
@@ -364,8 +478,7 @@ public final class ContactsRepository: @unchecked Sendable {
                 CNContactSocialProfilesKey as CNKeyDescriptor,
                 CNContactInstantMessageAddressesKey as CNKeyDescriptor,
                 CNContactRelationsKey as CNKeyDescriptor,
-                CNContactDatesKey as CNKeyDescriptor,
-                CNContactImageDataKey as CNKeyDescriptor
+                CNContactDatesKey as CNKeyDescriptor
             ]
         }
 

@@ -29,6 +29,41 @@ struct ContactCollectionSectionModel: Identifiable, Hashable, Sendable {
     let collections: [ContactCollectionSummary]
 }
 
+enum ContactFilterMatchMode: String, CaseIterable, Hashable, Identifiable, Sendable {
+    case all
+    case any
+
+    var id: String { rawValue }
+}
+
+enum ContactBirthdayFilter: String, CaseIterable, Hashable, Identifiable, Sendable {
+    case hasBirthday
+    case missingBirthday
+    case upcomingBirthday
+
+    var id: String { rawValue }
+}
+
+enum ContactMissingField: String, CaseIterable, Hashable, Identifiable, Sendable {
+    case phone
+    case email
+    case organization
+
+    var id: String { rawValue }
+}
+
+enum ContactFilterCondition: Hashable, Identifiable, Sendable {
+    case birthday(ContactBirthdayFilter)
+    case missingField(ContactMissingField)
+
+    var id: String {
+        switch self {
+        case .birthday: "birthday"
+        case .missingField: "missingField"
+        }
+    }
+}
+
 struct ContactListProjectionSnapshot: Hashable, Sendable {
     let collectionSections: [ContactCollectionSectionModel]
     let contactSections: [ContactListSectionModel]
@@ -44,6 +79,8 @@ struct ContactListProjectionRequest: Hashable, Sendable {
     var selectedCollectionID: String
     var selectedTagFilter: ContactTagFilter?
     var searchText: String
+    var contactFilters: [ContactFilterCondition]
+    var contactFilterMatchMode: ContactFilterMatchMode
     var language: AppLanguage
     var noRostersText: String
     var todayText: String
@@ -58,6 +95,8 @@ struct ContactListProjectionRequest: Hashable, Sendable {
         selectedCollectionID: String,
         selectedTagFilter: ContactTagFilter? = nil,
         searchText: String,
+        contactFilters: [ContactFilterCondition] = [],
+        contactFilterMatchMode: ContactFilterMatchMode = .all,
         language: AppLanguage,
         noRostersText: String,
         todayText: String,
@@ -71,6 +110,8 @@ struct ContactListProjectionRequest: Hashable, Sendable {
         self.selectedCollectionID = selectedCollectionID
         self.selectedTagFilter = selectedTagFilter
         self.searchText = searchText
+        self.contactFilters = contactFilters
+        self.contactFilterMatchMode = contactFilterMatchMode
         self.language = language
         self.noRostersText = noRostersText
         self.todayText = todayText
@@ -101,6 +142,8 @@ actor ContactListProjectionWorker {
             selectedCollectionID: request.selectedCollectionID,
             selectedTagFilter: request.selectedTagFilter,
             searchText: request.searchText,
+            contactFilters: request.contactFilters,
+            contactFilterMatchMode: request.contactFilterMatchMode,
             language: request.language,
             noRostersText: request.noRostersText,
             todayText: request.todayText,
@@ -132,6 +175,8 @@ struct ContactListProjectionService: Sendable {
         selectedCollectionID: String,
         selectedTagFilter: ContactTagFilter? = nil,
         searchText: String,
+        contactFilters: [ContactFilterCondition] = [],
+        contactFilterMatchMode: ContactFilterMatchMode = .all,
         language: AppLanguage,
         noRostersText: String,
         todayText: String,
@@ -150,6 +195,16 @@ struct ContactListProjectionService: Sendable {
         let tagsByID = Dictionary(uniqueKeysWithValues: contactTags.map { ($0.id, $0) })
         let unsortedRows = profiles
             .filter { visibleIDs.contains($0.id) }
+            .filter {
+                matchesContactFilters(
+                    $0,
+                    filters: contactFilters,
+                    matchMode: contactFilterMatchMode,
+                    contactTags: contactTags,
+                    tagIDsByContactID: tagIDsByContactID,
+                    upcomingOccurrencesByContactID: upcomingOccurrencesByContactID
+                )
+            }
             .filter {
                 searchText.isEmpty ||
                     $0.displayName.localizedCaseInsensitiveContains(searchText) ||
@@ -202,6 +257,62 @@ struct ContactListProjectionService: Sendable {
             contactSections: sections,
             visibleContactCount: rows.count
         )
+    }
+
+    private func matchesContactFilters(
+        _ profile: ContactRosterProfile,
+        filters: [ContactFilterCondition],
+        matchMode: ContactFilterMatchMode,
+        contactTags: [ContactTag],
+        tagIDsByContactID: [String: Set<String>],
+        upcomingOccurrencesByContactID: [String: RosterOccurrence]
+    ) -> Bool {
+        guard !filters.isEmpty else { return true }
+        switch matchMode {
+        case .all:
+            return filters.allSatisfy {
+                matchesContactFilter(
+                    $0,
+                    profile: profile,
+                    contactTags: contactTags,
+                    tagIDsByContactID: tagIDsByContactID,
+                    upcomingOccurrencesByContactID: upcomingOccurrencesByContactID
+                )
+            }
+        case .any:
+            return filters.contains {
+                matchesContactFilter(
+                    $0,
+                    profile: profile,
+                    contactTags: contactTags,
+                    tagIDsByContactID: tagIDsByContactID,
+                    upcomingOccurrencesByContactID: upcomingOccurrencesByContactID
+                )
+            }
+        }
+    }
+
+    private func matchesContactFilter(
+        _ filter: ContactFilterCondition,
+        profile: ContactRosterProfile,
+        contactTags: [ContactTag],
+        tagIDsByContactID: [String: Set<String>],
+        upcomingOccurrencesByContactID: [String: RosterOccurrence]
+    ) -> Bool {
+        switch filter {
+        case let .birthday(filter):
+            switch filter {
+            case .hasBirthday: return !profile.records.isEmpty
+            case .missingBirthday: return profile.records.isEmpty
+            case .upcomingBirthday: return upcomingOccurrencesByContactID[profile.id] != nil
+            }
+        case let .missingField(field):
+            switch field {
+            case .phone: return profile.phoneNumbers.isEmpty
+            case .email: return profile.emailAddresses.isEmpty
+            case .organization: return profile.organizationName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }
+        }
     }
 
     private func visibleContactIDs(

@@ -15,6 +15,8 @@ enum ContactOperationKind: String, Codable, Sendable {
     case update
     case delete
     case restore
+    case createGroup
+    case deleteGroup
 }
 
 enum ContactOperationStatus: String, Codable, Sendable {
@@ -159,6 +161,12 @@ struct LocalContactDraft: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
+struct ContactGroupOperationPayload: Codable, Hashable, Sendable {
+    var containerID: String?
+    var groupID: String?
+    var name: String
+}
+
 struct ContactOperationLog: Codable, Identifiable, Hashable, Sendable {
     var id: String
     var contactID: String
@@ -169,6 +177,7 @@ struct ContactOperationLog: Codable, Identifiable, Hashable, Sendable {
     var summary: String
     var fieldChanges: [ContactFieldChange]
     var draft: LocalContactDraft?
+    var contactGroup: ContactGroupOperationPayload?
     var errorMessage: String?
     var createdAt: Date
     var updatedAt: Date
@@ -183,6 +192,7 @@ struct ContactOperationLog: Codable, Identifiable, Hashable, Sendable {
         summary: String,
         fieldChanges: [ContactFieldChange] = [],
         draft: LocalContactDraft? = nil,
+        contactGroup: ContactGroupOperationPayload? = nil,
         errorMessage: String? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
@@ -196,6 +206,7 @@ struct ContactOperationLog: Codable, Identifiable, Hashable, Sendable {
         self.summary = summary
         self.fieldChanges = fieldChanges
         self.draft = draft
+        self.contactGroup = contactGroup
         self.errorMessage = errorMessage
         self.createdAt = createdAt
         self.updatedAt = updatedAt

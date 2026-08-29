@@ -1,6 +1,7 @@
 import RosterCore
 import Foundation
 import Testing
+import UniformTypeIdentifiers
 @testable import RosterApp
 
 @Suite("Contact architecture")
@@ -150,6 +151,51 @@ struct RosterAppTests {
         #expect(loaded.draftsByContactID["ada"]?.profile.records.first?.month == 8)
         #expect(loaded.operations.map(\.id) == ["op-1"])
         #expect(loaded.operations.first?.status == .pending)
+    }
+
+    @Test("Contact operation journal persists group operations")
+    func contactOperationJournalPersistsGroupOperations() async {
+        let databaseURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("sqlite3")
+        let store = ContactOperationJournalStore(databaseURL: databaseURL)
+        let operation = ContactOperationLog(
+            id: "group-op-1",
+            contactID: ContactCollectionIdentifier.container("icloud"),
+            appleContactID: nil,
+            displayName: "Family",
+            kind: .createGroup,
+            summary: "Create contact group Family",
+            contactGroup: ContactGroupOperationPayload(containerID: "icloud", groupID: nil, name: "Family")
+        )
+
+        await store.appendOperation(operation)
+        let loaded = await store.load()
+
+        #expect(loaded.operations.first?.kind == .createGroup)
+        #expect(loaded.operations.first?.contactGroup?.containerID == "icloud")
+        #expect(loaded.operations.first?.contactGroup?.name == "Family")
+    }
+
+    @Test("Contact collection identifiers expose safe raw Apple IDs")
+    func contactCollectionIdentifiersExposeSafeRawAppleIDs() {
+        #expect(ContactCollectionIdentifier.groupID(from: ContactCollectionIdentifier.group("friends")) == "friends")
+        #expect(ContactCollectionIdentifier.groupID(from: ContactCollectionIdentifier.container("icloud")) == nil)
+        #expect(ContactCollectionIdentifier.containerID(from: ContactCollectionIdentifier.container("icloud")) == "icloud")
+        #expect(ContactCollectionIdentifier.containerID(from: ContactCollectionIdentifier.group("friends")) == nil)
+    }
+
+    @Test("Selecting a contact collection switches to contacts")
+    @MainActor
+    func selectingContactCollectionSwitchesToContacts() {
+        let model = RosterAppModel()
+        let collectionID = ContactCollectionIdentifier.group("friends")
+
+        model.selection = .calendar
+        model.selectContactCollection(collectionID)
+
+        #expect(model.selection == .contacts)
+        #expect(model.selectedContactCollectionID == collectionID)
     }
 
     @Test("Selected contact collection filters projected rows locally")
@@ -543,6 +589,110 @@ struct RosterAppTests {
         #expect(Set(snapshot.contactSections.flatMap { $0.rows.map(\.id) }) == ["a", "b"])
     }
 
+    @Test("Contact filter condition IDs are stable by condition kind")
+    func contactFilterConditionIDsAreStableByConditionKind() {
+        #expect(ContactFilterCondition.birthday(.hasBirthday).id == ContactFilterCondition.birthday(.missingBirthday).id)
+        #expect(ContactFilterCondition.missingField(.phone).id == ContactFilterCondition.missingField(.email).id)
+    }
+
+    @Test("Contact projection applies all contact filter conditions")
+    func contactProjectionAppliesAllContactFilterConditions() {
+        let birthday = RosterRecord(
+            id: "ada-birthday",
+            contactID: "a",
+            contactName: "Ada",
+            organizationName: "",
+            kind: .gregorian,
+            components: DateComponents(calendar: Calendar(identifier: .gregorian), year: 1990, month: 8, day: 10)
+        )
+        let profiles = [
+            ContactRosterProfile(id: "a", displayName: "Ada", organizationName: "", records: [birthday], emailAddresses: []),
+            ContactRosterProfile(id: "b", displayName: "Grace", organizationName: "", records: [], emailAddresses: []),
+            ContactRosterProfile(id: "c", displayName: "Linus", organizationName: "", records: [], emailAddresses: ["linus@example.com"])
+        ]
+        let grouping = ContactGroupingSnapshot(
+            collections: [ContactCollectionSummary(id: ContactCollectionIdentifier.all, title: "All Contacts", kind: .all, parentContainerID: nil, contactCount: 3)],
+            contactIDsByCollectionID: [ContactCollectionIdentifier.all: Set(profiles.map(\.id))]
+        )
+
+        let snapshot = ContactListProjectionService().snapshot(
+            profiles: profiles,
+            grouping: grouping,
+            selectedCollectionID: ContactCollectionIdentifier.all,
+            searchText: "",
+            contactFilters: [.birthday(.missingBirthday), .missingField(.email)],
+            contactFilterMatchMode: .all,
+            language: .en,
+            noRostersText: "No birthdays",
+            todayText: "Today"
+        )
+
+        #expect(snapshot.visibleContactCount == 1)
+        #expect(snapshot.contactSections.flatMap { $0.rows.map(\.id) } == ["b"])
+    }
+
+    @Test("Contact projection applies any contact filter condition")
+    func contactProjectionAppliesAnyContactFilterCondition() {
+        let birthday = RosterRecord(
+            id: "ada-birthday",
+            contactID: "a",
+            contactName: "Ada",
+            organizationName: "",
+            kind: .gregorian,
+            components: DateComponents(calendar: Calendar(identifier: .gregorian), year: 1990, month: 8, day: 10)
+        )
+        let profiles = [
+            ContactRosterProfile(id: "a", displayName: "Ada", organizationName: "", records: [birthday], emailAddresses: []),
+            ContactRosterProfile(id: "b", displayName: "Grace", organizationName: "", records: [], emailAddresses: []),
+            ContactRosterProfile(id: "c", displayName: "Linus", organizationName: "", records: [], emailAddresses: ["linus@example.com"])
+        ]
+        let grouping = ContactGroupingSnapshot(
+            collections: [ContactCollectionSummary(id: ContactCollectionIdentifier.all, title: "All Contacts", kind: .all, parentContainerID: nil, contactCount: 3)],
+            contactIDsByCollectionID: [ContactCollectionIdentifier.all: Set(profiles.map(\.id))]
+        )
+
+        let snapshot = ContactListProjectionService().snapshot(
+            profiles: profiles,
+            grouping: grouping,
+            selectedCollectionID: ContactCollectionIdentifier.all,
+            searchText: "",
+            contactFilters: [.birthday(.missingBirthday), .missingField(.email)],
+            contactFilterMatchMode: .any,
+            language: .en,
+            noRostersText: "No birthdays",
+            todayText: "Today"
+        )
+
+        #expect(snapshot.visibleContactCount == 3)
+        #expect(Set(snapshot.contactSections.flatMap { $0.rows.map(\.id) }) == ["a", "b", "c"])
+    }
+
+    @Test("Group drop move plan removes previous groups in the same container")
+    func groupDropMovePlanRemovesPreviousGroupsInSameContainer() {
+        let grouping = ContactGroupingSnapshot(
+            groups: [
+                ContactGroupSummary(id: "friends", containerID: "icloud", name: "Friends", contactCount: 1),
+                ContactGroupSummary(id: "work", containerID: "icloud", name: "Work", contactCount: 1),
+                ContactGroupSummary(id: "local", containerID: "local", name: "Local", contactCount: 1)
+            ],
+            contactIDsByCollectionID: [
+                ContactCollectionIdentifier.group("friends"): ["ada"],
+                ContactCollectionIdentifier.group("work"): [],
+                ContactCollectionIdentifier.group("local"): ["ada"]
+            ],
+            groupIDsByContactID: ["ada": ["friends", "local"]]
+        )
+
+        let plan = ContactAssignmentTargetResolver.groupMovePlan(
+            contactIDs: ["ada"],
+            targetGroupID: "work",
+            grouping: grouping
+        )
+
+        #expect(plan.contactIDsToAdd == ["ada"])
+        #expect(plan.contactIDsByGroupIDToRemove == ["friends": ["ada"]])
+    }
+
     @Test("Contact projection worker caches matching requests")
     func contactProjectionWorkerCachesMatchingRequests() async {
         let profiles = [
@@ -668,6 +818,38 @@ struct RosterAppTests {
             selectedContactIDs: selectedIDs,
             isSelectionMode: false
         ) == ["ada"])
+    }
+
+    @Test("Contact assignment drop accepts text fallback")
+    func contactAssignmentDropAcceptsTextFallback() {
+        #expect(UTType.contactAssignmentDropTypes.contains(.plainText))
+        #expect(UTType.contactAssignmentDropTypes.contains(.text))
+    }
+
+    @Test("Text fallback parses dragged contact IDs")
+    func textFallbackParsesDraggedContactIDs() {
+        #expect(ContactAssignmentTargetResolver.droppedContactIDs(fromText: "ada, grace") == ["ada", "grace"])
+    }
+
+    @Test("Contact action URLs carry current contact values")
+    func contactActionURLsCarryCurrentContactValues() {
+        #expect(ContactActionURLFactory.url(for: .message, phoneNumbers: ["+86 159-6565-9550"], emailAddresses: [])?.absoluteString == "sms:+8615965659550")
+        #expect(ContactActionURLFactory.url(for: .call, phoneNumbers: ["+86 159-6565-9550"], emailAddresses: [])?.absoluteString == "tel:+8615965659550")
+        #expect(ContactActionURLFactory.url(for: .video, phoneNumbers: [], emailAddresses: ["ada@example.com"])?.absoluteString == "facetime:ada@example.com")
+        #expect(ContactActionURLFactory.url(for: .email, phoneNumbers: [], emailAddresses: ["ada@example.com"])?.absoluteString == "mailto:ada@example.com")
+        #expect(ContactActionURLFactory.url(for: .email, phoneNumbers: ["159"], emailAddresses: []) == nil)
+    }
+
+    @Test("Tagged contact count ignores empty and hidden contacts")
+    func taggedContactCountIgnoresEmptyAndHiddenContacts() {
+        #expect(RosterAppModel.taggedContactCount(
+            assignmentsByContactID: [
+                "ada": ["family", "work"],
+                "grace": [],
+                "hidden": ["family"]
+            ],
+            visibleContactIDs: ["ada", "grace"]
+        ) == 1)
     }
 
     @Test("Group drop targets include only real groups in visible collection sections")

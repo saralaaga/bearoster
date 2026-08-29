@@ -107,6 +107,19 @@ public enum ContactCollectionIdentifier {
     public static func tag(_ id: String) -> String {
         "tag:\(id)"
     }
+
+    public static func groupID(from collectionID: String) -> String? {
+        rawID(from: collectionID, prefix: "group:")
+    }
+
+    public static func containerID(from collectionID: String) -> String? {
+        rawID(from: collectionID, prefix: "container:")
+    }
+
+    private static func rawID(from collectionID: String, prefix: String) -> String? {
+        guard collectionID.hasPrefix(prefix) else { return nil }
+        return String(collectionID.dropFirst(prefix.count))
+    }
 }
 
 public struct ContactTag: Codable, Identifiable, Hashable, Sendable {

@@ -59,4 +59,24 @@ actor ContactSyncService {
     func addContacts(contactIDs: [String], toGroupID groupID: String) async throws {
         try await repository.addContacts(contactIDs: contactIDs, toGroupID: groupID)
     }
+
+    func moveContacts(
+        contactIDsToAdd: [String],
+        toGroupID groupID: String,
+        contactIDsByGroupIDToRemove: [String: [String]]
+    ) async throws {
+        try await repository.moveContacts(
+            contactIDsToAdd: contactIDsToAdd,
+            toGroupID: groupID,
+            contactIDsByGroupIDToRemove: contactIDsByGroupIDToRemove
+        )
+    }
+
+    func createGroup(named name: String, inContainerID containerID: String) async throws {
+        try await repository.createGroup(named: name, inContainerID: containerID)
+    }
+
+    func deleteGroup(groupID: String) async throws {
+        try await repository.deleteGroup(groupID: groupID)
+    }
 }

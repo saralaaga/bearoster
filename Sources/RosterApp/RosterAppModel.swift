@@ -107,6 +107,20 @@ final class RosterAppModel {
             rebuildContactProjection(debounceNanoseconds: 180_000_000)
         }
     }
+    var contactFilters: [ContactFilterCondition] = [] {
+        didSet {
+            guard contactFilters != oldValue else { return }
+            guard selection == .contacts || selection == .tags else { return }
+            rebuildContactProjection()
+        }
+    }
+    var contactFilterMatchMode: ContactFilterMatchMode = .all {
+        didSet {
+            guard contactFilterMatchMode != oldValue else { return }
+            guard selection == .contacts || selection == .tags else { return }
+            rebuildContactProjection()
+        }
+    }
     var selectedDate = Date() {
         didSet { selectedDateOccurrences = cachedRecords(on: selectedDate) }
     }
@@ -567,8 +581,28 @@ final class RosterAppModel {
     /// 跳转到联系人页并聚焦指定联系人（生日条目点击跳转，见设计文档 §6.3）
     func focusContact(_ contactID: String) {
         contactSearchText = ""
+        contactFilters = []
         selectedContactID = contactID
         selection = .contacts
+    }
+
+    func addContactFilter(_ filter: ContactFilterCondition) {
+        guard !contactFilters.contains(where: { $0.id == filter.id }) else { return }
+        contactFilters.append(filter)
+    }
+
+    func updateContactFilter(_ filter: ContactFilterCondition) {
+        guard let index = contactFilters.firstIndex(where: { $0.id == filter.id }) else { return }
+        contactFilters[index] = filter
+    }
+
+    func removeContactFilter(_ filter: ContactFilterCondition) {
+        contactFilters.removeAll { $0.id == filter.id }
+    }
+
+    func clearContactFilters() {
+        contactFilters = []
+        contactFilterMatchMode = .all
     }
 
     func selectTagFilter(_ filter: ContactTagFilter) {
@@ -577,6 +611,53 @@ final class RosterAppModel {
             contactSearchText = ""
         }
         selection = .tags
+    }
+
+    func selectContactCollection(_ collectionID: String) {
+        selectedContactCollectionID = collectionID
+        selection = .contacts
+    }
+
+    func createContactGroup(named name: String, inContainerID containerID: String) async {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return }
+        let operation = ContactOperationLog(
+            contactID: ContactCollectionIdentifier.container(containerID),
+            appleContactID: nil,
+            displayName: trimmedName,
+            kind: .createGroup,
+            summary: contactGroupCreateSummary(groupName: trimmedName),
+            contactGroup: ContactGroupOperationPayload(containerID: containerID, groupID: nil, name: trimmedName)
+        )
+        await queueGroupOperation(operation)
+    }
+
+    func deleteContactGroup(collectionID: String) async {
+        guard let groupID = ContactCollectionIdentifier.groupID(from: collectionID) else { return }
+        await deleteContactGroup(groupID: groupID)
+    }
+
+    func deleteContactGroup(groupID: String) async {
+        let groupName = contactGrouping.groups.first(where: { $0.id == groupID })?.name ?? l10n(.group)
+        let operation = ContactOperationLog(
+            contactID: ContactCollectionIdentifier.group(groupID),
+            appleContactID: groupID,
+            displayName: groupName,
+            kind: .deleteGroup,
+            summary: contactGroupDeleteSummary(groupName: groupName),
+            contactGroup: ContactGroupOperationPayload(containerID: nil, groupID: groupID, name: groupName)
+        )
+        await queueGroupOperation(operation)
+    }
+
+    private func queueGroupOperation(_ operation: ContactOperationLog) async {
+        contactOperationLog.insert(operation, at: 0)
+        await contactJournalStore.appendOperation(operation)
+        if contactWritePolicy == .automatic {
+            await writeBack(operation)
+        } else {
+            toast(contactQueuedText(count: 1))
+        }
     }
 
     func toggleTagExpansion(_ tagID: String) {
@@ -616,6 +697,8 @@ final class RosterAppModel {
             selectedCollectionID: selectedContactCollectionID,
             selectedTagFilter: selection == .tags ? selectedTagsFilter : nil,
             searchText: contactSearchText,
+            contactFilters: contactFilters,
+            contactFilterMatchMode: contactFilterMatchMode,
             language: language,
             noRostersText: l10n(.noRosters),
             todayText: l10n(.today),
@@ -881,6 +964,22 @@ final class RosterAppModel {
 
     func tagAndDescendantIDs(for tagID: String) -> Set<String> {
         contactTagTree.tagAndDescendantIDs(for: tagID)
+    }
+
+    var taggedContactCount: Int {
+        Self.taggedContactCount(
+            assignmentsByContactID: contactTagAssignmentsByContactID,
+            visibleContactIDs: Set(profiles.map(\.id))
+        )
+    }
+
+    nonisolated static func taggedContactCount(
+        assignmentsByContactID: [String: Set<String>],
+        visibleContactIDs: Set<String>
+    ) -> Int {
+        assignmentsByContactID.filter { contactID, tagIDs in
+            visibleContactIDs.contains(contactID) && !tagIDs.isEmpty
+        }.count
     }
 
     func contactCount(for filter: ContactTagFilter) -> Int {
@@ -1349,14 +1448,14 @@ final class RosterAppModel {
 
     private func writeBack(_ operation: ContactOperationLog) async {
         guard operation.status == .pending else { return }
-        guard operation.appleContactID != nil else {
-            markOperation(operation, status: .failed, error: contactCreateUnsupportedText)
-            return
-        }
 
         do {
             switch operation.kind {
             case .update, .restore:
+                guard operation.appleContactID != nil else {
+                    markOperation(operation, status: .failed, error: contactCreateUnsupportedText)
+                    return
+                }
                 guard let draft = operation.draft else { return }
                 try await contactSyncService.saveContact(
                     contactID: operation.contactID,
@@ -1365,6 +1464,10 @@ final class RosterAppModel {
                 await contactJournalStore.deleteDraft(contactID: operation.contactID)
                 contactDraftsByID[operation.contactID] = nil
             case .delete:
+                guard operation.appleContactID != nil else {
+                    markOperation(operation, status: .failed, error: contactCreateUnsupportedText)
+                    return
+                }
                 try await contactSyncService.deleteContacts(contactIDs: [operation.contactID])
                 await localRosterStore.deleteLocalOnlySpecs(for: [operation.contactID])
                 await contactTagStore.deleteAssignments(for: [operation.contactID])
@@ -1373,6 +1476,17 @@ final class RosterAppModel {
             case .create:
                 markOperation(operation, status: .failed, error: contactCreateUnsupportedText)
                 return
+            case .createGroup:
+                guard let group = operation.contactGroup,
+                      let containerID = group.containerID
+                else { return }
+                try await contactSyncService.createGroup(named: group.name, inContainerID: containerID)
+            case .deleteGroup:
+                guard let groupID = operation.contactGroup?.groupID else { return }
+                if selectedContactCollectionID == ContactCollectionIdentifier.group(groupID) {
+                    selectedContactCollectionID = ContactCollectionIdentifier.all
+                }
+                try await contactSyncService.deleteGroup(groupID: groupID)
             }
 
             markOperation(operation, status: .applied, error: nil)
@@ -1380,7 +1494,9 @@ final class RosterAppModel {
             await refreshContacts()
         } catch {
             markOperation(operation, status: .failed, error: error.localizedDescription)
-            errorMessage = L10n(language: language)(.saveFailed)
+            errorMessage = groupOperationKinds.contains(operation.kind)
+                ? L10n(language: language)(.contactGroupEditFailed)
+                : L10n(language: language)(.saveFailed)
         }
     }
 
@@ -1505,9 +1621,10 @@ final class RosterAppModel {
     }
 
     func assignDroppedContacts(from providers: [NSItemProvider], toTagID tagID: String) -> Bool {
-        guard providers.contains(where: {
-            $0.hasItemConformingToTypeIdentifier(UTType.rosterContactAssignmentPayload.identifier)
-                || $0.hasItemConformingToTypeIdentifier(UTType.legacyContactAssignmentPayload.identifier)
+        guard providers.contains(where: { provider in
+            UTType.contactAssignmentDropTypes.contains {
+                provider.hasItemConformingToTypeIdentifier($0.identifier)
+            }
         }) else {
             return false
         }
@@ -1529,14 +1646,15 @@ final class RosterAppModel {
         clearContactAssignmentTargets()
         recordE2EEvent("group-drop group=\(groupID) contacts=\(contactIDs.sorted().joined(separator: ","))")
         Task {
-            await addContacts(contactIDs, toGroupID: groupID)
+            await moveContacts(contactIDs, toGroupID: groupID)
         }
     }
 
     func assignDroppedContacts(from providers: [NSItemProvider], toGroupID groupID: String) -> Bool {
-        guard providers.contains(where: {
-            $0.hasItemConformingToTypeIdentifier(UTType.rosterContactAssignmentPayload.identifier)
-                || $0.hasItemConformingToTypeIdentifier(UTType.legacyContactAssignmentPayload.identifier)
+        guard providers.contains(where: { provider in
+            UTType.contactAssignmentDropTypes.contains {
+                provider.hasItemConformingToTypeIdentifier($0.identifier)
+            }
         }) else {
             return false
         }
@@ -1546,7 +1664,7 @@ final class RosterAppModel {
             self.clearContactAssignmentTargets()
             self.recordE2EEvent("group-drop group=\(groupID) contacts=\(contactIDs.sorted().joined(separator: ","))")
             Task {
-                await self.addContacts(contactIDs, toGroupID: groupID)
+                await self.moveContacts(contactIDs, toGroupID: groupID)
             }
         }
         return true
@@ -1696,10 +1814,30 @@ final class RosterAppModel {
 
     private func groupAssignmentToast(groupName: String, count: Int) -> String {
         switch language.coreLocale {
-        case .english: "Added \(count) contacts to \(groupName)"
-        case .simplifiedChinese: "已将 \(count) 位联系人添加到\(groupName)"
-        case .traditionalChinese: "已將 \(count) 位聯絡人加入\(groupName)"
+        case .english: "Moved \(count) contacts to \(groupName)"
+        case .simplifiedChinese: "已将 \(count) 位联系人移动到\(groupName)"
+        case .traditionalChinese: "已將 \(count) 位聯絡人移至\(groupName)"
         }
+    }
+
+    private func contactGroupCreateSummary(groupName: String) -> String {
+        switch language.coreLocale {
+        case .english: "Create contact group \(groupName)"
+        case .simplifiedChinese: "新建通讯录分组\(groupName)"
+        case .traditionalChinese: "新增通訊錄分組\(groupName)"
+        }
+    }
+
+    private func contactGroupDeleteSummary(groupName: String) -> String {
+        switch language.coreLocale {
+        case .english: "Delete contact group \(groupName)"
+        case .simplifiedChinese: "删除通讯录分组\(groupName)"
+        case .traditionalChinese: "刪除通訊錄分組\(groupName)"
+        }
+    }
+
+    private var groupOperationKinds: Set<ContactOperationKind> {
+        [.createGroup, .deleteGroup]
     }
 
     private func contactQueuedText(count: Int) -> String {
@@ -1771,6 +1909,9 @@ final class RosterAppModel {
         appendChange(&changes, field: "phoneNumbers", previous: previous.phoneNumbers.joined(separator: ", "), next: next.phoneNumbers.joined(separator: ", "))
         appendChange(&changes, field: "emailAddresses", previous: previous.emailAddresses.joined(separator: ", "), next: next.emailAddresses.joined(separator: ", "))
         appendChange(&changes, field: "postalAddresses", previous: previous.postalAddresses.joined(separator: ", "), next: next.postalAddresses.joined(separator: ", "))
+        if previous.imageData != next.imageData {
+            changes.append(ContactFieldChange(field: "avatar", previousValue: previous.imageData == nil ? "empty" : "set", nextValue: next.imageData == nil ? "empty" : "set"))
+        }
         appendChange(
             &changes,
             field: "birthdays",
@@ -1856,10 +1997,19 @@ final class RosterAppModel {
         current = values
     }
 
-    private func addContacts(_ contactIDs: Set<String>, toGroupID groupID: String) async {
+    private func moveContacts(_ contactIDs: Set<String>, toGroupID groupID: String) async {
         do {
             let groupName = contactGrouping.groups.first(where: { $0.id == groupID })?.name ?? l10n(.group)
-            try await contactSyncService.addContacts(contactIDs: contactIDs.sorted(), toGroupID: groupID)
+            let plan = ContactAssignmentTargetResolver.groupMovePlan(
+                contactIDs: contactIDs,
+                targetGroupID: groupID,
+                grouping: contactGrouping
+            )
+            try await contactSyncService.moveContacts(
+                contactIDsToAdd: plan.contactIDsToAdd.sorted(),
+                toGroupID: groupID,
+                contactIDsByGroupIDToRemove: plan.contactIDsByGroupIDToRemove.mapValues { $0.sorted() }
+            )
             await refreshContacts()
             toast(groupAssignmentToast(groupName: groupName, count: contactIDs.count))
         } catch {

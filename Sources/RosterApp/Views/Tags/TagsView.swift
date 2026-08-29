@@ -1,6 +1,5 @@
 import RosterCore
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct TagsView: View {
     @Environment(RosterAppModel.self) private var model
@@ -47,7 +46,6 @@ struct TagsView: View {
             ZStack {
                 RosterTheme.pageBackground(colorScheme)
                 VStack(spacing: 0) {
-                    GroupDropRail()
                     if let selectedProfile {
                         ContactRosterEditor(profile: selectedProfile)
                             .id(selectedProfile.id)
@@ -92,80 +90,6 @@ struct TagsView: View {
     }
 }
 
-private struct GroupDropRail: View {
-    @Environment(RosterAppModel.self) private var model
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        let groups = model.visibleGroupDropCollections()
-
-        HStack(spacing: 8) {
-            Image(systemName: "folder.badge.person.crop")
-                .font(.system(size: 12, weight: .semibold))
-            Text(model.l10n(.appleGroups))
-                .font(.system(size: 12.5, weight: .medium))
-            Spacer(minLength: 8)
-            if groups.isEmpty {
-                Text(model.l10n(.noContactGroups))
-                    .font(.system(size: 11.5, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            } else {
-                ScrollView(.horizontal) {
-                    HStack(spacing: 8) {
-                        ForEach(groups) { group in
-                            GroupDropChip(group: group)
-                        }
-                    }
-                }
-                .scrollIndicators(.hidden)
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity)
-        .background(RosterTheme.windowBackground(colorScheme))
-        .overlay(alignment: .bottom) {
-            RosterTheme.separator(colorScheme)
-                .frame(height: 0.5)
-        }
-    }
-}
-
-private struct GroupDropChip: View {
-    @Environment(RosterAppModel.self) private var model
-    @Environment(\.colorScheme) private var colorScheme
-    @State private var isDropTargeted = false
-    let group: ContactCollectionSummary
-
-    var body: some View {
-        Text(group.title)
-            .font(.system(size: 11, weight: .semibold))
-            .lineLimit(1)
-            .frame(maxWidth: 140)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(chipBackground, in: Capsule())
-            .overlay(
-                Capsule()
-                    .strokeBorder(isDropTargeted ? ContactsNativeStyle.accent.opacity(0.72) : Color.clear, lineWidth: 1)
-            )
-            .onDrop(of: [UTType.rosterContactAssignmentPayload, .legacyContactAssignmentPayload], isTargeted: $isDropTargeted) { providers in
-                let prefix = "group:"
-                guard group.id.hasPrefix(prefix) else { return false }
-                let groupID = String(group.id.dropFirst(prefix.count))
-                return model.assignDroppedContacts(from: providers, toGroupID: groupID)
-            }
-    }
-
-    private var chipBackground: Color {
-        if isDropTargeted {
-            return ContactsNativeStyle.accent.opacity(colorScheme == .dark ? 0.28 : 0.15)
-        }
-        return Color.secondary.opacity(0.10)
-    }
-}
-
 struct TagsToolbar: View {
     @Environment(RosterAppModel.self) private var model
     @State private var isShowingNewTagPopover = false
@@ -192,6 +116,8 @@ struct TagsToolbar: View {
                     isShowingNewTagPopover = false
                 }
             }
+
+            ContactFiltersButton()
 
             SearchField(text: $model.contactSearchText, prompt: model.l10n(.search))
                 .frame(width: 240)
