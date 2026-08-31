@@ -103,6 +103,7 @@ struct SidebarView: View {
                     .padding(12)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
+                .overlayScrollIndicators()
 
                 if !isCollapsed, let next = model.cachedUpcomingOccurrences.first {
                     NextRosterCard(occurrence: next)
@@ -855,7 +856,34 @@ private struct SidebarE2EFrameReporter: ViewModifier {
     }
 }
 
+private struct OverlayScrollIndicators: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async { configure(from: view) }
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        DispatchQueue.main.async { configure(from: view) }
+    }
+
+    private func configure(from view: NSView) {
+        guard let scrollView = sequence(first: view.superview, next: { $0?.superview })
+            .compactMap({ $0 as? NSScrollView })
+            .first
+        else { return }
+        scrollView.scrollerStyle = .overlay
+        scrollView.autohidesScrollers = true
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+    }
+}
+
 private extension View {
+    func overlayScrollIndicators() -> some View {
+        background(OverlayScrollIndicators().frame(width: 0, height: 0))
+    }
+
     @ViewBuilder
     func optionalAccessibilityIdentifier(_ identifier: String?) -> some View {
         if let identifier {

@@ -24,8 +24,6 @@ struct PermissionsSettingsView: View {
                 contactFieldsSection
                 voiceSection
                 supportedCalendarsSection
-                dataSourceSection
-                aboutSection
             }
             .padding(.horizontal, 42)
             .padding(.vertical, 32)
@@ -139,14 +137,6 @@ struct PermissionsSettingsView: View {
                     .frame(width: 64, alignment: .trailing)
                 }
 
-                SettingsDivider()
-
-                Text(model.l10n(.extendedContactFieldsBody))
-                    .font(.system(size: 12.5, weight: .medium))
-                    .foregroundStyle(RosterTheme.inkSecondary)
-                    .lineSpacing(3)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 14)
             }
         }
     }
@@ -228,26 +218,6 @@ struct PermissionsSettingsView: View {
         }
     }
 
-    private var dataSourceSection: some View {
-        SettingsSection(title: model.l10n(.dataSource)) {
-            SettingsRow(title: model.l10n(.contactsSource), detail: model.l10n(.permissionBody)) {
-                Image(systemName: "checkmark.icloud.fill")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(RosterTheme.accent)
-                    .frame(width: 64, alignment: .trailing)
-            }
-        }
-    }
-
-    private var aboutSection: some View {
-        SettingsSection(title: model.l10n(.about)) {
-            Text(model.l10n(.aboutBody))
-                .font(.system(size: 12.5, weight: .medium))
-                .foregroundStyle(RosterTheme.inkSecondary)
-                .lineSpacing(3)
-                .padding(18)
-        }
-    }
 
 }
 
