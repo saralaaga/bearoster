@@ -45,7 +45,7 @@ package struct L10n {
         package let en: String
     }
 
-    package static let appName = Key(zhHans: "小熊名册", zhHant: "小熊名冊", en: "Bearoster")
+    package static let appName = Key(zhHans: "蓝熊名册", zhHant: "藍熊名冊", en: "Bearoster")
     package static let browse = Key(zhHans: "浏览", zhHant: "瀏覽", en: "Browse")
     package static let manage = Key(zhHans: "管理", zhHant: "管理", en: "Manage")
     package static let permissionGranted = Key(zhHans: "已获得通讯录访问权限", zhHant: "已獲得通訊錄存取權限", en: "Contacts access granted")
@@ -182,13 +182,13 @@ package struct L10n {
     package static let selectedContacts = Key(zhHans: "已选择", zhHant: "已選擇", en: "Selected")
     package static let deleteContacts = Key(zhHans: "删除联系人", zhHant: "刪除聯絡人", en: "Delete Contacts")
     package static let deleteContactsTitle = Key(zhHans: "删除联系人？", zhHant: "刪除聯絡人？", en: "Delete contacts?")
-    package static let deleteContactsMessage = Key(zhHans: "这会从 macOS 通讯录中删除所选联系人，并可能同步到 iCloud。此操作无法从小熊名册中撤销。", zhHant: "這會從 macOS 通訊錄中刪除所選聯絡人，並可能同步到 iCloud。此操作無法從小熊名冊中復原。", en: "This will delete the selected contacts from macOS Contacts and may sync to iCloud. This cannot be undone in Bearoster.")
+    package static let deleteContactsMessage = Key(zhHans: "这会从 macOS 通讯录中删除所选联系人，并可能同步到 iCloud。此操作无法从蓝熊名册中撤销。", zhHant: "這會從 macOS 通訊錄中刪除所選聯絡人，並可能同步到 iCloud。此操作無法從藍熊名冊中復原。", en: "This will delete the selected contacts from macOS Contacts and may sync to iCloud. This cannot be undone in Bearoster.")
     package static let contactsDeleted = Key(zhHans: "已删除联系人", zhHant: "已刪除聯絡人", en: "Contacts deleted")
     package static let deleteContactsFailed = Key(zhHans: "无法删除联系人，请检查通讯录权限或账户是否允许编辑。", zhHant: "無法刪除聯絡人，請檢查通訊錄權限或帳戶是否允許編輯。", en: "Could not delete contacts. Check Contacts permission or whether the account allows editing.")
     package static let contactGroupAccess = Key(zhHans: "通讯录分组访问", zhHant: "通訊錄分組存取", en: "Contact group access")
     package static let allContactsAccess = Key(zhHans: "全部通讯录", zhHant: "全部通訊錄", en: "All contacts")
     package static let selectedGroupsAccess = Key(zhHans: "仅选择的分组", zhHant: "僅選取的分組", en: "Selected groups only")
-    package static let contactGroupAccessBody = Key(zhHans: "这是小熊名册内部的访问范围。macOS 仍然按 App 授权通讯录，小熊名册会只显示和计算你选择的分组。", zhHant: "這是小熊名冊內部的存取範圍。macOS 仍然以 App 為單位授權通訊錄，小熊名冊只會顯示和計算你選取的分組。", en: "This is Bearoster's local access scope. macOS still grants Contacts access to the app, and Bearoster only displays and calculates selected groups.")
+    package static let contactGroupAccessBody = Key(zhHans: "这是蓝熊名册内部的访问范围。macOS 仍然按 App 授权通讯录，蓝熊名册会只显示和计算你选择的分组。", zhHant: "這是藍熊名冊內部的存取範圍。macOS 仍然以 App 為單位授權通訊錄，藍熊名冊只會顯示和計算你選取的分組。", en: "This is Bearoster's local access scope. macOS still grants Contacts access to the app, and Bearoster only displays and calculates selected groups.")
     package static let includeUngroupedContacts = Key(zhHans: "包含未分组联系人", zhHant: "包含未分組聯絡人", en: "Include ungrouped contacts")
     package static let ungroupedContacts = Key(zhHans: "未分组联系人", zhHant: "未分組聯絡人", en: "Ungrouped contacts")
     package static let noContactGroups = Key(zhHans: "没有从 Apple 通讯录读取到分组。", zhHant: "沒有從 Apple 通訊錄讀取到分組。", en: "No groups were found in Apple Contacts.")
