@@ -22,8 +22,6 @@ struct PermissionsSettingsView: View {
                 }
                 preferencesSection
                 contactFieldsSection
-                voiceSection
-                supportedCalendarsSection
             }
             .padding(.horizontal, 42)
             .padding(.vertical, 32)
@@ -138,83 +136,6 @@ struct PermissionsSettingsView: View {
                 }
 
             }
-        }
-    }
-
-    private var voiceSection: some View {
-        @Bindable var model = model
-
-        return SettingsSection(title: model.l10n(.voiceInput)) {
-            VStack(alignment: .leading, spacing: 12) {
-                TextField(model.l10n(.voicePlaceholder), text: $model.voiceText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13, weight: .medium))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RosterTheme.controlBackground(colorScheme), in: RoundedRectangle(cornerRadius: RosterTheme.controlCorner))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: RosterTheme.controlCorner)
-                            .strokeBorder(RosterTheme.separator(colorScheme))
-                    )
-
-                HStack(spacing: 10) {
-                    Button {
-                        Task { await model.toggleVoiceInput() }
-                    } label: {
-                        Label(
-                            model.isListening ? model.l10n(.stopListening) : model.l10n(.startListening),
-                            systemImage: model.isListening ? "stop.circle" : "mic"
-                        )
-                    }
-                    .buttonStyle(SettingsActionButtonStyle(kind: .regular))
-
-                    Button(model.l10n(.convertDate)) {
-                        model.convertVoiceText()
-                    }
-                    .buttonStyle(SettingsActionButtonStyle(kind: .primary))
-
-                    Spacer(minLength: 0)
-                }
-
-                if let result = model.voiceResult {
-                    Text(result)
-                        .font(.system(size: 12.5, weight: .medium))
-                        .foregroundStyle(RosterTheme.inkSecondary)
-                        .transition(.opacity)
-                }
-
-                if model.isListening {
-                    Label(model.l10n(.listening), systemImage: "waveform")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(RosterTheme.accent)
-                        .transition(.opacity)
-                }
-            }
-            .padding(18)
-            .animation(RosterTheme.Motion.allowed(RosterTheme.Motion.quickFade, reduceMotion: reduceMotion), value: model.voiceResult)
-            .animation(RosterTheme.Motion.allowed(RosterTheme.Motion.quickFade, reduceMotion: reduceMotion), value: model.isListening)
-        }
-    }
-
-    private var supportedCalendarsSection: some View {
-        SettingsSection(title: model.l10n(.supportedCalendars)) {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 10)], spacing: 10) {
-                ForEach(RosterCalendarKind.allCases) { kind in
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(color(for: kind))
-                            .frame(width: 9, height: 9)
-                        Text(model.formatter.calendarName(kind, locale: model.language.coreLocale))
-                            .font(.system(size: 13, weight: .semibold))
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
-                    .background(RosterTheme.hoverFill(colorScheme), in: RoundedRectangle(cornerRadius: RosterTheme.controlCorner))
-                }
-            }
-            .padding(18)
         }
     }
 
