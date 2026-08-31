@@ -3,7 +3,7 @@ ObjC.import("ApplicationServices");
 const app = Application.currentApplication();
 app.includeStandardAdditions = true;
 const systemEvents = Application("System Events");
-const roster = Application("Roster");
+const roster = Application("Bearoster");
 const framesPath = "/tmp/roster-e2e-frames.tsv";
 const eventsPath = "/tmp/roster-e2e-events.log";
 const screenProbePath = "/tmp/roster-e2e-screen-probe.png";
@@ -120,7 +120,7 @@ function drag(source, target) {
 }
 
 roster.activate();
-const process = waitForProcess("Roster", 10);
+const process = waitForProcess("Bearoster", 10);
 try {
   process.frontmost = true;
 } catch (_) {}

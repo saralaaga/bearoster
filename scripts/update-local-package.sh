@@ -27,13 +27,15 @@ mv "$TMP_VERSION_FILE" "$VERSION_FILE"
 trap - EXIT
 
 echo "updated Packaging/VERSION to build $NEXT_BUILD_NUMBER"
+killall Bearoster >/dev/null 2>&1 || true
 killall Roster >/dev/null 2>&1 || true
 BUILD_OUTPUT="$("$ROOT/scripts/build-app.sh" release)"
 APP_PATH="${BUILD_OUTPUT##*$'\n'}"
-TARGET_APP="/Applications/Roster.app"
-LEGACY_TARGET_APP="/Applications/Birthday.app"
+TARGET_APP="/Applications/Bearoster.app"
+LEGACY_ROSTER_APP="/Applications/Roster.app"
+LEGACY_BIRTHDAY_APP="/Applications/Birthday.app"
 rm -rf "$TARGET_APP"
 cp -R "$APP_PATH" "$TARGET_APP"
-rm -rf "$LEGACY_TARGET_APP"
+rm -rf "$LEGACY_ROSTER_APP" "$LEGACY_BIRTHDAY_APP"
 echo "installed $TARGET_APP"
 open "$TARGET_APP"

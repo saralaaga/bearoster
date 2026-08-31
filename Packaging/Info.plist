@@ -5,7 +5,7 @@
   <key>CFBundleDevelopmentRegion</key>
   <string>en</string>
   <key>CFBundleExecutable</key>
-  <string>Roster</string>
+  <string>Bearoster</string>
   <key>CFBundleIdentifier</key>
   <string>dev.local.roster</string>
   <key>CFBundleIconFile</key>
@@ -13,7 +13,7 @@
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
-  <string>Roster</string>
+  <string>Bearoster</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
@@ -23,13 +23,13 @@
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
   <key>NSContactsUsageDescription</key>
-  <string>Roster reads and writes selected contact fields directly in macOS Contacts.</string>
+  <string>Bearoster reads and writes selected contact fields directly in macOS Contacts.</string>
   <key>NSMicrophoneUsageDescription</key>
-  <string>Roster uses the microphone only when you start voice date input.</string>
+  <string>Bearoster uses the microphone only when you start voice date input.</string>
   <key>NSQuitAlwaysKeepsWindows</key>
   <false/>
   <key>NSSpeechRecognitionUsageDescription</key>
-  <string>Roster uses speech recognition to convert spoken birthday dates into calendar dates.</string>
+  <string>Bearoster uses speech recognition to convert spoken birthday dates into calendar dates.</string>
   <key>NSPrincipalClass</key>
   <string>NSApplication</string>
 </dict>

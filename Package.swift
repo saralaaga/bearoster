@@ -12,7 +12,7 @@ let package = Package(
     products: [
         .library(name: "RosterCore", targets: ["RosterCore"]),
         .library(name: "RosterShared", targets: ["RosterShared"]),
-        .executable(name: "Roster", targets: ["RosterApp"]),
+        .executable(name: "Bearoster", targets: ["RosterApp"]),
         .executable(name: "RosterIOS", targets: ["RosterIOSApp"])
     ],
     targets: [

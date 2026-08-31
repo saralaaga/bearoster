@@ -19,7 +19,7 @@ fi
 source "$VERSION_FILE"
 : "${ROSTER_MARKETING_VERSION:?missing ROSTER_MARKETING_VERSION in $VERSION_FILE}"
 : "${ROSTER_BUILD_NUMBER:?missing ROSTER_BUILD_NUMBER in $VERSION_FILE}"
-APP_NAME="Roster"
+APP_NAME="Bearoster"
 
 if [[ "$CONFIG" == "release" ]]; then
   APP_DIR="$ROOT/dist/$APP_NAME.app"
