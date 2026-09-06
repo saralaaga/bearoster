@@ -1,14 +1,47 @@
 import RosterCore
 import RosterShared
 import AppKit
+import Observation
 import SwiftUI
 
 // MARK: - Contacts editor
+
+@MainActor
+@Observable
+final class ContactEditorBridge {
+    enum Mode: Equatable {
+        case view
+        case editing
+    }
+
+    enum Intent: Equatable {
+        case none
+        case save
+        case cancel
+    }
+
+    var mode: Mode = .view
+    var intent: Intent = .none
+    var isSaving = false
+    var canSave = false
+
+    func reset() {
+        mode = .view
+        intent = .none
+        isSaving = false
+        canSave = false
+    }
+}
 
 struct ContactsEditorView: View {
     @Environment(RosterAppModel.self) private var model
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let editor: ContactEditorBridge
+
+    init(editor: ContactEditorBridge) {
+        self.editor = editor
+    }
 
     var body: some View {
         @Bindable var model = model
@@ -59,7 +92,7 @@ struct ContactsEditorView: View {
                             BulkContactSelectionView()
                                 .transition(detailTransition)
                         } else if let profile = selectedProfile {
-                            ContactRosterEditor(profile: profile)
+                            ContactRosterEditor(profile: profile, editor: editor)
                                 .id(profile.id)
                                 .transition(detailTransition)
                         } else {
@@ -77,6 +110,9 @@ struct ContactsEditorView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(ContactsNativeStyle.windowBackground(colorScheme))
+        .onChange(of: selectedID) { _, _ in
+            editor.reset()
+        }
     }
 
     private var detailTransition: AnyTransition {
@@ -96,6 +132,7 @@ private enum ContactsLayout {
 
 struct ContactsToolbar: View {
     @Environment(RosterAppModel.self) private var model
+    let editor: ContactEditorBridge
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isConfirmingDeletion = false
@@ -150,7 +187,48 @@ struct ContactsToolbar: View {
             .frame(width: 240)
 
             refreshButton
+
+            if let profile = model.selectedProfile {
+                editorControls(profile: profile)
+            }
         }
+    }
+
+    private func editorControls(profile: ContactRosterProfile) -> some View {
+        HStack(spacing: 8) {
+            if editor.mode == .editing {
+                Button(model.l10n(.cancel)) {
+                    editor.intent = .cancel
+                }
+                .font(.system(size: 12.5, weight: .medium))
+                .buttonStyle(.bordered)
+                .disabled(editor.isSaving)
+
+                Button {
+                    editor.intent = .save
+                } label: {
+                    if editor.isSaving {
+                        ProgressView()
+                            .controlSize(.small)
+                            .frame(minWidth: 34)
+                    } else {
+                        Text(model.l10n(.done))
+                    }
+                }
+                .font(.system(size: 12.5, weight: .semibold))
+                .buttonStyle(.borderedProminent)
+                .disabled(!editor.canSave || editor.isSaving)
+                .accessibilityLabel(model.l10n(.done))
+            } else {
+                Button(model.l10n(.edit)) {
+                    editor.mode = .editing
+                }
+                .font(.system(size: 12.5, weight: .medium))
+                .buttonStyle(.borderedProminent)
+                .accessibilityLabel("\(model.l10n(.edit)) \(profile.displayName)")
+            }
+        }
+        .transition(toolbarModeTransition)
     }
 
     private var selectionControls: some View {
@@ -1052,33 +1130,52 @@ struct ContactRosterEditor: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let profile: ContactRosterProfile
+    let editor: ContactEditorBridge
     @State private var draft: RosterEditDraft
-    @State private var isEditing = false
-    @State private var isSaving = false
     @State private var isShowingTagEditor = false
 
-    init(profile: ContactRosterProfile) {
+    init(profile: ContactRosterProfile, editor: ContactEditorBridge = ContactEditorBridge()) {
         self.profile = profile
+        self.editor = editor
         _draft = State(initialValue: RosterEditDraft(profile: profile))
+    }
+
+    private var isEditing: Bool {
+        editor.mode == .editing
     }
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 18) {
+            VStack(spacing: 0) {
                 hero
                 countdownBanner
-
                 editableCards
-
-                actionBar
             }
-            .padding(.horizontal, 32)
-            .padding(.top, 34)
-            .padding(.bottom, 60)
-            .frame(maxWidth: 624)
-            .frame(maxWidth: .infinity, alignment: isEditing ? .leading : .center)
+            .padding(.horizontal, 40)
+            .padding(.top, 28)
+            .padding(.bottom, 72)
+            .frame(maxWidth: 640)
+            .frame(maxWidth: .infinity, alignment: .center)
         }
         .background(ContactsNativeStyle.detailBackground(colorScheme))
+        .onChange(of: editor.mode) { _, mode in
+            guard mode == .editing else { return }
+            draft = RosterEditDraft(profile: profile)
+            editor.canSave = draft.payload(personID: profile.id) != nil
+        }
+        .onChange(of: draft) { _, draft in
+            editor.canSave = draft.payload(personID: profile.id) != nil
+        }
+        .onChange(of: editor.intent) { _, intent in
+            switch intent {
+            case .save:
+                saveDraft()
+            case .cancel:
+                cancelEditing()
+            case .none:
+                break
+            }
+        }
     }
 
     @ViewBuilder
@@ -1106,102 +1203,100 @@ struct ContactRosterEditor: View {
     }
 
     private var hero: some View {
-        VStack(spacing: 10) {
+        HStack(alignment: .center, spacing: 18) {
             Button {
-                chooseAndQueueAvatarImage()
+                if isEditing {
+                    chooseAvatarImage()
+                } else {
+                    chooseAndQueueAvatarImage()
+                }
             } label: {
-                ContactAvatarImageView(name: profile.displayName, imageData: profile.imageData, color: heroColor, size: 96)
+                ContactAvatarImageView(name: profile.displayName, imageData: isEditing ? draft.imageData : profile.imageData, color: heroColor, size: 72)
             }
             .buttonStyle(.plain)
             .help(model.l10n(.chooseImage))
             .accessibilityLabel(model.l10n(.chooseImage))
 
             VStack(spacing: 3) {
-                Text(isEditing ? model.l10n(.editContact) : profile.displayName)
-                    .font(.system(size: 24, weight: .bold))
-                    .multilineTextAlignment(.center)
+                Text(profile.displayName)
+                    .font(.system(size: 22, weight: .bold))
+                    .lineLimit(2)
+                Text(detailTagline)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
                 if !isEditing {
-                    Text(detailTagline)
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                    ContactQuickActionBar(profile: profile)
                 }
             }
-
-            if !isEditing {
-                ContactQuickActionBar(profile: profile)
-            }
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .draggable(model.dragPayload(for: profile.id))
     }
 
     @ViewBuilder
     private var countdownBanner: some View {
-        if let occurrence = nextOccurrence {
-            let days = model.resolver.daysUntil(occurrence.date)
-            HStack(spacing: 14) {
-                VStack(alignment: .leading, spacing: 2) {
-                    if days == 0 {
-                        Text(model.l10n(.today))
-                            .font(.system(size: 24, weight: .bold))
-                    } else {
-                        HStack(alignment: .firstTextBaseline, spacing: 5) {
-                            Text("\(days)")
-                                .font(.system(size: 24, weight: .bold))
-                                .monospacedDigit()
-                            Text(daysSuffix)
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(days == 0 ? .white.opacity(0.82) : .secondary)
-                        }
-                    }
-
+        Group {
+            if let occurrence = nextOccurrence {
+                let days = model.resolver.daysUntil(occurrence.date)
+                HStack(spacing: 10) {
+                    Circle()
+                        .fill(days == 0 ? ContactsNativeStyle.red : heroColor)
+                        .frame(width: 8, height: 8)
+                    Text(days == 0 ? model.l10n(.today) : "\(days) \(daysSuffix(for: days))")
+                        .font(.system(size: 15, weight: .bold))
+                        .monospacedDigit()
+                        .foregroundStyle(days == 0 ? ContactsNativeStyle.red : .primary)
                     Text(countdownSubtitle(for: occurrence))
                         .font(.system(size: 12))
-                        .foregroundStyle(days == 0 ? .white.opacity(0.82) : .secondary)
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                    Image(systemName: "birthday.cake")
+                        .foregroundStyle(days == 0 ? ContactsNativeStyle.red : .secondary)
                 }
-
-                Spacer(minLength: 0)
-
-                Image(systemName: "birthday.cake")
-                    .font(.system(size: 28, weight: .regular))
-                    .foregroundStyle(days == 0 ? .white.opacity(0.76) : .secondary.opacity(0.72))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(days == 0 ? ContactsNativeStyle.red.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(days == 0 ? Color.clear : ContactsNativeStyle.separator(colorScheme), lineWidth: 0.5)
+                )
+            } else {
+                HStack(spacing: 8) {
+                    Text(model.l10n(.noRosters))
+                        .font(.system(size: 13, weight: .medium))
+                    Text(model.l10n(.edit))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                }
+                .foregroundStyle(.tertiary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(ContactsNativeStyle.separator(colorScheme), style: StrokeStyle(lineWidth: 0.7, dash: [4, 3]))
+                )
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 14)
-            .foregroundStyle(days == 0 ? .white : .primary)
-            .background(days == 0 ? ContactsNativeStyle.red : ContactsNativeStyle.cardBackground(colorScheme), in: RoundedRectangle(cornerRadius: 10))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(days == 0 ? Color.clear : ContactsNativeStyle.separator(colorScheme))
-            )
-            .shadow(color: .black.opacity(colorScheme == .dark ? 0.22 : 0.06), radius: 2, y: 0.5)
         }
+        .padding(.top, 20)
     }
 
     private var readCards: some View {
-        VStack(spacing: 18) {
-            NativeInfoCard {
-                if profile.records.isEmpty {
-                    Text(model.l10n(.noRosters))
-                        .font(.system(size: 13))
-                        .foregroundStyle(.tertiary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
-                } else {
+        VStack(spacing: 0) {
+            if !profile.records.isEmpty {
+                ContactDetailSection(title: model.l10n(.birthday)) {
                     ForEach(Array(profile.records.enumerated()), id: \.element.id) { index, record in
-                        if index > 0 {
-                            NativeDivider()
-                        }
+                        if index > 0 { NativeDivider() }
                         RosterRecordSummaryRow(record: record)
                     }
                 }
-
-                NativeDivider()
-                tagInfoRow
             }
+
+            ContactDetailSection(title: model.l10n(.tags)) { tagInfoRow }
+            ContactDetailSection(title: model.l10n(.contactInfo)) { readContactRows }
+            ContactDetailSection(title: model.l10n(.work)) { readWorkRows }
 
             if model.extendedContactFieldsEnabled,
                let extended = model.extendedProfilesByID[profile.id],
@@ -1212,52 +1307,12 @@ struct ContactRosterEditor: View {
     }
 
     private var editCards: some View {
-        VStack(spacing: 18) {
-            NativeInfoCard {
-                tagInfoRow
-            }
-
-            NativeInfoCard {
-                contactNameRows
-            }
-
-            NativeInfoCard {
-                contactWorkRows
-            }
-
-            NativeInfoCard {
-                if draft.entries.isEmpty {
-                    NativeInfoRow(label: model.l10n(.birthDate)) {
-                        Text(model.l10n(.noRosters))
-                            .foregroundStyle(.tertiary)
-                    }
-                } else {
-                    ForEach(Array($draft.entries.enumerated()), id: \.element.id) { index, $entry in
-                        if index > 0 {
-                            NativeDivider()
-                        }
-                        RosterEditEntryView(entry: $entry, profile: profile) {
-                            draft.removeEntry(id: entry.id)
-                        }
-                    }
-                }
-
-                if !draft.entries.isEmpty {
-                    NativeDivider()
-                }
-                NativeInfoRow(label: "") {
-                    Button {
-                        draft.addEntry(personID: profile.id, kind: .gregorian)
-                    } label: {
-                        Label(model.l10n(.addRoster), systemImage: "plus.circle.fill")
-                    }
-                    .buttonStyle(KimiActionButtonStyle(kind: .regular))
-                }
-            }
-
-            NativeInfoCard {
-                contactMethodRows
-            }
+        VStack(spacing: 0) {
+            ContactDetailSection(title: model.l10n(.name)) { contactNameRows }
+            ContactDetailSection(title: model.l10n(.birthday)) { birthdayEditRows }
+            ContactDetailSection(title: model.l10n(.tags)) { tagInfoRow }
+            ContactDetailSection(title: model.l10n(.work)) { contactWorkRows }
+            ContactDetailSection(title: model.l10n(.contactInfo)) { contactMethodRows }
 
             if model.extendedContactFieldsEnabled,
                let extended = model.extendedProfilesByID[profile.id],
@@ -1268,7 +1323,59 @@ struct ContactRosterEditor: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 3)
+                    .padding(.top, 8)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var readContactRows: some View {
+        readRow(model.l10n(.phone), value: profile.phoneNumbers.joined(separator: ", "))
+        NativeDivider()
+        readRow(model.l10n(.email), value: profile.emailAddresses.joined(separator: ", "))
+        NativeDivider()
+        readRow(model.l10n(.address), value: profile.postalAddresses.joined(separator: ", "))
+    }
+
+    @ViewBuilder
+    private var readWorkRows: some View {
+        readRow(model.l10n(.organization), value: profile.organizationName)
+        NativeDivider()
+        readRow(model.l10n(.department), value: profile.departmentName)
+        NativeDivider()
+        readRow(model.l10n(.jobTitle), value: profile.jobTitle)
+    }
+
+    private func readRow(_ label: String, value: String) -> some View {
+        NativeInfoRow(label: label) {
+            Text(value.isEmpty ? model.l10n(.notFilled) : value)
+                .foregroundStyle(value.isEmpty ? .tertiary : .primary)
+                .lineLimit(2)
+        }
+    }
+
+    @ViewBuilder
+    private var birthdayEditRows: some View {
+        if draft.entries.isEmpty {
+            NativeInfoRow(label: model.l10n(.birthDate)) {
+                Text(model.l10n(.noRosters)).foregroundStyle(.tertiary)
+            }
+        } else {
+            ForEach(Array($draft.entries.enumerated()), id: \.element.id) { index, $entry in
+                if index > 0 { NativeDivider() }
+                RosterEditEntryView(entry: $entry, profile: profile) {
+                    draft.removeEntry(id: entry.id)
+                }
+            }
+        }
+        if !draft.entries.isEmpty { NativeDivider() }
+        NativeInfoRow(label: "") {
+            Button {
+                draft.addEntry(personID: profile.id, kind: .gregorian)
+            } label: {
+                Label(model.l10n(.addRoster), systemImage: "plus.circle.fill")
+            }
+            .buttonStyle(KimiActionButtonStyle(kind: .regular))
         }
     }
 
@@ -1380,45 +1487,6 @@ struct ContactRosterEditor: View {
         }
     }
 
-    private var actionBar: some View {
-        HStack(spacing: 10) {
-            if isEditing {
-                Button {
-                    saveDraft()
-                } label: {
-                    if isSaving {
-                        ProgressView()
-                            .controlSize(.small)
-                            .frame(width: 42)
-                    } else {
-                        Text(model.l10n(.done))
-                    }
-                }
-                .buttonStyle(KimiActionButtonStyle(kind: .primary))
-                .disabled(draft.payload(personID: profile.id) == nil || isSaving)
-
-                Button {
-                    draft = RosterEditDraft(profile: profile)
-                    isEditing = false
-                } label: {
-                    Text(model.l10n(.cancel))
-                }
-                .buttonStyle(KimiActionButtonStyle(kind: .regular))
-                .disabled(isSaving)
-            } else {
-                Button {
-                    draft = RosterEditDraft(profile: profile)
-                    isEditing = true
-                } label: {
-                    Text(model.l10n(.edit))
-                }
-                .buttonStyle(KimiActionButtonStyle(kind: .primary))
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 2)
-    }
-
     private var nextOccurrence: RosterOccurrence? {
         profile.records
             .compactMap { model.resolver.nextOccurrence(for: $0, after: Date()) }
@@ -1454,9 +1522,9 @@ struct ContactRosterEditor: View {
         profile.records.first.map { color(for: $0.kind) } ?? ContactsNativeStyle.accent
     }
 
-    private var daysSuffix: String {
+    private func daysSuffix(for days: Int) -> String {
         switch model.language.coreLocale {
-        case .english: "days"
+        case .english: days == 1 ? "day" : "days"
         case .simplifiedChinese: "天后"
         case .traditionalChinese: "天後"
         }
@@ -1477,13 +1545,26 @@ struct ContactRosterEditor: View {
     }
 
     private func saveDraft() {
-        guard draft.payload(personID: profile.id) != nil else { return }
-        Task { @MainActor in
-            isSaving = true
-            await model.save(contactID: profile.id, draft: draft)
-            isSaving = false
-            isEditing = false
+        guard draft.payload(personID: profile.id) != nil else {
+            editor.intent = .none
+            return
         }
+        Task { @MainActor in
+            model.errorMessage = nil
+            editor.isSaving = true
+            await model.save(contactID: profile.id, draft: draft)
+            editor.isSaving = false
+            if model.errorMessage == nil {
+                editor.mode = .view
+            }
+            editor.intent = .none
+        }
+    }
+
+    private func cancelEditing() {
+        draft = RosterEditDraft(profile: profile)
+        editor.mode = .view
+        editor.intent = .none
     }
 
     private func chooseAvatarImage() {
@@ -2067,6 +2148,26 @@ private struct RemovableContactTagChip: View {
 
 // MARK: - Native cards
 
+struct ContactDetailSection<Content: View>: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let title: String
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 4)
+
+            NativeInfoCard {
+                content
+            }
+        }
+        .padding(.top, 26)
+    }
+}
+
 struct NativeInfoCard<Content: View>: View {
     @Environment(\.colorScheme) private var colorScheme
     @ViewBuilder let content: Content
@@ -2080,7 +2181,7 @@ struct NativeInfoCard<Content: View>: View {
             RoundedRectangle(cornerRadius: 10)
                 .strokeBorder(ContactsNativeStyle.separator(colorScheme))
         )
-        .shadow(color: .black.opacity(colorScheme == .dark ? 0.22 : 0.06), radius: 2, y: 0.5)
+        .shadow(color: .black.opacity(colorScheme == .dark ? 0.12 : 0.035), radius: 2, y: 0.5)
     }
 }
 
@@ -2093,15 +2194,15 @@ struct NativeInfoRow<Content: View>: View {
             Text(label)
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
-                .frame(width: 76, alignment: .trailing)
+                .frame(width: 84, alignment: .trailing)
 
             content
                 .font(.system(size: 14))
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(minHeight: 44)
+        .padding(.vertical, 9)
+        .frame(minHeight: 38)
     }
 }
 
@@ -2111,7 +2212,7 @@ struct NativeDivider: View {
     var body: some View {
         ContactsNativeStyle.separator(colorScheme)
             .frame(height: 0.5)
-            .padding(.leading, 108)
+            .padding(.leading, 116)
     }
 }
 

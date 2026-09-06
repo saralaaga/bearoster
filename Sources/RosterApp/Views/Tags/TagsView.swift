@@ -4,8 +4,13 @@ import SwiftUI
 
 struct TagsView: View {
     @Environment(RosterAppModel.self) private var model
+    let editor: ContactEditorBridge
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    init(editor: ContactEditorBridge) {
+        self.editor = editor
+    }
 
     var body: some View {
         let selectedProfile = model.selectedProfile
@@ -48,7 +53,7 @@ struct TagsView: View {
                 RosterTheme.pageBackground(colorScheme)
                 VStack(spacing: 0) {
                     if let selectedProfile {
-                        ContactRosterEditor(profile: selectedProfile)
+                        ContactRosterEditor(profile: selectedProfile, editor: editor)
                             .id(selectedProfile.id)
                             .transition(detailTransition)
                     } else {
@@ -63,6 +68,9 @@ struct TagsView: View {
         }
         .background(RosterTheme.windowBackground(colorScheme))
         .animation(RosterTheme.Motion.allowed(RosterTheme.Motion.quickFade, reduceMotion: reduceMotion), value: model.selectedTagsFilter)
+        .onChange(of: selectedProfile?.id) { _, _ in
+            editor.reset()
+        }
     }
 
     private var tagListTransition: AnyTransition {
@@ -93,6 +101,7 @@ struct TagsView: View {
 
 struct TagsToolbar: View {
     @Environment(RosterAppModel.self) private var model
+    let editor: ContactEditorBridge
     @State private var isShowingNewTagPopover = false
 
     var body: some View {
@@ -122,6 +131,20 @@ struct TagsToolbar: View {
 
             SearchField(text: $model.contactSearchText, prompt: model.l10n(.search))
                 .frame(width: 240)
+
+            if model.selectedProfile != nil {
+                if editor.mode == .editing {
+                    Button(model.l10n(.cancel)) { editor.intent = .cancel }
+                        .buttonStyle(.bordered)
+                        .disabled(editor.isSaving)
+                    Button(model.l10n(.done)) { editor.intent = .save }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(!editor.canSave || editor.isSaving)
+                } else {
+                    Button(model.l10n(.edit)) { editor.mode = .editing }
+                        .buttonStyle(.borderedProminent)
+                }
+            }
         }
         .padding(.horizontal, 16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

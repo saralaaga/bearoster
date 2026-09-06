@@ -11,6 +11,7 @@ struct RootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var calendarMode = CalendarDisplayMode.month
     @State private var isSidebarCollapsed = false
+    @State private var contactEditorBridge = ContactEditorBridge()
 
     private var sidebarWidth: CGFloat {
         isSidebarCollapsed ? RosterTheme.Layout.sidebarCollapsedWidth : RosterTheme.Layout.sidebarWidth
@@ -23,7 +24,8 @@ struct RootView: View {
             AppToolbar(
                 calendarMode: $calendarMode,
                 isSidebarCollapsed: $isSidebarCollapsed,
-                sidebarWidth: sidebarWidth
+                sidebarWidth: sidebarWidth,
+                contactEditorBridge: contactEditorBridge
             )
                 .frame(height: 54)
 
@@ -69,6 +71,9 @@ struct RootView: View {
                     .transition(toastTransition)
             }
         }
+        .onChange(of: model.selection) { _, _ in
+            contactEditorBridge.reset()
+        }
         .tint(RosterTheme.accent)
         .alert(model.l10n(.appName), isPresented: Binding(
             get: { model.errorMessage != nil },
@@ -88,9 +93,9 @@ struct RootView: View {
         case .list:
             RosterRecordsView()
         case .contacts:
-            ContactsEditorView()
+            ContactsEditorView(editor: contactEditorBridge)
         case .tags:
-            TagsView()
+            TagsView(editor: contactEditorBridge)
         case .sync:
             ContactSyncHistoryView()
         case .permissions:
@@ -131,6 +136,7 @@ struct AppToolbar: View {
     @Binding var calendarMode: CalendarDisplayMode
     @Binding var isSidebarCollapsed: Bool
     let sidebarWidth: CGFloat
+    let contactEditorBridge: ContactEditorBridge
 
     var body: some View {
         HStack(spacing: 12) {
@@ -198,9 +204,9 @@ struct AppToolbar: View {
         case .list:
             RosterListToolbarControls()
         case .contacts:
-            ContactsToolbar()
+            ContactsToolbar(editor: contactEditorBridge)
         case .tags:
-            TagsToolbar()
+            TagsToolbar(editor: contactEditorBridge)
         case .sync:
             ToolbarTitle(text: "同步与历史")
         case .permissions:
