@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test
+        run: swift test --scratch-path "$PWD/.build"
+      - name: Build macOS targets
+        run: swift build --scratch-path "$PWD/.build"
+      - name: Build iOS shared target
+        run: |
+          swift build \
+            --scratch-path .build-ios-audit \
+            --triple arm64-apple-ios17.0-simulator \
+            --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
+            --target RosterShared
