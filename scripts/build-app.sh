@@ -45,19 +45,40 @@ if [[ -f "$ROOT/Packaging/AppIcon.icns" ]]; then
 fi
 chmod +x "$MACOS/$APP_NAME"
 
+IDENTITY_LABEL="Apple Development: "
+if [[ "$CONFIG" == "release" ]]; then
+  IDENTITY_LABEL="Developer ID Application: "
+fi
+
 if command -v codesign >/dev/null 2>&1; then
   SIGN_IDENTITY="${ROSTER_CODESIGN_IDENTITY:-}"
   if [[ -z "$SIGN_IDENTITY" ]] && command -v security >/dev/null 2>&1; then
     SIGN_IDENTITY="$(
       security find-identity -v -p codesigning 2>/dev/null \
-        | sed -n 's/.*"\(Apple Development: .*\)".*/\1/p' \
+        | sed -n "s/.*\"\(${IDENTITY_LABEL}.*\)\".*/\1/p" \
         | head -n 1
     )"
   fi
   if [[ -z "$SIGN_IDENTITY" ]]; then
+    if [[ "$CONFIG" == "release" ]]; then
+      echo "error: release build needs a 'Developer ID Application' identity; install one or set ROSTER_CODESIGN_IDENTITY=- for an ad-hoc build" >&2
+      exit 1
+    fi
     SIGN_IDENTITY="-"
   fi
-  codesign --force --sign "$SIGN_IDENTITY" "$APP_DIR" >/dev/null
+
+  CODESIGN_ARGS=(--force --sign "$SIGN_IDENTITY")
+  if [[ "$CONFIG" == "release" ]]; then
+    CODESIGN_ARGS+=(--options runtime)
+    ENTITLEMENTS="$ROOT/Packaging/Bearoster.entitlements"
+    if [[ -f "$ENTITLEMENTS" ]]; then
+      CODESIGN_ARGS+=(--entitlements "$ENTITLEMENTS")
+    fi
+    if [[ "$SIGN_IDENTITY" != "-" ]]; then
+      CODESIGN_ARGS+=(--timestamp)
+    fi
+  fi
+  codesign "${CODESIGN_ARGS[@]}" "$APP_DIR" >/dev/null
 fi
 
 if [[ "$CONFIG" == "release" ]]; then
