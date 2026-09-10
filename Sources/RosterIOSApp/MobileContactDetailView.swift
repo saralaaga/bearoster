@@ -26,16 +26,16 @@ struct MobileContactDetailView: View {
             }
 
             if !phoneNumbers.isEmpty {
-                Section("电话") {
+                Section(model.l10n(.phone)) {
                     ForEach(phoneNumbers, id: \.self) { phone in
-                        LabeledContent("手机", value: phone)
+                        LabeledContent(model.l10n(.mobilePhone), value: phone)
                     }
                 }
             }
 
-            Section("生日") {
+            Section(model.l10n(.birthday)) {
                 if profile.records.isEmpty {
-                    Text("没有生日记录")
+                    Text(model.l10n(.noRosters))
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(profile.records) { record in
@@ -49,10 +49,10 @@ struct MobileContactDetailView: View {
                 }
             }
 
-            Section("标签") {
+            Section(model.l10n(.tags)) {
                 let tags = model.tags(for: profile.id)
                 if tags.isEmpty {
-                    Text("未打标签")
+                    Text(model.l10n(.untaggedContacts))
                         .foregroundStyle(.secondary)
                 } else {
                     FlowPills(tags: tags)
@@ -60,15 +60,15 @@ struct MobileContactDetailView: View {
             }
 
             if let extended = model.extendedProfilesByID[profile.id], extended.hasVisibleFields {
-                Section("更多资料") {
+                Section(model.l10n(.moreFields)) {
                     if !extended.emailAddresses.isEmpty {
-                        LabeledContent("邮箱", value: extended.emailAddresses.joined(separator: ", "))
+                        LabeledContent(model.l10n(.email), value: extended.emailAddresses.joined(separator: ", "))
                     }
                     if !extended.departmentName.isEmpty {
-                        LabeledContent("部门", value: extended.departmentName)
+                        LabeledContent(model.l10n(.department), value: extended.departmentName)
                     }
                     if !extended.jobTitle.isEmpty {
-                        LabeledContent("职位", value: extended.jobTitle)
+                        LabeledContent(model.l10n(.jobTitle), value: extended.jobTitle)
                     }
                 }
             }
@@ -79,7 +79,7 @@ struct MobileContactDetailView: View {
         #endif
         .toolbar {
             ToolbarItem(placement: editButtonPlacement) {
-                Button("编辑") { }
+                Button(model.l10n(.edit)) { }
             }
         }
     }

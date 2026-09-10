@@ -8,12 +8,12 @@ package final class VoiceInputService {
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
 
-    package func start(locale: Locale, onText: @escaping @MainActor (String) -> Void) async throws {
+    package func start(locale: Locale, language: AppLanguage, onText: @escaping @MainActor (String) -> Void) async throws {
         let speechGranted = await requestSpeechAccess()
         let micGranted = await AVCaptureDevice.requestAccess(for: .audio)
         guard speechGranted, micGranted else {
             throw NSError(domain: "Roster.VoiceInput", code: 1, userInfo: [
-                NSLocalizedDescriptionKey: "Speech recognition and microphone permissions are required."
+                NSLocalizedDescriptionKey: L10n(language: language)(.voiceAccessRequired)
             ])
         }
 
@@ -21,7 +21,7 @@ package final class VoiceInputService {
 
         guard let recognizer = SFSpeechRecognizer(locale: locale), recognizer.isAvailable else {
             throw NSError(domain: "Roster.VoiceInput", code: 2, userInfo: [
-                NSLocalizedDescriptionKey: "Speech recognizer is not available for this language."
+                NSLocalizedDescriptionKey: L10n(language: language)(.voiceLanguageUnavailable)
             ])
         }
 

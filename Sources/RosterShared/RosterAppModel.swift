@@ -367,7 +367,7 @@ package final class RosterAppModel {
         )
         let worker = derivedDataWorker
 
-        startCalculationProgress(message: message)
+        startCalculationProgress(message: localizedProgressMessage(message))
         derivedDataTask?.cancel()
         derivedDataTask = Task {
             if debounceNanoseconds > 0 {
@@ -425,6 +425,25 @@ package final class RosterAppModel {
                 guard self.derivedRequestID == requestID else { return }
                 self.calculationProgress = .inactive
             }
+        }
+    }
+
+    private func localizedProgressMessage(_ message: String) -> String {
+        switch message {
+        case "Preparing roster data", "Calculating roster data", "Calculating upcoming roster data":
+            return l10n(.progressPreparing)
+        case "Filtering roster data", "Searching roster data":
+            return l10n(.progressFiltering)
+        case "Sorting roster data":
+            return l10n(.progressSorting)
+        case "Updating language", "Updating local edits", "Updating contact groups", "Clearing contacts", "Restoring contact":
+            return l10n(.progressUpdating)
+        case "Reading macOS Contacts":
+            return l10n(.progressReadingContacts)
+        case "Calculating month":
+            return l10n(.progressPreparing)
+        default:
+            return message
         }
     }
 
@@ -1591,7 +1610,7 @@ package final class RosterAppModel {
 
         do {
             isListening = true
-            try await voiceInput.start(locale: Locale(identifier: language.coreLocale.rawValue)) { [weak self] text in
+            try await voiceInput.start(locale: Locale(identifier: language.coreLocale.rawValue), language: language) { [weak self] text in
                 self?.voiceText = text
             }
         } catch {
@@ -1899,9 +1918,9 @@ package final class RosterAppModel {
 
     private var contactCreateUnsupportedText: String {
         switch language.coreLocale {
-        case .english: "Creating full macOS contacts is not wired yet."
-        case .simplifiedChinese: "创建完整 macOS 联系人的写回还未接入。"
-        case .traditionalChinese: "建立完整 macOS 聯絡人的寫回尚未接入。"
+        case .english: "Bearoster can’t create new contacts in macOS Contacts yet. Add them in Contacts and they’ll show up here."
+        case .simplifiedChinese: "还不能在 macOS 通讯录里新建联系人，可以先在通讯录里添加，这里会同步显示。"
+        case .traditionalChinese: "還不能在 macOS 通訊錄裡新建聯絡人，可以先在通訊錄裡新增，這裡會同步顯示。"
         }
     }
 
@@ -1909,7 +1928,7 @@ package final class RosterAppModel {
         switch language.coreLocale {
         case .english: "Contact restored locally"
         case .simplifiedChinese: "已从回收站恢复到本地"
-        case .traditionalChinese: "已從回收站恢復到本機"
+        case .traditionalChinese: "已從垃圾桶恢復到本機"
         }
     }
 
@@ -1925,7 +1944,7 @@ package final class RosterAppModel {
         switch language.coreLocale {
         case .english: "Moved \(draft.displayName) to Trash"
         case .simplifiedChinese: "将 \(draft.displayName) 移入回收站"
-        case .traditionalChinese: "將 \(draft.displayName) 移入回收站"
+        case .traditionalChinese: "將 \(draft.displayName) 移入垃圾桶"
         }
     }
 

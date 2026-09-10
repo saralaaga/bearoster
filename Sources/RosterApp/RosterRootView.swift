@@ -167,7 +167,7 @@ struct AppToolbar: View {
         HStack(spacing: 8) {
             ToolbarIconButton(
                 systemImage: "sidebar.left",
-                help: isSidebarCollapsed ? "展开边栏" : "收起边栏"
+                help: isSidebarCollapsed ? model.l10n(.showSidebar) : model.l10n(.hideSidebar)
             ) {
                 withAnimation(RosterTheme.Motion.allowed(RosterTheme.Motion.stateChange, reduceMotion: reduceMotion)) {
                     isSidebarCollapsed.toggle()
@@ -208,7 +208,7 @@ struct AppToolbar: View {
         case .tags:
             TagsToolbar(editor: contactEditorBridge)
         case .sync:
-            ToolbarTitle(text: "同步与历史")
+            ToolbarTitle(text: model.l10n(.syncHistory))
         case .permissions:
             ToolbarTitle(text: model.l10n(.permissions), detail: versionDisplay)
         }

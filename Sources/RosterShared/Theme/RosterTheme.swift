@@ -66,19 +66,35 @@ package enum RosterTheme {
     }
 
     package static func pageBackground(_ scheme: ColorScheme) -> Color {
+        #if os(macOS)
         scheme == .dark ? Color(nsColor: .underPageBackgroundColor) : Color(hex: 0xF5F5F7)
+        #else
+        scheme == .dark ? Color(hex: 0x000000) : Color(hex: 0xF5F5F7)
+        #endif
     }
 
     package static func windowBackground(_ scheme: ColorScheme) -> Color {
+        #if os(macOS)
         scheme == .dark ? Color(nsColor: .windowBackgroundColor) : Color.white
+        #else
+        scheme == .dark ? Color(hex: 0x1C1C1E) : Color.white
+        #endif
     }
 
     package static func sidebarBackground(_ scheme: ColorScheme) -> Color {
+        #if os(macOS)
         scheme == .dark ? Color(nsColor: .underPageBackgroundColor) : Color(hex: 0xF2F2F7)
+        #else
+        scheme == .dark ? Color(hex: 0x000000) : Color(hex: 0xF2F2F7)
+        #endif
     }
 
     package static func cardBackground(_ scheme: ColorScheme) -> Color {
+        #if os(macOS)
         scheme == .dark ? Color(nsColor: .controlBackgroundColor) : .white
+        #else
+        scheme == .dark ? Color(hex: 0x2C2C2E) : .white
+        #endif
     }
 
     package static func controlBackground(_ scheme: ColorScheme) -> Color {

@@ -9,24 +9,24 @@ struct MobileMoreView: View {
 
         NavigationStack {
             List {
-                Section("同步") {
-                    LabeledContent("待写回", value: "\(model.pendingContactOperationCount)")
-                    LabeledContent("失败", value: "\(model.failedContactOperationCount)")
-                    LabeledContent("冲突", value: "\(model.conflictedContactOperationCount)")
+                Section(model.l10n(.sync)) {
+                    LabeledContent(model.l10n(.statusPending), value: "\(model.pendingContactOperationCount)")
+                    LabeledContent(model.l10n(.statusFailed), value: "\(model.failedContactOperationCount)")
+                    LabeledContent(model.l10n(.statusConflict), value: "\(model.conflictedContactOperationCount)")
                 }
 
-                Section("设置") {
-                    Toggle("显示年龄", isOn: $model.showAge)
+                Section(model.l10n(.settings)) {
+                    Toggle(model.l10n(.displayAge), isOn: $model.showAge)
 
-                    Picker("语言", selection: $model.language) {
-                        Text("跟随系统").tag(AppLanguage.system)
-                        Text("简体中文").tag(AppLanguage.zhHans)
-                        Text("繁體中文").tag(AppLanguage.zhHant)
+                    Picker(model.l10n(.appLanguage), selection: $model.language) {
+                        Text(AppLanguage.system.displayName).tag(AppLanguage.system)
+                        Text(AppLanguage.zhHans.displayName).tag(AppLanguage.zhHans)
+                        Text(AppLanguage.zhHant.displayName).tag(AppLanguage.zhHant)
                         Text("English").tag(AppLanguage.en)
                     }
                 }
             }
-            .navigationTitle("更多")
+            .navigationTitle(model.l10n(.more))
         }
     }
 }

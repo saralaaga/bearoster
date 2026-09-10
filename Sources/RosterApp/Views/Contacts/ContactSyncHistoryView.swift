@@ -11,30 +11,30 @@ struct ContactSyncHistoryView: View {
                 header
 
                 NativeInfoCard {
-                    NativeInfoRow(label: "写入模式") {
-                        Picker("写入模式", selection: Binding(
+                    NativeInfoRow(label: model.l10n(.writePolicy)) {
+                        Picker(model.l10n(.writePolicy), selection: Binding(
                             get: { model.contactWritePolicy },
                             set: { model.setContactWritePolicy($0) }
                         )) {
-                            Text("仅本地").tag(ContactWritePolicy.localOnly)
-                            Text("确认后写入").tag(ContactWritePolicy.confirmBeforeWrite)
-                            Text("自动写入").tag(ContactWritePolicy.automatic)
+                            Text(model.l10n(.writePolicyLocalOnly)).tag(ContactWritePolicy.localOnly)
+                            Text(model.l10n(.writePolicyConfirm)).tag(ContactWritePolicy.confirmBeforeWrite)
+                            Text(model.l10n(.writePolicyAutomatic)).tag(ContactWritePolicy.automatic)
                         }
                         .pickerStyle(.segmented)
                     }
 
                     NativeDivider()
 
-                    NativeInfoRow(label: "队列") {
+                    NativeInfoRow(label: model.l10n(.queue)) {
                         HStack(spacing: 10) {
-                            StatusPill(title: "待写入", count: model.pendingContactOperationCount, color: ContactsNativeStyle.accent)
-                            StatusPill(title: "冲突", count: model.conflictedContactOperationCount, color: ContactsNativeStyle.red)
-                            StatusPill(title: "失败", count: model.failedContactOperationCount, color: Color(hex: 0xFF9500))
+                            StatusPill(title: model.l10n(.statusPending), count: model.pendingContactOperationCount, color: ContactsNativeStyle.accent)
+                            StatusPill(title: model.l10n(.statusConflict), count: model.conflictedContactOperationCount, color: ContactsNativeStyle.red)
+                            StatusPill(title: model.l10n(.statusFailed), count: model.failedContactOperationCount, color: Color(hex: 0xFF9500))
                             Spacer(minLength: 0)
                             Button {
                                 Task { await model.writeBackPendingContactOperations() }
                             } label: {
-                                Label("写入待处理", systemImage: "arrow.up.doc")
+                                Label(model.l10n(.writePending), systemImage: "arrow.up.doc")
                             }
                             .buttonStyle(KimiActionButtonStyle(kind: .primary))
                             .disabled(model.pendingContactOperationCount == 0)
@@ -43,22 +43,22 @@ struct ContactSyncHistoryView: View {
                 }
 
                 if !conflicts.isEmpty {
-                    operationSection(title: "冲突", operations: conflicts, showsConflictActions: true)
+                    operationSection(title: model.l10n(.statusConflict), operations: conflicts, showsConflictActions: true)
                 }
 
                 if !failed.isEmpty {
-                    operationSection(title: "失败", operations: failed, showsConflictActions: false)
+                    operationSection(title: model.l10n(.statusFailed), operations: failed, showsConflictActions: false)
                 }
 
                 if !pending.isEmpty {
-                    operationSection(title: "待写入", operations: pending, showsConflictActions: false)
+                    operationSection(title: model.l10n(.statusPending), operations: pending, showsConflictActions: false)
                 }
 
                 if !trashedDrafts.isEmpty {
                     trashSection
                 }
 
-                operationSection(title: "历史记录", operations: history, showsConflictActions: false)
+                operationSection(title: model.l10n(.history), operations: history, showsConflictActions: false)
             }
             .padding(.horizontal, 32)
             .padding(.top, 30)
@@ -71,9 +71,9 @@ struct ContactSyncHistoryView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text("同步与历史")
+            Text(model.l10n(.syncHistory))
                 .font(.system(size: 24, weight: .bold))
-            Text("联系人修改先保存在名册，本页负责确认写回、冲突处理、失败重试和回收站恢复。")
+            Text(model.l10n(.syncHistoryBody))
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
         }
@@ -111,7 +111,7 @@ struct ContactSyncHistoryView: View {
             SectionTitle(title: title, count: operations.count)
             NativeInfoCard {
                 if operations.isEmpty {
-                    EmptyJournalRow(text: "没有记录")
+                    EmptyJournalRow(text: model.l10n(.noEntries))
                 } else {
                     ForEach(Array(operations.enumerated()), id: \.element.id) { index, operation in
                         if index > 0 {
@@ -126,7 +126,7 @@ struct ContactSyncHistoryView: View {
 
     private var trashSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionTitle(title: "回收站", count: trashedDrafts.count)
+            SectionTitle(title: model.l10n(.trash), count: trashedDrafts.count)
             NativeInfoCard {
                 ForEach(Array(trashedDrafts.enumerated()), id: \.element.id) { index, draft in
                     if index > 0 {
@@ -137,7 +137,7 @@ struct ContactSyncHistoryView: View {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(draft.displayName)
                                 .font(.system(size: 13.5, weight: .semibold))
-                            Text(draft.deletedAt.map(Self.dateFormatter.string(from:)) ?? "本地回收站")
+                            Text(draft.deletedAt.map(Self.dateFormatter.string(from:)) ?? model.l10n(.trashLocal))
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
                         }
@@ -145,7 +145,7 @@ struct ContactSyncHistoryView: View {
                         Button {
                             Task { await model.restoreContactFromTrash(draft.id) }
                         } label: {
-                            Label("恢复", systemImage: "arrow.uturn.backward")
+                            Label(model.l10n(.restore), systemImage: "arrow.uturn.backward")
                         }
                         .buttonStyle(KimiActionButtonStyle(kind: .regular))
                     }
@@ -247,7 +247,7 @@ private struct ContactOperationRow: View {
             if !operation.fieldChanges.isEmpty {
                 VStack(alignment: .leading, spacing: 3) {
                     ForEach(operation.fieldChanges, id: \.self) { change in
-                        Text("\(change.field): \(change.previousValue) -> \(change.nextValue)")
+                        Text("\(change.field): \(change.previousValue) → \(change.nextValue)")
                             .font(.system(size: 11.5))
                             .foregroundStyle(.secondary)
                             .lineLimit(2)
@@ -259,12 +259,12 @@ private struct ContactOperationRow: View {
             if showsConflictActions {
                 HStack(spacing: 8) {
                     Spacer(minLength: 36)
-                    Button("使用 macOS 版本") {
+                    Button(model.l10n(.keepMacOSVersion)) {
                         Task { await model.acceptMacOSVersion(for: operation.id) }
                     }
                     .buttonStyle(KimiActionButtonStyle(kind: .regular))
 
-                    Button("用本地覆盖") {
+                    Button(model.l10n(.keepLocalVersion)) {
                         Task { await model.overwriteMacOSVersion(for: operation.id) }
                     }
                     .buttonStyle(KimiActionButtonStyle(kind: .primary))
@@ -288,11 +288,11 @@ private struct ContactOperationRow: View {
 
     private var statusText: String {
         switch operation.status {
-        case .pending: "待写入"
-        case .applied: "已写入"
-        case .failed: "失败"
-        case .conflict: "冲突"
-        case .reverted: "已放弃"
+        case .pending: model.l10n(.statusPending)
+        case .applied: model.l10n(.statusApplied)
+        case .failed: model.l10n(.statusFailed)
+        case .conflict: model.l10n(.statusConflict)
+        case .reverted: model.l10n(.statusReverted)
         }
     }
 

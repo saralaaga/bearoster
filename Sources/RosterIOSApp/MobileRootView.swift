@@ -1,3 +1,4 @@
+import RosterShared
 import SwiftUI
 
 struct MobileRootView: View {
@@ -8,24 +9,25 @@ struct MobileRootView: View {
         case more
     }
 
+    @Environment(RosterAppModel.self) private var model
     @State private var tab: Tab = .contacts
 
     var body: some View {
         TabView(selection: $tab) {
             MobileContactsView()
-                .tabItem { Label("通讯录", systemImage: "person.crop.circle") }
+                .tabItem { Label(model.l10n(.contacts), systemImage: "person.crop.circle") }
                 .tag(Tab.contacts)
 
             MobileTagsView()
-                .tabItem { Label("标签", systemImage: "tag") }
+                .tabItem { Label(model.l10n(.tags), systemImage: "tag") }
                 .tag(Tab.tags)
 
             MobileCalendarView()
-                .tabItem { Label("日历", systemImage: "calendar") }
+                .tabItem { Label(model.l10n(.calendar), systemImage: "calendar") }
                 .tag(Tab.calendar)
 
             MobileMoreView()
-                .tabItem { Label("更多", systemImage: "ellipsis.circle") }
+                .tabItem { Label(model.l10n(.more), systemImage: "ellipsis.circle") }
                 .tag(Tab.more)
         }
     }

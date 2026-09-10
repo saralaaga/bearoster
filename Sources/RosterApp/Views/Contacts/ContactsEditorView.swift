@@ -773,7 +773,7 @@ struct BulkContactSelectionView: View {
                     }
                 }
 
-                Text("可批量整理这些联系人")
+                Text(localCopy(zhHans: "可批量整理这些联系人", zhHant: "可批量整理這些聯絡人", en: "Ready for batch cleanup"))
                     .font(.system(size: 12.5, weight: .medium))
                     .foregroundStyle(.secondary)
             }
@@ -810,13 +810,13 @@ struct BulkContactSelectionView: View {
     private func renameCard(selectedProfiles: [ContactRosterProfile]) -> some View {
         NativeInfoCard {
             VStack(alignment: .leading, spacing: 14) {
-                Text("批量重命名")
+                Text(model.l10n(.batchRename))
                     .font(.system(size: 13, weight: .bold))
 
-                Picker("重命名方式", selection: $draft.renameMode) {
-                    Text("替换").tag(ContactBatchRenameMode.replace)
-                    Text("前缀").tag(ContactBatchRenameMode.prefix)
-                    Text("后缀").tag(ContactBatchRenameMode.suffix)
+                Picker(localCopy(zhHans: "重命名方式", zhHant: "重新命名方式", en: "Rename method"), selection: $draft.renameMode) {
+                    Text(localCopy(zhHans: "替换", zhHant: "取代", en: "Replace")).tag(ContactBatchRenameMode.replace)
+                    Text(localCopy(zhHans: "前缀", zhHant: "前綴", en: "Prefix")).tag(ContactBatchRenameMode.prefix)
+                    Text(localCopy(zhHans: "后缀", zhHant: "後綴", en: "Suffix")).tag(ContactBatchRenameMode.suffix)
                 }
                 .pickerStyle(.segmented)
                 .frame(maxWidth: 320)
@@ -824,16 +824,16 @@ struct BulkContactSelectionView: View {
                 switch draft.renameMode {
                 case .replace:
                     HStack(spacing: 10) {
-                        BatchField(title: "查找", text: $draft.renameFind, placeholder: "原文本")
-                        BatchField(title: "替换为", text: $draft.renameReplacement, placeholder: "新文本")
+                        BatchField(title: localCopy(zhHans: "查找", zhHant: "尋找", en: "Find"), text: $draft.renameFind, placeholder: localCopy(zhHans: "原文本", zhHant: "原文字", en: "Text to replace"))
+                        BatchField(title: localCopy(zhHans: "替换为", zhHant: "取代為", en: "Replace with"), text: $draft.renameReplacement, placeholder: localCopy(zhHans: "新文本", zhHant: "新文字", en: "New text"))
                     }
                 case .prefix:
-                    BatchField(title: "前缀", text: $draft.renamePrefix, placeholder: "例如：VIP - ")
+                    BatchField(title: localCopy(zhHans: "前缀", zhHant: "前綴", en: "Prefix"), text: $draft.renamePrefix, placeholder: localCopy(zhHans: "例如：VIP - ", zhHant: "例如：VIP - ", en: "Example: VIP - "))
                 case .suffix:
-                    BatchField(title: "后缀", text: $draft.renameSuffix, placeholder: "例如： (客户)")
+                    BatchField(title: localCopy(zhHans: "后缀", zhHant: "後綴", en: "Suffix"), text: $draft.renameSuffix, placeholder: localCopy(zhHans: "例如： (客户)", zhHant: "例如： (客戶)", en: "Example: (Client)"))
                 }
 
-                Text("会先显示预览，再决定是仅补空还是覆盖已有值。")
+                Text(localCopy(zhHans: "先预览改动，再选择只填写空项或覆盖已有值。", zhHant: "先預覽改動，再選擇只填寫空項或覆蓋既有值。", en: "Preview changes first, then choose whether to fill blanks or overwrite existing values."))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
@@ -845,12 +845,12 @@ struct BulkContactSelectionView: View {
         NativeInfoCard {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    Text("共同字段")
+                    Text(model.l10n(.batchCommonFields))
                         .font(.system(size: 13, weight: .bold))
                     Spacer(minLength: 0)
-                    Picker("写入策略", selection: $fillPolicy) {
-                        Text("仅补空").tag(ContactBatchFillPolicy.onlyEmpty)
-                        Text("覆盖已有值").tag(ContactBatchFillPolicy.overwriteExisting)
+                    Picker(model.l10n(.batchWritePolicy), selection: $fillPolicy) {
+                        Text(model.l10n(.batchOnlyEmpty)).tag(ContactBatchFillPolicy.onlyEmpty)
+                        Text(model.l10n(.batchOverwrite)).tag(ContactBatchFillPolicy.overwriteExisting)
                     }
                     .pickerStyle(.segmented)
                     .frame(width: 240)
@@ -859,14 +859,14 @@ struct BulkContactSelectionView: View {
                 VStack(spacing: 10) {
                     HStack(spacing: 10) {
                         BatchField(title: model.l10n(.name), text: $draft.givenName, placeholder: commonTextPlaceholder(selectedProfiles, value: \.givenName))
-                        BatchField(title: "姓", text: $draft.familyName, placeholder: commonTextPlaceholder(selectedProfiles, value: \.familyName))
-                        BatchField(title: "昵称", text: $draft.nickname, placeholder: commonTextPlaceholder(selectedProfiles, value: \.nickname))
+                        BatchField(title: model.l10n(.familyName), text: $draft.familyName, placeholder: commonTextPlaceholder(selectedProfiles, value: \.familyName))
+                        BatchField(title: model.l10n(.nickname), text: $draft.nickname, placeholder: commonTextPlaceholder(selectedProfiles, value: \.nickname))
                     }
 
                     HStack(spacing: 10) {
                         BatchField(title: model.l10n(.work), text: $draft.organizationName, placeholder: commonTextPlaceholder(selectedProfiles, value: \.organizationName))
-                        BatchField(title: "部门", text: $draft.departmentName, placeholder: commonTextPlaceholder(selectedProfiles, value: \.departmentName))
-                        BatchField(title: "职位", text: $draft.jobTitle, placeholder: commonTextPlaceholder(selectedProfiles, value: \.jobTitle))
+                        BatchField(title: model.l10n(.department), text: $draft.departmentName, placeholder: commonTextPlaceholder(selectedProfiles, value: \.departmentName))
+                        BatchField(title: model.l10n(.jobTitle), text: $draft.jobTitle, placeholder: commonTextPlaceholder(selectedProfiles, value: \.jobTitle))
                     }
 
                     BatchMultilineField(title: model.l10n(.phone), text: $draft.phoneNumbers, placeholder: commonListPlaceholder(selectedProfiles, value: \.phoneNumbers))
@@ -881,7 +881,7 @@ struct BulkContactSelectionView: View {
     private func previewCard(selectedProfiles: [ContactRosterProfile]) -> some View {
         NativeInfoCard {
             VStack(alignment: .leading, spacing: 12) {
-                Text("预览")
+                Text(model.l10n(.batchPreview))
                     .font(.system(size: 13, weight: .bold))
 
                 VStack(alignment: .leading, spacing: 6) {
@@ -930,7 +930,7 @@ struct BulkContactSelectionView: View {
 
     private func previewLines(for selectedProfiles: [ContactRosterProfile]) -> [String] {
         let count = selectedProfiles.count
-        guard count > 0 else { return ["未选择联系人"] }
+        guard count > 0 else { return [localCopy(zhHans: "未选择联系人", zhHant: "未選取聯絡人", en: "No contacts selected")] }
 
         var lines: [String] = []
         let renameValue = previewRenameSummary()
@@ -938,18 +938,18 @@ struct BulkContactSelectionView: View {
             lines.append(renameValue)
         }
 
-        appendPreview(&lines, title: "姓名", value: draft.givenName, selectedProfiles: selectedProfiles, keyPath: \.givenName)
-        appendPreview(&lines, title: "姓", value: draft.familyName, selectedProfiles: selectedProfiles, keyPath: \.familyName)
-        appendPreview(&lines, title: "昵称", value: draft.nickname, selectedProfiles: selectedProfiles, keyPath: \.nickname)
-        appendPreview(&lines, title: "公司", value: draft.organizationName, selectedProfiles: selectedProfiles, keyPath: \.organizationName)
-        appendPreview(&lines, title: "部门", value: draft.departmentName, selectedProfiles: selectedProfiles, keyPath: \.departmentName)
-        appendPreview(&lines, title: "职位", value: draft.jobTitle, selectedProfiles: selectedProfiles, keyPath: \.jobTitle)
-        appendPreviewList(&lines, title: "电话", value: draft.phoneNumbers, selectedProfiles: selectedProfiles, keyPath: \.phoneNumbers)
-        appendPreviewList(&lines, title: "邮箱", value: draft.emailAddresses, selectedProfiles: selectedProfiles, keyPath: \.emailAddresses)
-        appendPreviewList(&lines, title: "地址", value: draft.postalAddresses, selectedProfiles: selectedProfiles, keyPath: \.postalAddresses)
+        appendPreview(&lines, title: model.l10n(.name), value: draft.givenName, selectedProfiles: selectedProfiles, keyPath: \.givenName)
+        appendPreview(&lines, title: model.l10n(.familyName), value: draft.familyName, selectedProfiles: selectedProfiles, keyPath: \.familyName)
+        appendPreview(&lines, title: model.l10n(.nickname), value: draft.nickname, selectedProfiles: selectedProfiles, keyPath: \.nickname)
+        appendPreview(&lines, title: model.l10n(.organization), value: draft.organizationName, selectedProfiles: selectedProfiles, keyPath: \.organizationName)
+        appendPreview(&lines, title: model.l10n(.department), value: draft.departmentName, selectedProfiles: selectedProfiles, keyPath: \.departmentName)
+        appendPreview(&lines, title: model.l10n(.jobTitle), value: draft.jobTitle, selectedProfiles: selectedProfiles, keyPath: \.jobTitle)
+        appendPreviewList(&lines, title: model.l10n(.phone), value: draft.phoneNumbers, selectedProfiles: selectedProfiles, keyPath: \.phoneNumbers)
+        appendPreviewList(&lines, title: model.l10n(.email), value: draft.emailAddresses, selectedProfiles: selectedProfiles, keyPath: \.emailAddresses)
+        appendPreviewList(&lines, title: model.l10n(.address), value: draft.postalAddresses, selectedProfiles: selectedProfiles, keyPath: \.postalAddresses)
 
         if lines.isEmpty {
-            lines.append("未填写批量改动。")
+            lines.append(localCopy(zhHans: "还没有填写批量改动。", zhHant: "還沒有填寫批量改動。", en: "No batch changes entered yet."))
         }
         return lines
     }
@@ -960,15 +960,15 @@ struct BulkContactSelectionView: View {
             let needle = draft.renameFind.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !needle.isEmpty else { return "" }
             let count = previewCount { $0.displayName.contains(needle) || $0.nickname.contains(needle) }
-            return "替换「\(needle)」会影响 \(count) 人"
+            return localCopy(zhHans: "重命名 \(count) 位联系人", zhHant: "重新命名 \(count) 位聯絡人", en: "Renames \(contactCountText(count))")
         case .prefix:
             let prefix = draft.renamePrefix.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !prefix.isEmpty else { return "" }
-            return "前缀「\(prefix)」会影响 \(model.selectedContactSelectionCount) 人"
+            return localCopy(zhHans: "给 \(model.selectedContactSelectionCount) 位联系人姓名加上「\(prefix)」", zhHant: "為 \(model.selectedContactSelectionCount) 位聯絡人姓名加上「\(prefix)」", en: "Adds “\(prefix)” to \(nameCountText(model.selectedContactSelectionCount))")
         case .suffix:
             let suffix = draft.renameSuffix.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !suffix.isEmpty else { return "" }
-            return "后缀「\(suffix)」会影响 \(model.selectedContactSelectionCount) 人"
+            return localCopy(zhHans: "给 \(model.selectedContactSelectionCount) 位联系人姓名加上「\(suffix)」", zhHant: "為 \(model.selectedContactSelectionCount) 位聯絡人姓名加上「\(suffix)」", en: "Adds “\(suffix)” to \(nameCountText(model.selectedContactSelectionCount))")
         }
     }
 
@@ -982,7 +982,7 @@ struct BulkContactSelectionView: View {
         guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         let count = previewCount(selectedProfiles, keyPath: keyPath)
         guard count > 0 else { return }
-        lines.append("\(title)：将\(fillPolicy == .onlyEmpty ? "补充" : "覆盖") \(count) 人")
+        lines.append(previewLine(title: title, count: count))
     }
 
     private func appendPreviewList(
@@ -995,7 +995,7 @@ struct BulkContactSelectionView: View {
         guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         let count = previewCount(selectedProfiles, keyPath: keyPath)
         guard count > 0 else { return }
-        lines.append("\(title)：将\(fillPolicy == .onlyEmpty ? "补充" : "覆盖") \(count) 人")
+        lines.append(previewLine(title: title, count: count))
     }
 
     private func previewCount(
@@ -1046,14 +1046,46 @@ struct BulkContactSelectionView: View {
         _ selectedProfiles: [ContactRosterProfile],
         value: KeyPath<ContactRosterProfile, String>
     ) -> String {
-        commonTextValue(selectedProfiles, value: value).isEmpty ? "混合值" : commonTextValue(selectedProfiles, value: value)
+        commonTextValue(selectedProfiles, value: value).isEmpty ? localCopy(zhHans: "多个不同值", zhHant: "多個不同值", en: "Mixed values") : commonTextValue(selectedProfiles, value: value)
     }
 
     private func commonListPlaceholder(
         _ selectedProfiles: [ContactRosterProfile],
         value: KeyPath<ContactRosterProfile, [String]>
     ) -> String {
-        commonListValue(selectedProfiles, value: value).isEmpty ? "每行一个" : commonListValue(selectedProfiles, value: value)
+        commonListValue(selectedProfiles, value: value).isEmpty ? model.l10n(.onePerLine) : commonListValue(selectedProfiles, value: value)
+    }
+
+    private func previewLine(title: String, count: Int) -> String {
+        switch model.language.coreLocale {
+        case .english:
+            let verb = fillPolicy == .onlyEmpty ? "fill" : "overwrite"
+            return "\(contactCountText(count)): \(verb) \(title)"
+        case .simplifiedChinese:
+            return "\(title)：\(fillPolicy == .onlyEmpty ? "填写空项" : "覆盖已有值")，\(count) 位联系人"
+        case .traditionalChinese:
+            return "\(title)：\(fillPolicy == .onlyEmpty ? "填寫空項" : "覆蓋既有值")，\(count) 位聯絡人"
+        }
+    }
+
+    private func nameCountText(_ count: Int) -> String {
+        count == 1 ? "1 name" : "\(count) names"
+    }
+
+    private func contactCountText(_ count: Int) -> String {
+        switch model.language.coreLocale {
+        case .english: count == 1 ? "1 contact" : "\(count) contacts"
+        case .simplifiedChinese: "\(count) 位联系人"
+        case .traditionalChinese: "\(count) 位聯絡人"
+        }
+    }
+
+    private func localCopy(zhHans: String, zhHant: String, en: String) -> String {
+        switch model.language.coreLocale {
+        case .english: en
+        case .simplifiedChinese: zhHans
+        case .traditionalChinese: zhHant
+        }
     }
 }
 

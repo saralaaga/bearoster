@@ -22,7 +22,7 @@ struct MobileContactsView: View {
                 filterSection
 
                 if rows.isEmpty {
-                    ContentUnavailableView("没有联系人", systemImage: "person.crop.circle")
+                    ContentUnavailableView(model.l10n(.noContacts), systemImage: "person.crop.circle")
                         .listRowBackground(Color.clear)
                 } else {
                     ForEach(rows) { row in
@@ -32,13 +32,13 @@ struct MobileContactsView: View {
                     }
                 }
             }
-            .navigationTitle("通讯录")
-            .searchable(text: $searchText, prompt: "搜索姓名、公司、标签")
+            .navigationTitle(model.l10n(.contacts))
+            .searchable(text: $searchText, prompt: model.l10n(.searchContactsPrompt))
             .navigationDestination(for: String.self) { contactID in
                 if let profile = model.profile(for: contactID) {
                     MobileContactDetailView(profile: profile)
                 } else {
-                    ContentUnavailableView("联系人不可用", systemImage: "person.crop.circle.badge.exclamationmark")
+                    ContentUnavailableView(model.l10n(.contactsUnavailable), systemImage: "person.crop.circle.badge.exclamationmark")
                 }
             }
             .toolbar {
@@ -46,7 +46,7 @@ struct MobileContactsView: View {
                     Button { } label: {
                         Image(systemName: "plus")
                     }
-                    .accessibilityLabel("新建联系人")
+                    .accessibilityLabel(model.l10n(.newContact))
                 }
             }
         }
@@ -63,12 +63,12 @@ struct MobileContactsView: View {
     private var filterSection: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                MobileFilterChip(title: "全部", count: model.visibleContactCount, isSelected: selectedFilter == .all) {
+                MobileFilterChip(title: model.l10n(.all), count: model.visibleContactCount, isSelected: selectedFilter == .all) {
                     selectedFilter = .all
                     model.selectTagFilter(.all)
                 }
 
-                MobileFilterChip(title: "未打标签", count: model.contactCount(for: .untagged), isSelected: selectedFilter == .untagged) {
+                MobileFilterChip(title: model.l10n(.untaggedContacts), count: model.contactCount(for: .untagged), isSelected: selectedFilter == .untagged) {
                     selectedFilter = .untagged
                     model.selectTagFilter(.untagged)
                 }

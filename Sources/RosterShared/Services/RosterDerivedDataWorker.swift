@@ -59,14 +59,14 @@ package actor RosterDerivedDataWorker {
     ) -> RosterDerivedDataSnapshot {
         let key = RosterDerivedDataCacheKey(request)
         if let cached = cache[key] {
-            progress(.active(message: "Using cached roster data", completed: 1, total: 1))
+            progress(.active(message: Self.progressText(zhHans: "使用缓存的生日数据", zhHant: "使用快取的生日資料", en: "Using cached birthday data", locale: request.language.coreLocale), completed: 1, total: 1))
             return cached
         }
 
-        progress(.active(message: "Preparing roster records", completed: 0, total: 6))
+        progress(.active(message: Self.progressText(zhHans: "准备生日记录", zhHant: "準備生日記錄", en: "Preparing birthday records", locale: request.language.coreLocale), completed: 0, total: 6))
         let allRecords = service.allRecords(from: request.profiles)
 
-        progress(.active(message: "Filtering roster records", completed: 1, total: 6))
+        progress(.active(message: Self.progressText(zhHans: "筛选生日记录", zhHant: "篩選生日記錄", en: "Filtering birthday records", locale: request.language.coreLocale), completed: 1, total: 6))
         let filtered = service.filteredRecords(
             from: allRecords,
             searchText: request.searchText,
@@ -77,7 +77,7 @@ package actor RosterDerivedDataWorker {
             sort: request.sort
         )
 
-        progress(.active(message: "Grouping roster list", completed: 2, total: 6))
+        progress(.active(message: Self.progressText(zhHans: "整理生日列表", zhHant: "整理生日列表", en: "Grouping birthdays", locale: request.language.coreLocale), completed: 2, total: 6))
         let groups = service.recordGroups(
             from: filtered.occurrences,
             sort: request.sort,
@@ -93,13 +93,13 @@ package actor RosterDerivedDataWorker {
             todayText: request.todayText
         )
 
-        progress(.active(message: "Calculating upcoming roster data", completed: 3, total: 6))
+        progress(.active(message: Self.progressText(zhHans: "计算近期生日", zhHant: "計算近期生日", en: "Calculating upcoming birthdays", locale: request.language.coreLocale), completed: 3, total: 6))
         let upcoming = service.upcomingOccurrences(
             from: allRecords,
             upcomingRange: request.upcomingRange
         )
 
-        progress(.active(message: "Calculating visible month", completed: 4, total: 6))
+        progress(.active(message: Self.progressText(zhHans: "计算本月", zhHant: "計算本月", en: "Calculating this month", locale: request.language.coreLocale), completed: 4, total: 6))
         let visible = service.visibleMonthData(
             allRecords: allRecords,
             visibleMonth: request.visibleMonth,
@@ -109,7 +109,7 @@ package actor RosterDerivedDataWorker {
         ) { completedDays, totalDays in
             let base = 4.0 / 6.0
             let monthShare = totalDays == 0 ? 0 : (Double(completedDays) / Double(totalDays)) / 6.0
-            progress(.active(message: "Calculating visible month", completed: Int((base + monthShare) * 100), total: 100))
+            progress(.active(message: Self.progressText(zhHans: "计算本月", zhHant: "計算本月", en: "Calculating this month", locale: request.language.coreLocale), completed: Int((base + monthShare) * 100), total: 100))
         }
 
         let snapshot = RosterDerivedDataSnapshot(
@@ -127,7 +127,7 @@ package actor RosterDerivedDataWorker {
             visibleFilteredOccurrencesByDay: visible.filteredOccurrencesByDay
         )
 
-        progress(.active(message: "Finishing roster data", completed: 6, total: 6))
+        progress(.active(message: Self.progressText(zhHans: "完成生日数据", zhHant: "完成生日資料", en: "Finishing birthday data", locale: request.language.coreLocale), completed: 6, total: 6))
         cache[key] = snapshot
         trimCacheIfNeeded()
         return snapshot
@@ -138,6 +138,14 @@ package actor RosterDerivedDataWorker {
         searchText: String
     ) -> [Date: [RosterOccurrence]] {
         service.filterVisibleOccurrences(occurrencesByDay, searchText: searchText)
+    }
+
+    private static func progressText(zhHans: String, zhHant: String, en: String, locale: CalendarFormattingService.AppLocale) -> String {
+        switch locale {
+        case .english: en
+        case .simplifiedChinese: zhHans
+        case .traditionalChinese: zhHant
+        }
     }
 
     private func trimCacheIfNeeded() {

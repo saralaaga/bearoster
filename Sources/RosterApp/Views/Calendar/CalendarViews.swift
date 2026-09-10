@@ -22,6 +22,7 @@ struct CalendarDashboardView: View {
             if mode == .month {
                 HStack(spacing: 0) {
                     MonthGridView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     Rectangle()
                         .fill(RosterTheme.separator(colorScheme))
                         .frame(width: 1)
@@ -39,12 +40,20 @@ struct CalendarDashboardView: View {
 struct MonthGridView: View {
     @Environment(RosterAppModel.self) private var model
     @Environment(\.colorScheme) private var colorScheme
-    private static let columns = Array(repeating: GridItem(.flexible(minimum: 64), spacing: 6), count: 7)
+    private static let gridSpacing: CGFloat = 6
+    private static let minRowHeight: CGFloat = 64
     private let calendar = Calendar(identifier: .gregorian)
+
+    private var weeks: [[Date]] {
+        let dates = model.visibleMonthDates
+        return stride(from: 0, to: dates.count, by: 7).map {
+            Array(dates[$0..<min($0 + 7, dates.count)])
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            LazyVGrid(columns: Self.columns, spacing: 6) {
+            HStack(spacing: Self.gridSpacing) {
                 ForEach(model.weekdaySymbols, id: \.self) { symbol in
                     Text(symbol)
                         .font(.caption.weight(.semibold))
@@ -57,23 +66,40 @@ struct MonthGridView: View {
             .padding(.top, 14)
             .padding(.bottom, 4)
 
-            ScrollView {
-                LazyVGrid(columns: Self.columns, spacing: 6) {
-                    ForEach(model.visibleMonthDates, id: \.self) { date in
-                        CalendarDayCell(
-                            date: date,
-                            occurrences: model.filteredRecords(on: date),
-                            inDisplayedMonth: isInDisplayedMonth(date),
-                            isSelected: calendar.isDate(model.selectedDate, inSameDayAs: date)
-                        )
-                            .frame(minHeight: 94)
+            GeometryReader { proxy in
+                let rowHeight = Self.rowHeight(availableHeight: proxy.size.height, rowCount: weeks.count)
+
+                ScrollView {
+                    VStack(spacing: Self.gridSpacing) {
+                        ForEach(Array(weeks.enumerated()), id: \.offset) { _, week in
+                            HStack(spacing: Self.gridSpacing) {
+                                ForEach(week, id: \.self) { date in
+                                    CalendarDayCell(
+                                        date: date,
+                                        occurrences: model.filteredRecords(on: date),
+                                        inDisplayedMonth: isInDisplayedMonth(date),
+                                        isSelected: calendar.isDate(model.selectedDate, inSameDayAs: date)
+                                    )
+                                }
+                            }
+                            .frame(height: rowHeight)
+                        }
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 18)
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 18)
             }
         }
         .background(RosterTheme.windowBackground(colorScheme))
+    }
+
+    /// Evenly distributes the available height across the month's week rows,
+    /// clamped to a minimum row height so very short windows scroll instead of squeezing.
+    private static func rowHeight(availableHeight: CGFloat, rowCount: Int) -> CGFloat {
+        let rows = CGFloat(max(rowCount, 1))
+        let overhead = gridSpacing * (rows - 1) + 18 // row spacing + bottom padding
+        return max(minRowHeight, (availableHeight - overhead) / rows)
     }
 
     private func isInDisplayedMonth(_ date: Date) -> Bool {
@@ -121,7 +147,7 @@ struct CalendarDayCell: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(borderColor, lineWidth: isToday || isSelected ? 1.3 : 1)
+                    .strokeBorder(borderColor, lineWidth: isSelected ? 1.5 : 1)
             )
             .saturation(inDisplayedMonth ? 1 : 0)
             .opacity(inDisplayedMonth ? 1 : 0.45)
@@ -132,15 +158,15 @@ struct CalendarDayCell: View {
     }
 
     private var background: Color {
-        if isSelected { return RosterTheme.mustard.opacity(colorScheme == .dark ? 0.14 : 0.22) }
-        if inDisplayedMonth { return RosterTheme.cardBackground(colorScheme) }
+        if isSelected { return RosterTheme.accent.opacity(0.12) }
+        if !occurrences.isEmpty { return RosterTheme.cardBackground(colorScheme) }
         return .clear
     }
 
     private var borderColor: Color {
-        if isToday { return RosterTheme.accent }
-        if isSelected { return RosterTheme.mustard }
-        return inDisplayedMonth ? RosterTheme.separator(colorScheme) : .clear
+        if isSelected { return RosterTheme.accent }
+        if !occurrences.isEmpty { return RosterTheme.separator(colorScheme) }
+        return .clear
     }
 
     private var accessibilityLabel: String {
@@ -152,26 +178,23 @@ struct CalendarDayCell: View {
 }
 
 struct RosterPill: View {
-    @Environment(RosterAppModel.self) private var model
     let occurrence: RosterOccurrence
 
     var body: some View {
-        Button {
-            model.focusContact(occurrence.record.contactID)
-        } label: {
+        HStack(spacing: 0) {
+            RoundedRectangle(cornerRadius: 1.5)
+                .fill(color(for: occurrence.record.kind))
+                .frame(width: 3)
             Text(occurrence.record.contactName)
                 .lineLimit(1)
-                .font(.system(size: 10, weight: .bold))
+                .font(.system(size: 10, weight: .semibold))
                 .padding(.horizontal, 5)
                 .padding(.vertical, 2)
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(color(for: occurrence.record.kind), in: RoundedRectangle(cornerRadius: 4))
-                .contentShape(Rectangle())
+                .foregroundStyle(color(for: occurrence.record.kind))
         }
-        .buttonStyle(.plain)
-        .help(occurrence.record.contactName)
-        .accessibilityLabel("\(model.l10n(.openContact)): \(occurrence.record.contactName)")
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(color(for: occurrence.record.kind).opacity(0.14), in: RoundedRectangle(cornerRadius: 4))
+        .accessibilityLabel(occurrence.record.contactName)
     }
 }
 

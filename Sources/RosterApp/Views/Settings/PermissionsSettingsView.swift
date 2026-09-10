@@ -89,10 +89,9 @@ struct PermissionsSettingsView: View {
                     detail: languageDisplayName
                 ) {
                     Picker(model.l10n(.appLanguage), selection: $model.language) {
-                        Text("System").tag(AppLanguage.system)
-                        Text("简体中文").tag(AppLanguage.zhHans)
-                        Text("繁體中文").tag(AppLanguage.zhHant)
-                        Text("English").tag(AppLanguage.en)
+                        ForEach(AppLanguage.allCases) { language in
+                            Text(language.displayName).tag(language)
+                        }
                     }
                     .pickerStyle(.menu)
                     .fixedSize()
@@ -344,11 +343,13 @@ private struct ContactGroupAccessEditor: View {
         let contactCount = selectedContactCount
         switch model.language.coreLocale {
         case .english:
-            return "\(model.l10n(.selectedGroupsSummary)): \(groupCount), \(contactCount) contacts"
+            let contacts = contactCount == 1 ? "1 contact" : "\(contactCount) contacts"
+            let groups = groupCount == 1 ? "1 group" : "\(groupCount) groups"
+            return "\(model.l10n(.selectedGroupsSummary)): \(groups), \(contacts)"
         case .simplifiedChinese:
-            return "\(model.l10n(.selectedGroupsSummary)) \(groupCount) 个，包含 \(contactCount) 位联系人"
+            return "已选 \(groupCount) 个分组，包含 \(contactCount) 位联系人"
         case .traditionalChinese:
-            return "\(model.l10n(.selectedGroupsSummary)) \(groupCount) 個，包含 \(contactCount) 位聯絡人"
+            return "已選 \(groupCount) 個分組，包含 \(contactCount) 位聯絡人"
         }
     }
 
@@ -527,18 +528,13 @@ private struct SettingsActionButtonStyle: ButtonStyle {
 
 private extension PermissionsSettingsView {
     var languageDisplayName: String {
-        switch model.language {
-        case .system: return "System"
-        case .zhHans: return "简体中文"
-        case .zhHant: return "繁體中文"
-        case .en: return "English"
-        }
+        model.language.displayName
     }
 
     var upcomingRangeDisplay: String {
         switch model.language.coreLocale {
         case .english:
-            return "\(model.upcomingRange) days"
+            return model.upcomingRange == 1 ? "1 day" : "\(model.upcomingRange) days"
         case .simplifiedChinese:
             return "\(model.upcomingRange) 天"
         case .traditionalChinese:

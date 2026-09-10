@@ -8,7 +8,7 @@ struct MobileCalendarView: View {
         NavigationStack {
             List {
                 if model.filteredRecordListGroups.isEmpty {
-                    ContentUnavailableView("没有日期", systemImage: "calendar")
+                    ContentUnavailableView(model.l10n(.noDates), systemImage: "calendar")
                         .listRowBackground(Color.clear)
                 } else {
                     ForEach(model.filteredRecordListGroups) { group in
@@ -29,12 +29,12 @@ struct MobileCalendarView: View {
                     }
                 }
             }
-            .navigationTitle("日历")
+            .navigationTitle(model.l10n(.calendar))
             .navigationDestination(for: String.self) { contactID in
                 if let profile = model.profile(for: contactID) {
                     MobileContactDetailView(profile: profile)
                 } else {
-                    ContentUnavailableView("联系人不可用", systemImage: "person.crop.circle.badge.exclamationmark")
+                    ContentUnavailableView(model.l10n(.contactsUnavailable), systemImage: "person.crop.circle.badge.exclamationmark")
                 }
             }
         }

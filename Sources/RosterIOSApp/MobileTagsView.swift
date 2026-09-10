@@ -8,14 +8,14 @@ struct MobileTagsView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("智能分组") {
-                    tagSummaryRow(title: "全部联系人", count: model.contactCount(for: .all), color: RosterTheme.accent)
-                    tagSummaryRow(title: "未打标签", count: model.contactCount(for: .untagged), color: .secondary)
+                Section(model.l10n(.smartGroups)) {
+                    tagSummaryRow(title: model.l10n(.allContactsAccess), count: model.contactCount(for: .all), color: RosterTheme.accent)
+                    tagSummaryRow(title: model.l10n(.untaggedContacts), count: model.contactCount(for: .untagged), color: .secondary)
                 }
 
-                Section("我的标签") {
+                Section(model.l10n(.myTags)) {
                     if model.contactTagTreeNodes.isEmpty {
-                        ContentUnavailableView("没有标签", systemImage: "tag")
+                        ContentUnavailableView(model.l10n(.noTags), systemImage: "tag")
                     } else {
                         ForEach(model.contactTagTreeNodes) { node in
                             HStack(spacing: 10) {
@@ -36,7 +36,7 @@ struct MobileTagsView: View {
                     }
                 }
             }
-            .navigationTitle("标签")
+            .navigationTitle(model.l10n(.tags))
         }
     }
 

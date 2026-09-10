@@ -68,7 +68,7 @@ struct SidebarView: View {
                         }
 
                         SidebarItem(
-                            title: "同步与历史",
+                            title: model.l10n(.syncHistory),
                             systemImage: "clock.arrow.circlepath",
                             badge: model.pendingContactOperationCount + model.failedContactOperationCount + model.conflictedContactOperationCount,
                             isSelected: model.selection == .sync,
@@ -859,29 +859,53 @@ private struct SidebarE2EFrameReporter: ViewModifier {
 private struct OverlayScrollIndicators: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let view = NSView(frame: .zero)
-        DispatchQueue.main.async { configure(from: view) }
+        scheduleConfiguration(for: view)
         return view
     }
 
     func updateNSView(_ view: NSView, context: Context) {
-        DispatchQueue.main.async { configure(from: view) }
+        scheduleConfiguration(for: view)
     }
 
-    private func configure(from view: NSView) {
-        guard let scrollView = sequence(first: view.superview, next: { $0?.superview })
-            .compactMap({ $0 as? NSScrollView })
-            .first
-        else { return }
-        scrollView.scrollerStyle = .overlay
-        scrollView.autohidesScrollers = true
+    private func scheduleConfiguration(for view: NSView) {
+        DispatchQueue.main.async { configure(from: view, attempt: 0) }
+    }
+
+    private func configure(from view: NSView, attempt: Int) {
+        var ancestor = view.superview
+        var scrollView: NSScrollView?
+        while let current = ancestor {
+            if let candidate = current as? NSScrollView {
+                scrollView = candidate
+                break
+            }
+            ancestor = current.superview
+        }
+
+        guard let scrollView else {
+            guard attempt < 4 else { return }
+            DispatchQueue.main.async { configure(from: view, attempt: attempt + 1) }
+            return
+        }
+
+        // Keep the scroller above the content instead of reserving a layout column.
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.scrollerStyle = .overlay
+        scrollView.automaticallyAdjustsContentInsets = false
+        scrollView.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
+        scrollView.scrollerInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
+        scrollView.tile()
     }
 }
 
 private extension View {
     func overlayScrollIndicators() -> some View {
-        background(OverlayScrollIndicators().frame(width: 0, height: 0))
+        overlay {
+            OverlayScrollIndicators()
+                .frame(width: 0, height: 0)
+        }
     }
 
     @ViewBuilder

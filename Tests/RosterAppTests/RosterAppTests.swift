@@ -6,6 +6,16 @@ import UniformTypeIdentifiers
 
 @Suite("Contact architecture")
 struct RosterAppTests {
+    @Test("Localized copy uses natural English terminology")
+    func localizedCopyUsesNaturalEnglish() {
+        let l10n = L10n(language: .en)
+        #expect(l10n(.list) == "Birthdays")
+        #expect(l10n(.aboutBody).contains("Bearoster is for cleaning up"))
+        #expect(l10n(.permissionBody).contains("Nothing leaves your Mac"))
+        #expect(l10n(.listening) == "Listening…")
+        #expect(l10n(.trash) == "Recently Deleted")
+    }
+
     @Test("Chinese names are projected into pinyin initial sections")
     func chineseNamesUsePinyinInitials() {
         let profiles = [
