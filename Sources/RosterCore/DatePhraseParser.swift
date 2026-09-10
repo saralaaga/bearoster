@@ -63,10 +63,11 @@ public struct DatePhraseParser: Sendable {
     private func parseChineseLunar(_ text: String) -> (year: Int?, month: Int, day: Int, leap: Bool)? {
         let leap = text.contains("闰")
         let monthText = text.replacingOccurrences(of: "闰", with: "")
-        guard let month = chineseMonths.first(where: { monthText.contains($0.key + "月") })?.value,
-              let day = chineseDays.first(where: { monthText.contains($0.key) })?.value
-        else { return nil }
-        return (parseYear(text), month, day, leap)
+        guard let (monthMatch, monthRange) = chineseMonthMatch(in: monthText) else { return nil }
+
+        let dayText = String(monthText[monthRange.upperBound...])
+        guard let day = chineseDays.first(where: { dayText.contains($0.0) })?.1 else { return nil }
+        return (parseYear(text), monthMatch.1, day, leap)
     }
 
     private func parseNamedMonth(_ text: String, months: [String: Int]) -> (year: Int?, month: Int, day: Int)? {
@@ -74,6 +75,18 @@ public struct DatePhraseParser: Sendable {
         let day = integers(in: text).first { (1...31).contains($0) }
         guard let day else { return nil }
         return (parseYear(text), match.value, day)
+    }
+
+    private func chineseMonthMatch(in text: String) -> (match: (String, Int), range: Range<String.Index>)? {
+        for match in chineseMonths {
+            guard let range = text.range(of: match.0 + "月") else { continue }
+            if range.lowerBound == text.startIndex { return (match, range) }
+            let previous = text[text.index(before: range.lowerBound)]
+            if !"一二三四五六七八九十廿卅".contains(previous) {
+                return (match, range)
+            }
+        }
+        return nil
     }
 
     private func parseNumericMonthDay(_ text: String) -> (year: Int?, month: Int, day: Int)? {
@@ -95,22 +108,22 @@ public struct DatePhraseParser: Sendable {
         text.matches(of: /\d+/).compactMap { Int($0.output) }
     }
 
-    private let chineseMonths: [String: Int] = [
-        "十二": 12, "十一": 11, "冬": 11, "腊": 12, "正": 1,
-        "一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6,
-        "七": 7, "八": 8, "九": 9, "十": 10
+    private let chineseMonths: [(String, Int)] = [
+        ("十二", 12), ("十一", 11), ("冬", 11), ("腊", 12), ("正", 1),
+        ("一", 1), ("二", 2), ("三", 3), ("四", 4), ("五", 5), ("六", 6),
+        ("七", 7), ("八", 8), ("九", 9), ("十", 10)
     ]
 
-    private let chineseDays: [String: Int] = [
-        "三十": 30, "廿九": 29, "二十九": 29, "廿八": 28, "二十八": 28,
-        "廿七": 27, "二十七": 27, "廿六": 26, "二十六": 26,
-        "廿五": 25, "二十五": 25, "廿四": 24, "二十四": 24,
-        "廿三": 23, "二十三": 23, "廿二": 22, "二十二": 22,
-        "廿一": 21, "二十一": 21, "二十": 20,
-        "十九": 19, "十八": 18, "十七": 17, "十六": 16, "十五": 15,
-        "十四": 14, "十三": 13, "十二": 12, "十一": 11,
-        "初十": 10, "初九": 9, "初八": 8, "初七": 7, "初六": 6,
-        "初五": 5, "初四": 4, "初三": 3, "初二": 2, "初一": 1
+    private let chineseDays: [(String, Int)] = [
+        ("三十", 30), ("廿九", 29), ("二十九", 29), ("廿八", 28), ("二十八", 28),
+        ("廿七", 27), ("二十七", 27), ("廿六", 26), ("二十六", 26),
+        ("廿五", 25), ("二十五", 25), ("廿四", 24), ("二十四", 24),
+        ("廿三", 23), ("二十三", 23), ("廿二", 22), ("二十二", 22),
+        ("廿一", 21), ("二十一", 21), ("二十", 20),
+        ("十九", 19), ("十八", 18), ("十七", 17), ("十六", 16), ("十五", 15),
+        ("十四", 14), ("十三", 13), ("十二", 12), ("十一", 11),
+        ("初十", 10), ("初九", 9), ("初八", 8), ("初七", 7), ("初六", 6),
+        ("初五", 5), ("初四", 4), ("初三", 3), ("初二", 2), ("初一", 1)
     ]
 
     private let islamicMonths: [String: Int] = [

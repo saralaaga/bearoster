@@ -14,6 +14,34 @@ struct RosterCoreTests {
         #expect(parsed.isLeapMonth)
     }
 
+    @Test(
+        "Chinese lunar phrase parser handles overlapping month and day words",
+        arguments: [
+            ("农历十一月初五", 11, 5, false),
+            ("农历十一月十一", 11, 11, false),
+            ("农历十二月初十", 12, 10, false),
+            ("农历十二月十二", 12, 12, false),
+            ("农历正月初一", 1, 1, false),
+            ("农历冬月初五", 11, 5, false),
+            ("农历腊月三十", 12, 30, false),
+            ("农历闰六月初五", 6, 5, true)
+        ]
+    )
+    func parsesChineseOverlappingMonthAndDayWords(_ phrase: String, month: Int, day: Int, isLeapMonth: Bool) throws {
+        let parsed = try #require(DatePhraseParser().parse(phrase))
+
+        #expect(parsed.calendarKind == .chinese)
+        #expect(parsed.month == month)
+        #expect(parsed.day == day)
+        #expect(parsed.isLeapMonth == isLeapMonth)
+    }
+
+    @Test("Chinese lunar phrase parser rejects invalid month or missing day")
+    func rejectsInvalidChineseLunarDates() {
+        #expect(DatePhraseParser().parse("农历十三月初一") == nil)
+        #expect(DatePhraseParser().parse("农历十二月") == nil)
+    }
+
     @Test("Islamic parser keeps Hijri month identity")
     func parsesIslamicRamadan() throws {
         let parsed = try #require(DatePhraseParser().parse("Islamic Ramadan 12"))
