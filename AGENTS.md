@@ -6,7 +6,21 @@ Roster 是 Swift 原生 macOS App，不是 Web/Electron 项目。默认技术栈
 - `Sources/RosterCore/` 放纯领域逻辑和 Contacts 模型。
 - `Sources/RosterApp/` 放 SwiftUI/AppKit 应用层、本地存储、服务和界面。
 - `Tests/RosterCoreTests/`、`Tests/RosterAppTests/` 放 Swift Testing 测试。
-- `scripts/build-app.sh` 构建 `.app`，`scripts/update-local-package.sh` 构建 release 并安装到 `/Applications/Roster.app`。
+- `scripts/build-app.sh` 构建 Bearoster `.app`（debug 在 `.build/`，release 在 `dist/` 并生成 zip）；`scripts/update-local-package.sh` 安装到 `/Applications/Bearoster.app`，还会删除旧 `/Applications/Roster.app`、`/Applications/Birthday.app`。这些不是无副作用的测试命令，执行前遵守下方本地安装门禁。
+
+## 部署、签名与本地安装约束（2026-09-06）
+
+- Coordinator、worker 和独立 Agent 在资源初始化、签名、公证、分发或密钥操作前，完整读取 `/Users/carlos/.agents/deployment-policy.md`（版本 2026-09-06）。协议不可用时停止敏感执行并报告 blocked；普通本地无秘密开发与 focused 测试可继续。旧文档/脚本能运行不构成发布授权。
+- **当前外部分发状态：blocked，受保护执行器、签名身份、分发目标和审批尚未核实。** 本节是 Agent 行为规范，不是 OS/Keychain/CI 强制隔离；没有修改签名配置、撤销证书、停用远端自动化或改变任何云权限。
+- 已知本地标识：`Packaging/Info.plist` 使用 `dev.local.roster`、可执行名 Bearoster；版本来源 `Packaging/VERSION`。不能把开发 bundle ID 当作已批准的商店身份。Apple Team、正式 bundle ID、App Store Connect 应用、TestFlight/官网分发账号与存储资源须单独核实，不猜测或借用其它项目身份。
+- 当前 `.github/workflows/ci.yml` 仅见 Swift 测试和 macOS/iOS shared target 构建，不是签名/发布入口；其为当前未提交文件，不能假定远端一致。push/merge 前核实远端是否另有自动签名/发布；未知则先确认。
+- `scripts/build-app.sh` 未指定身份时会自动查找本机 Apple Development 身份。无凭据本地打包应显式使用 `ROSTER_CODESIGN_IDENTITY=-` 做 ad-hoc 签名，避免自动使用证书；这不是发布签名或公证。不要在持有发布秘密的 Shell 运行构建或项目钩子。
+- 本地安装与外部分发分开：执行 `scripts/update-local-package.sh` 前须取得明确范围授权（可以是本轮会话的有限授权），说明它会修改版本、终止 Bearoster/Roster 进程、替换 Bearoster 并删除上述旧 App。用户未授权删除旧 App 或目标/副作用变化时停止，不默认接受脚本全部动作；默认先做不安装的验证。文档/只读审查任务不得自动安装或签名。
+- 本地安装须先确认可恢复的旧安装包/数据保护方式；未经明确授权不得删除用户数据库、重置系统权限、写回真实通讯录或清理用户正在使用的进程。沿用原 Contacts/SQLite/原生 e2e 验证要求，不把打包成功等同于数据安全。
+- 外部上传、TestFlight/App Store 发布、Developer ID/分发证书签名、公证须走经验证的受保护入口：构建无发布秘密，签名/上传/批准身份分离，密钥仅供受信步骤。普通 Agent 不得持有签名私钥、Apple 账号管理/API 管理凭据、广域 BWS Token、其它项目 SSH/云密钥，不得向任意子进程共享宿主 Keychain/home。
+- 部署 Task 必须带共享协议路径/版本、项目/环境/资源或分发目标、允许/禁止动作、入口和身份引用、commit/产物摘要/版本、授权期限、审查、验证与回滚。独立人类审批须由执行器验证，业务 Agent 不能自批或修改生效策略；入口缺失先计划建设，不能回退手工持密钥脚本。
+- 不打印秘密、完整环境、vault/认证响应；不把整库注入 Shell，不用 xtrace/env/set/declare 输出凭据。泄露/越权/缺权限时停止受影响操作、脱敏通知用户，不转发原始日志、不尝试旧 key。恢复按共享事件流程批准。
+- 日常开发与外部分发门禁不混淆：本地测试无需云发布器，候选 zip 不代表已发布；线上/商店状态需实际 provider 证据。单独终端/worktree 不等于证书或用户数据隔离。
 
 ## 工作流程
 
@@ -15,8 +29,8 @@ Roster 是 Swift 原生 macOS App，不是 Web/Electron 项目。默认技术栈
 1. 遇到需求的时候先考虑如何用最小的代码去实现，先去联网搜索，如果有开源的库、项目能够实现，用现成的代码。
 1. 对 UI 的改动要与 SwiftUI 原生体验、现有 `RosterTheme`、其它页面和 macOS HIG 匹配。
 1. 测试完、构建完清理掉进程，避免进程的占用。
-1. 每次新的改动完成后，先运行 `scripts/update-local-package.sh` 做一次本地发布。
-1. 新的一轮改动验证前也先跑一次 `scripts/update-local-package.sh`。
+1. 每次改动先按改动面运行 focused 测试/构建；需要 `.app` 验证时可显式 ad-hoc 本地打包。`scripts/update-local-package.sh` 仅在上方本地安装门禁满足后运行，不再每轮自动执行。
+1. 新一轮验证不要自动递增版本、关闭 App、覆盖安装或清理旧 App；纯文档和只读任务只验证对应文件。
 1. 涉及 macOS 拖拽交互时，按 `docs/e2e/macos-drag-and-drop.md` 的方案运行对应 e2e。
 1. 与客户的对话要把需求明确清楚，搞清楚需求的边界，再开始做代码。
 
