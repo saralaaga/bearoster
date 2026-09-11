@@ -25,8 +25,12 @@ head_commit() {
   git -C "$RELEASE_ROOT" rev-parse HEAD
 }
 
+# `release/` holds build outputs and human approval records, not source. It is
+# excluded so that minting an approval cannot itself invalidate the gate.
 worktree_is_clean() {
-  [[ -z "$(git -C "$RELEASE_ROOT" status --porcelain --untracked-files=normal)" ]]
+  local dirty
+  dirty="$(git -C "$RELEASE_ROOT" status --porcelain --untracked-files=normal -- . ':(exclude)release' 2>/dev/null)"
+  [[ -z "$dirty" ]]
 }
 
 # field <key> <file> -> prints the value of a "key: value" line
