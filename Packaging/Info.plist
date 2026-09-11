@@ -20,6 +20,8 @@
   <string>$(ROSTER_MARKETING_VERSION)</string>
   <key>CFBundleVersion</key>
   <string>$(ROSTER_BUILD_NUMBER)</string>
+  <key>LSApplicationCategoryType</key>
+  <string>public.app-category.productivity</string>
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
   <key>NSContactsUsageDescription</key>

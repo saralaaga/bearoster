@@ -21,6 +21,16 @@ source "$VERSION_FILE"
 : "${ROSTER_BUILD_NUMBER:?missing ROSTER_BUILD_NUMBER in $VERSION_FILE}"
 APP_NAME="Bearoster"
 
+# Bundle identifier. Debug keeps the long-standing dev id so existing local
+# TCC/Contacts grants survive; release uses the shipping identifier.
+if [[ -z "${ROSTER_BUNDLE_ID:-}" ]]; then
+  if [[ "$CONFIG" == "release" ]]; then
+    ROSTER_BUNDLE_ID="com.bearoster.app"
+  else
+    ROSTER_BUNDLE_ID="dev.local.roster"
+  fi
+fi
+
 if [[ "$CONFIG" == "release" ]]; then
   APP_DIR="$ROOT/dist/$APP_NAME.app"
 else
@@ -40,10 +50,15 @@ cp "$ROOT/.build/$CONFIG/$APP_NAME" "$MACOS/$APP_NAME"
 cp "$ROOT/Packaging/Info.plist" "$CONTENTS/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $ROSTER_MARKETING_VERSION" "$CONTENTS/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $ROSTER_BUILD_NUMBER" "$CONTENTS/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $ROSTER_BUNDLE_ID" "$CONTENTS/Info.plist"
 if [[ -f "$ROOT/Packaging/AppIcon.icns" ]]; then
   cp "$ROOT/Packaging/AppIcon.icns" "$RESOURCES/AppIcon.icns"
 fi
 chmod +x "$MACOS/$APP_NAME"
+
+if [[ -f "$ROOT/Packaging/PrivacyInfo.xcprivacy" ]]; then
+  cp "$ROOT/Packaging/PrivacyInfo.xcprivacy" "$RESOURCES/PrivacyInfo.xcprivacy"
+fi
 
 IDENTITY_LABEL="Apple Development: "
 if [[ "$CONFIG" == "release" ]]; then
