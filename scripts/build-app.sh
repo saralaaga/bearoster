@@ -31,7 +31,9 @@ if [[ -z "${ROSTER_BUNDLE_ID:-}" ]]; then
   fi
 fi
 
-if [[ "$CONFIG" == "release" ]]; then
+if [[ -n "${ROSTER_APP_DIR:-}" ]]; then
+  APP_DIR="$ROSTER_APP_DIR"
+elif [[ "$CONFIG" == "release" ]]; then
   APP_DIR="$ROOT/dist/$APP_NAME.app"
 else
   APP_DIR="$ROOT/.build/$APP_NAME.app"
@@ -60,6 +62,10 @@ if [[ -f "$ROOT/Packaging/PrivacyInfo.xcprivacy" ]]; then
   cp "$ROOT/Packaging/PrivacyInfo.xcprivacy" "$RESOURCES/PrivacyInfo.xcprivacy"
 fi
 
+if [[ -n "${ROSTER_EMBED_PROFILE:-}" ]]; then
+  cp "$ROSTER_EMBED_PROFILE" "$CONTENTS/embedded.provisionprofile"
+fi
+
 IDENTITY_LABEL="Apple Development: "
 if [[ "$CONFIG" == "release" ]]; then
   IDENTITY_LABEL="Developer ID Application: "
@@ -85,7 +91,7 @@ if command -v codesign >/dev/null 2>&1; then
   CODESIGN_ARGS=(--force --sign "$SIGN_IDENTITY")
   if [[ "$CONFIG" == "release" ]]; then
     CODESIGN_ARGS+=(--options runtime)
-    ENTITLEMENTS="$ROOT/Packaging/Bearoster.entitlements"
+    ENTITLEMENTS="${ROSTER_ENTITLEMENTS:-$ROOT/Packaging/Bearoster.entitlements}"
     if [[ -f "$ENTITLEMENTS" ]]; then
       CODESIGN_ARGS+=(--entitlements "$ENTITLEMENTS")
     fi
@@ -96,7 +102,7 @@ if command -v codesign >/dev/null 2>&1; then
   codesign "${CODESIGN_ARGS[@]}" "$APP_DIR" >/dev/null
 fi
 
-if [[ "$CONFIG" == "release" ]]; then
+if [[ "$CONFIG" == "release" && "${ROSTER_SKIP_ZIP:-0}" != "1" ]]; then
   (cd "$ROOT/dist" && rm -f "$APP_NAME-$ROSTER_MARKETING_VERSION.zip" && zip -qr "$APP_NAME-$ROSTER_MARKETING_VERSION.zip" "$APP_NAME.app")
   echo "$ROOT/dist/$APP_NAME-$ROSTER_MARKETING_VERSION.zip"
 fi
