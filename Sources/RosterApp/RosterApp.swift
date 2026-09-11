@@ -101,6 +101,10 @@ final class RosterApp: NSObject, NSApplicationDelegate {
     }
 
     private static var e2eFixture: RosterE2EFixture? {
+        // Debug-only. Shipping builds must not expose the fixture-data path.
+        #if !DEBUG
+        return nil
+        #else
         let arguments = ProcessInfo.processInfo.arguments
         guard let index = arguments.firstIndex(where: { $0 == "--roster-e2e" || $0 == "--birthday-e2e" }),
               arguments.indices.contains(arguments.index(after: index))
@@ -108,11 +112,19 @@ final class RosterApp: NSObject, NSApplicationDelegate {
             return nil
         }
 
-        switch arguments[arguments.index(after: index)] {
+        let nameIndex = arguments.index(after: index)
+        switch arguments[nameIndex] {
         case "contact-drag":
             return RosterE2EFixtures.contactDragAndDrop
+        case "store":
+            let viewIndex = arguments.index(index, offsetBy: 2)
+            let rawView = arguments.indices.contains(viewIndex) ? arguments[viewIndex] : "calendar"
+            return RosterE2EFixtures.storeScreenshots(
+                selection: SidebarSelection(rawValue: rawView) ?? .calendar
+            )
         default:
             return nil
         }
+        #endif
     }
 }

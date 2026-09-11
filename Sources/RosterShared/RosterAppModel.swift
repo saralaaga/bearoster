@@ -507,6 +507,9 @@ package final class RosterAppModel {
         contactTags = fixture.tags
         contactTagAssignmentsByContactID = fixture.assignmentsByContactID
         selection = fixture.initialSelection
+        if let selectedDate = fixture.initialSelectedDate {
+            self.selectedDate = selectedDate
+        }
         expandedTagIDs = ["__tags_root__"]
         applyContactSnapshot(fixture.snapshot)
     }

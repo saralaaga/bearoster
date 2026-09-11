@@ -28,3 +28,6 @@ DerivedData/
 # Local design/demo working directories
 kimi/
 logo-candidates/
+
+# Release candidates (manifests + artifacts are rebuilt per commit)
+release/artifacts/
