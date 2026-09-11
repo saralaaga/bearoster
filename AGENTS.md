@@ -8,13 +8,13 @@ Roster 是 Swift 原生 macOS App，不是 Web/Electron 项目。默认技术栈
 - `Tests/RosterCoreTests/`、`Tests/RosterAppTests/` 放 Swift Testing 测试。
 - `scripts/build-app.sh` 构建 Bearoster `.app`（debug 在 `.build/`，release 在 `dist/` 并生成 zip）；`scripts/update-local-package.sh` 安装到 `/Applications/Bearoster.app`，还会删除旧 `/Applications/Roster.app`、`/Applications/Birthday.app`。这些不是无副作用的测试命令，执行前遵守下方本地安装门禁。
 
-## 部署、签名与本地安装约束（2026-09-06）
+## 部署、签名与本地安装约束（2026-09-11）
 
 - Coordinator、worker 和独立 Agent 在资源初始化、签名、公证、分发或密钥操作前，完整读取 `/Users/carlos/.agents/deployment-policy.md`（版本 2026-09-06）。协议不可用时停止敏感执行并报告 blocked；普通本地无秘密开发与 focused 测试可继续。旧文档/脚本能运行不构成发布授权。
-- **当前外部分发状态：blocked，受保护执行器、签名身份、分发目标和审批尚未核实。** 本节是 Agent 行为规范，不是 OS/Keychain/CI 强制隔离；没有修改签名配置、撤销证书、停用远端自动化或改变任何云权限。
-- 已知本地标识：`Packaging/Info.plist` 使用 `dev.local.roster`、可执行名 Bearoster；版本来源 `Packaging/VERSION`。不能把开发 bundle ID 当作已批准的商店身份。Apple Team、正式 bundle ID、App Store Connect 应用、TestFlight/官网分发账号与存储资源须单独核实，不猜测或借用其它项目身份。
-- 当前 `.github/workflows/ci.yml` 仅见 Swift 测试和 macOS/iOS shared target 构建，不是签名/发布入口；其为当前未提交文件，不能假定远端一致。push/merge 前核实远端是否另有自动签名/发布；未知则先确认。
-- `scripts/build-app.sh` 未指定身份时会自动查找本机 Apple Development 身份。无凭据本地打包应显式使用 `ROSTER_CODESIGN_IDENTITY=-` 做 ad-hoc 签名，避免自动使用证书；这不是发布签名或公证。不要在持有发布秘密的 Shell 运行构建或项目钩子。
+- **当前状态：签名身份已核实，外部上传仍 blocked。** 团队 `BC4LLSRW92` 下已有 Developer ID Application、Apple Distribution、Mac Installer Distribution 三张证书与一份 Mac App Store 描述文件；受保护执行器和独立人工审批入口尚未建立，因此外部上传/提交不得执行。本节是 Agent 行为规范，不是 OS/Keychain/CI 强制隔离。
+- 已知标识：可执行名 Bearoster；版本来源 `Packaging/VERSION`；正式 bundle ID `com.bearoster.app`（已在团队 BC4LLSRW92 下注册为 App ID）；debug 构建仍用 `dev.local.roster` 以保住本机既有的 Contacts/TCC 授权。App Store Connect 应用记录、TestFlight/官网分发账号与存储资源尚未建立，须单独核实，不猜测或借用其它项目身份。
+- 远端是 `https://github.com/saralaaga/bearoster`（private）。`.github/workflows/ci.yml` 只跑 Swift 测试与 macOS/iOS shared target 构建，不是签名/发布入口。push/merge 前核实远端是否另有自动签名/发布；未知则先确认。
+- 打包脚本：`scripts/build-app.sh` 出直发产物（release 强制要求 Developer ID Application，找不到直接报错；debug 自动用 Apple Development，无则 ad-hoc），`scripts/build-mas-pkg.sh` 出 Mac App Store 的签名 `.pkg`。无凭据本地打包显式用 `ROSTER_CODESIGN_IDENTITY=-`。发布凭据存于自托管 Infisical 的 `Bearoster`/`prod`（`/notary`、`/signing`），证书私钥在签名主机的登录钥匙串里。不要在持有发布秘密的 Shell 运行构建或项目钩子。
 - 本地安装与外部分发分开：执行 `scripts/update-local-package.sh` 前须取得明确范围授权（可以是本轮会话的有限授权），说明它会修改版本、终止 Bearoster/Roster 进程、替换 Bearoster 并删除上述旧 App。用户未授权删除旧 App 或目标/副作用变化时停止，不默认接受脚本全部动作；默认先做不安装的验证。文档/只读审查任务不得自动安装或签名。
 - 本地安装须先确认可恢复的旧安装包/数据保护方式；未经明确授权不得删除用户数据库、重置系统权限、写回真实通讯录或清理用户正在使用的进程。沿用原 Contacts/SQLite/原生 e2e 验证要求，不把打包成功等同于数据安全。
 - 外部上传、TestFlight/App Store 发布、Developer ID/分发证书签名、公证须走经验证的受保护入口：构建无发布秘密，签名/上传/批准身份分离，密钥仅供受信步骤。普通 Agent 不得持有签名私钥、Apple 账号管理/API 管理凭据、广域 BWS Token、其它项目 SSH/云密钥，不得向任意子进程共享宿主 Keychain/home。
