@@ -8,6 +8,8 @@ Static, dependency-free site for `https://bearoster.com`.
 
 ## Cloudflare Pages deploy
 
+Deployment is an external production change. Use a protected entrypoint or the account owner; an ordinary agent must not use a Cloudflare browser session or API token directly.
+
 1. Connect this repository to Cloudflare Pages.
 2. Set **Build output directory** to `website`.
 3. Add custom domain `bearoster.com`.

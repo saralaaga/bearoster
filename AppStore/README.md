@@ -40,9 +40,9 @@ scripts/capture-store-shots.sh
 
 需要你本人做的：
 
-- [ ] 把 `legal/` 四篇发布到 bearoster.com，确认两个 URL 可直接访问（Apple 会实际抓取）
+- [ ] 部署 `website/` 后确认 `/privacy`、`/support`、`/en/privacy`、`/en/support` 返回独立法务页（当前线上 catch-all 返回首页，不合要求；部署须走受保护入口）
 - [ ] 在 App Store Connect 填写文案并跑完两份问卷
-- [ ] 确认 `support@bearoster.com` 这个邮箱真实可用（如果要用别的地址，改 `legal/` 和 `metadata/` 里的值）
+- [ ] 在 Cloudflare Email Routing 把 `support@bearoster.com` 转发到 `saralaagarwal1990@gmail.com`，完成后确认 MX 已生效（2026-09-20 检查尚无 MX 记录）
 - [ ] App 隐私问卷选「不收集数据」
 - [ ] 年龄分级问卷按 `questionnaires/age-rating.md` 填，预期 4+
 - [ ] 备份 Infisical `ENCRYPTION_KEY`（`~/infisical/backup-infisical.sh`）
