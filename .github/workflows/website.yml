@@ -1,0 +1,43 @@
+name: Website production deploy
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment:
+      name: website-production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.17.0
+
+      - name: Verify static site
+        run: scripts/website/verify-static-site.sh
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_SEND_METRICS: "false"
+        run: |
+          npx --yes wrangler@4.42.0 pages project get bearoster
+          npx --yes wrangler@4.42.0 pages deploy website \
+            --project-name=bearoster \
+            --branch=main \
+            --commit-dirty=true
+
+      - name: Verify production legal URLs
+        run: scripts/website/verify-production.sh

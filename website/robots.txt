@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://bearoster.com/sitemap.xml
