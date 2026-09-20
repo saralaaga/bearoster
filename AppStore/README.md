@@ -59,4 +59,4 @@ scripts/capture-store-shots.sh
 
 ## 待确认
 
-- 商店里显示的名字用 `Bearoster`（与 bundle 名、域名一致）。App 内简体中文界面标题显示「蓝熊名册」。如果希望商店名称也显示中文，需要额外补 `InfoPlist.strings` 本地化并重跑打包，改之前先确认。
+- 商店名称按语言本地化：zh-Hans 使用「蓝熊名册」，en-US 使用 `Bearoster`。运行时界面已有对应本地化；如后续要求安装后的应用名也完全跟随语言，再补 `InfoPlist.strings`。
