@@ -33,11 +33,12 @@ the bootstrap again with a fresh token.
 
 ## Deploy and roll back
 
-After the site branch is merged, dispatch **Website production deploy** from
-`main`. GitHub asks for approval before running `wrangler pages deploy
-website`. The target is hard-coded to Pages project `bearoster`, production
-branch `main`, and the checked-out `website/` tree. The workflow finishes by
-fetching all four legal URLs and checking their required content.
+After the site branch is merged, changing `website/` or the deploy workflow on
+`main` starts **Website production deploy** automatically. GitHub asks for
+approval before running `wrangler pages deploy website`. The target is
+hard-coded to Pages project `bearoster`, production branch `main`, and the
+checked-out `website/` tree. The workflow finishes by fetching all four legal
+URLs and checking their required content.
 
 Rollback is a Cloudflare Pages deployment rollback to the previous production
 deployment, followed by HTTP checks of all four legal URLs. If rollback is

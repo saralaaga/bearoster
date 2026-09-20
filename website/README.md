@@ -17,11 +17,10 @@ Deployment is an external production change. Use the protected GitHub Actions ga
    only `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` from Infisical
    `Bearoster/prod` into GitHub environment secrets. The Cloudflare token must
    be account-scoped to Cloudflare Pages: Edit.
-3. Merge the site branch into `main`.
-4. Dispatch **Website production deploy** from `main`; it is intentionally
-   manual, so pushing to `main` cannot deploy by itself.
-5. Approve the `website-production` deployment in GitHub.
-6. The final workflow step verifies `/privacy`, `/support`, `/en/privacy`, and
+3. Merge the site branch into `main`; pushes that change `website/` or the
+   deploy workflow start **Website production deploy** automatically.
+4. Approve the `website-production` deployment in GitHub.
+5. The final workflow step verifies `/privacy`, `/support`, `/en/privacy`, and
    `/en/support`.
 
 The deploy target is fixed to the Cloudflare Pages project `bearoster` and the
