@@ -36,5 +36,7 @@
   <string>Bearoster uses speech recognition to convert spoken birthday dates into calendar dates.</string>
   <key>NSPrincipalClass</key>
   <string>NSApplication</string>
+  <key>ITSAppUsesNonExemptEncryption</key>
+  <false/>
 </dict>
 </plist>
