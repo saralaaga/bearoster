@@ -1,8 +1,8 @@
 # 受保护执行器与人工审批入口
 
-状态：**部分建成。外部上传/提交仍然 blocked。**
+状态：**方案 A（GitHub Actions Environment）已建成，等待用户完成一次性配置。配置完成前外部上传仍然 blocked。**
 适用策略：`/Users/carlos/.agents/deployment-policy.md`（版本 2026-09-06）
-最后更新：2026-09-11
+最后更新：2026-09-24
 
 ## 这份文档解决什么问题
 
@@ -49,27 +49,40 @@ evidence: 查看了 1.0 的商店文案与截图，本地跑通沙盒构建
 - **挡不住的**：任何能写仓库或写 `release/approvals/` 的 Agent 都能伪造一条记录。`approver:` 字段是自报的，没有密码学意义。
 - 因此这层是**纵深防御**，不是策略要求的「独立审批入口」。
 
-## 还没建成：真正的强制边界
+## 已建成：GitHub Actions Environment 入口（方案 A）
 
-策略要求入口具备「普通 Agent 无法授予自己更大身份、无法自批」的性质，且由 OS/IAM/CI 强制，而不是靠脚本自觉。两个可选方案：
+`.github/workflows/release.yml` 与网站部署门（`docs/website-deploy-gate.md`）同一模式：
 
-### 方案 A（推荐）：GitHub Actions Environment + Required Reviewers
+- **candidate job（无任何秘密）**：校验 dispatch 的版本号与 `Packaging/VERSION` 一致，跑全量测试，用 `build-release-artifact.sh direct` 出 ad-hoc 候选产物 + manifest，作为 workflow artifact 上传。这是审批人看到并被绑定到的产物。
+- **sign-and-upload job（`environment: app-store-release`）**：只有你在 GitHub 上点 Approve 后才运行。从 Environment secrets 导入 Apple Distribution / Installer 身份与描述文件，跑 `scripts/build-mas-pkg.sh` 出签名 `.pkg`，再用 ASC API key 通过 `xcrun altool --upload-app` 上传 App Store Connect。结束即删除专用钥匙串。
 
-- 新建 workflow `release.yml`，用 `environment: app-store-release`。
-- 在该 Environment 上设置 **Required reviewers**（必须是你本人，不能是机器人账号）。
-- Apple 凭据只存在于该 Environment 的 secrets 里，workflow 用 `id-token` / Environment secrets 读取。
-- Agent 可以改 workflow 文件、可以 push，但**无法自我批准**待执行的 deployment——GitHub 会拦住，直到你点 Approve。
-- 构建与签名分离：普通 CI job 只构建、上传候选产物；签名/notarize/上传放在需要 Environment 审批的 job 里。
+Environment 限制为 `main` 分支 + 你本人是唯一 required reviewer。Agent 可以改 workflow、可以 push，但无法代替你点 Approve。
 
-这条路的代价：Apple Distribution 私钥和 notary key 要存进 GitHub secrets。密钥离开本机，换来的是真正的双人（人 + 机器）分离。
+### 一次性配置（只能你本人做）
 
-### 方案 B：本机独立审批器 + 独立钥匙串
+```bash
+scripts/release/configure-release-gate.sh      # 创建 app-store-release 审批门
+scripts/release/bootstrap-release-secrets.sh   # 写入六个 Environment secrets
+```
 
-- 单独的、Agent 无写权限的用户账号或机器，持有专用钥匙串，`setup-signing-keychain.sh` 已经把私钥搬进需交互解锁的钥匙串，是这条路的第一步。
-- 需要额外解决：Agent 能以同一用户身份访问宿主 Keychain。没有 OS 级用户/机器隔离就不成立。
-- 成本比方案 A 高，隔离强度取决于你怎么配。
+第二个脚本会把 `MAS_IDENTITIES_P12_B64`、`MAS_PROVISIONING_PROFILE_B64`、`MAS_P12_PASSWORD`、`ASC_API_KEY_ID`、`ASC_API_ISSUER_ID`、`ASC_API_KEY_P8_B64` 写进 GitHub Environment，交互式输入，不打印任何值。ASC key 的本地来源是 Infisical `Bearoster/prod` `/notary`；p12 是 `~/private_keys/p12/bearoster-mas-identities.p12`。
 
-**在 A 或 B 任一建成并验证之前，`execute-release.sh` 会一直返回 blocked（退出码 3），这是设计如此。**
+**代价与边界**：Apple 私钥和 ASC key 离开本机存进 GitHub secrets，换来审批/执行身份分离。GitHub 侧凭据轮换 = 重跑 bootstrap 脚本；本机侧轮换后旧 secret 会继续有效直到被覆盖，轮换时两边都要做。
+
+### 发布流程
+
+1. `main` 上确认 `Packaging/VERSION` 是要发的版本（build number 递增过）。
+2. GitHub → Actions → **App Store release** → Run workflow，输入版本号。
+3. candidate job 出产物后，GitHub 请求你审批 deployment；你核对版本与候选 manifest 后 Approve。
+4. sign-and-upload job 签名并上传；之后在 App Store Connect 里选 build 并提交审核（提交审核这一步仍由你在网页上完成）。
+
+回滚：上传只是把 build 送进 ASC，不会自动发布；发错版本就在 ASC 丢弃该 build，修 VERSION 后重新走流程。
+
+### 方案 B（未采用）
+
+本机独立审批器 + 独立钥匙串。没有 OS 级用户/机器隔离就不成立（Agent 能以同一用户身份访问宿主 Keychain），成本更高，作为备选记录。
+
+**本地 `execute-release.sh` 仍按设计停在特权步骤前（退出码 3）。本地路径不再扩展；外部执行一律走上面的 GitHub 入口。**
 
 ## 密钥现状与轮换
 

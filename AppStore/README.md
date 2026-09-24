@@ -40,7 +40,7 @@ scripts/capture-store-shots.sh
 
 需要你本人做的：
 
-- [ ] 部署 `website/` 后确认 `/privacy`、`/support`、`/en/privacy`、`/en/support` 返回独立法务页（当前线上 catch-all 返回首页，不合要求；部署须走受保护入口）
+- [ ] 部署 `website/` 后确认 `/privacy`、`/support`、`/en/privacy`、`/en/support` 返回独立法务页（main 上的新法务页已就绪；2026-09-24 复查线上仍是 catch-all 首页。须先运行 `scripts/website/configure-deploy-gate.sh` 配好 `website-production` 门，再 dispatch **Website production deploy** 并审批）
 - [ ] 在 App Store Connect 填写文案并跑完两份问卷
 - [ ] 在 Cloudflare Email Routing 把 `support@bearoster.com` 转发到 `saralaagarwal1990@gmail.com`，完成后确认 MX 已生效（2026-09-20 检查尚无 MX 记录）
 - [ ] App 隐私问卷选「不收集数据」
@@ -50,7 +50,7 @@ scripts/capture-store-shots.sh
 
 仍然是 blocked 的：
 
-- [ ] **上传构建**。`docs/release-protected-executor.md` 里列了让这一步可执行需要建的东西，没建成之前不要手工拿密钥跑上传脚本
+- [ ] **上传构建**。受保护入口已建成（`.github/workflows/release.yml` + `app-store-release` Environment），但你须先运行 `scripts/release/configure-release-gate.sh` 和 `scripts/release/bootstrap-release-secrets.sh` 完成一次性配置，见 `docs/release-protected-executor.md`。配置完成前不要手工拿密钥跑上传脚本
 - [ ] 欧盟交易商状态（只有面向欧盟上架时才需要）
 
 ## 免费发布、之后再订阅
