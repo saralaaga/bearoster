@@ -25,7 +25,7 @@ birthday,contacts,tags,lunar calendar,organizer,reminder,groups,address book,pho
 ## Promotional Text (170 max)
 
 ```
-Version 1.0. Runs entirely on your Mac: no network, no uploads, no data collection, no account.
+Version 1.0. Runs entirely on your Mac: no uploads, no data collection, no account.
 ```
 
 ## Description (4000 max)
@@ -48,7 +48,7 @@ ORGANIZING CONTACTS
 · Fills in blanks only. It will not overwrite what you already wrote unless you ask it to
 
 WHY IT'S SAFE
-· No network. The app makes no network requests, so your contacts never leave your Mac
+· Your contacts never leave your Mac — no uploads, no syncing, no third-party servers
 · No data collection. No analytics, no telemetry, no third-party SDKs
 · No account, no sign-in
 · Just two permissions: Contacts (read and write), and Microphone + Speech Recognition (only used when you start voice input)
