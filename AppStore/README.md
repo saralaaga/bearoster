@@ -44,7 +44,7 @@ scripts/capture-store-shots.sh
 - [x] 在 App Store Connect 填写文案并跑完两份问卷（2026-09-24 由 agent 经 ego 浏览器完成：中英文案/关键词/URL/版权、6 张截图、隐私 Data Not Collected 已发布、年龄分级 4+、内容权利无第三方内容；余下两件小事见下）
 - [ ] ASC 版本页把 `01-calendar` 截图拖到第一位（合成拖拽驱动不了 ASC 的排序组件，顺序当前为 02,03,01,04,05,06）
 - [ ] ASC 版本页 App Review Information 填联系人姓名/电话/邮箱（个人联系方式，agent 不代填）
-- [ ] 在 Cloudflare Email Routing 把 `support@bearoster.com` 转发到 `saralaagarwal1990@gmail.com`，完成后确认 MX 已生效（2026-09-20 检查尚无 MX 记录）
+- [x] 在 Cloudflare Email Routing 把 `support@bearoster.com` 转发到 `saralaagarwal1990@gmail.com`（2026-09-24 完成：规则已启用，MX/SPF 已生效，目标邮箱此前已验证）
 - [ ] 备份 Infisical `ENCRYPTION_KEY`（`~/infisical/backup-infisical.sh`）
 - [ ] p12 口令存进密码管理器
 
