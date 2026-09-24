@@ -1,6 +1,7 @@
 import RosterCore
 import Foundation
 import Observation
+import Security
 import SwiftUI
 import UniformTypeIdentifiers
 #if os(macOS)
@@ -239,6 +240,15 @@ package final class RosterAppModel {
     package private(set) var contactWritePolicy: ContactWritePolicy = .confirmBeforeWrite
     package private(set) var contactDraftsByID: [String: LocalContactDraft] = [:]
     package private(set) var contactOperationLog: [ContactOperationLog] = []
+    package private(set) var isAgentAccessEnabled = false
+    package private(set) var agentAccessToken = ""
+    package private(set) var agentAccessEndpoint: String?
+    package private(set) var agentAccessError: String?
+    private var agentAccessServer: AgentAccessServer?
+    /// Bumped on every enable/disable/rotate so an in-flight server start that
+    /// resumes after a toggle change can detect it is stale and tear down
+    /// instead of leaving a listener running with no handle.
+    private var agentAccessEpoch = 0
     package var expandedTagIDs: Set<String> = []
     package private(set) var extendedProfilesByID: [String: ContactExtendedProfile] = [:]
     package private(set) var cachedUpcomingOccurrences: [RosterOccurrence] = []
@@ -255,7 +265,7 @@ package final class RosterAppModel {
     private let contactSyncService = ContactSyncService()
     private let localRosterStore = LocalRosterStore()
     private let contactTagStore = ContactTagStore()
-    private let contactJournalStore = ContactOperationJournalStore()
+    private let contactJournalStore: ContactOperationJournalStore
     private let derivedDataWorker = RosterDerivedDataWorker()
     private let contactProjectionWorker = ContactListProjectionWorker()
     private let voiceInput = VoiceInputService()
@@ -287,8 +297,12 @@ package final class RosterAppModel {
         set { contactFieldAccessLevel = newValue ? .extended : .birthdayOnly }
     }
 
-    package init(e2eFixture: RosterE2EFixture? = nil) {
+    package init(e2eFixture: RosterE2EFixture? = nil, journalDatabaseURL: URL? = nil) {
         self.e2eFixture = e2eFixture
+        let resolvedJournalURL = journalDatabaseURL
+            ?? (e2eFixture != nil ? Self.e2eJournalURL() : nil)
+            ?? AppSupportPaths.database(named: "contact-journal.sqlite3")
+        self.contactJournalStore = ContactOperationJournalStore(databaseURL: resolvedJournalURL)
         observeContactsChanges()
         scheduleDerivedDataRebuild(message: "Preparing roster data", debounceNanoseconds: 150_000_000)
         if let e2eFixture {
@@ -299,6 +313,7 @@ package final class RosterAppModel {
             Task { await loadContactTags() }
             Task { await loadContactJournal() }
             Task { await loadCachedContactSnapshot() }
+            Task { await restoreAgentAccessState() }
         }
     }
 
@@ -436,7 +451,7 @@ package final class RosterAppModel {
             return l10n(.progressFiltering)
         case "Sorting roster data":
             return l10n(.progressSorting)
-        case "Updating language", "Updating local edits", "Updating contact groups", "Clearing contacts", "Restoring contact":
+        case "Updating language", "Updating local edits", "Updating contact groups", "Clearing contacts", "Restoring contact", "Queueing imported drafts":
             return l10n(.progressUpdating)
         case "Reading macOS Contacts":
             return l10n(.progressReadingContacts)
@@ -1321,6 +1336,176 @@ package final class RosterAppModel {
         }
     }
 
+    package func queueImportedDrafts(_ outcome: ContactDraftIntakeOutcome) async {
+        let conflictIDs = Set(outcome.conflicts.map { $0.draft.id })
+        let drafts = (outcome.accepted + outcome.conflicts).map(\.draft)
+        guard !drafts.isEmpty else { return }
+
+        var operations: [ContactOperationLog] = []
+        for draft in drafts {
+            let operation = ContactOperationLog(
+                contactID: draft.id,
+                appleContactID: nil,
+                displayName: draft.displayName,
+                kind: .create,
+                status: conflictIDs.contains(draft.id) ? .conflict : .pending,
+                summary: contactCreateSummary(for: draft),
+                fieldChanges: [ContactFieldChange(
+                    field: "name",
+                    previousValue: "—",
+                    nextValue: draft.displayName
+                )],
+                draft: draft
+            )
+            await contactJournalStore.saveDraft(draft)
+            await contactJournalStore.appendOperation(operation)
+            contactDraftsByID[draft.id] = draft
+            operations.append(operation)
+        }
+        contactOperationLog.insert(contentsOf: operations.reversed(), at: 0)
+        applyProfilesIfRosterChanged(profilesByApplyingLocalState(to: profiles), message: "Queueing imported drafts")
+
+        // Agent-originated drafts never write back on their own, regardless of
+        // the global write policy: the user's confirmation in Sync History is
+        // the only path into the Contacts store.
+        toast(contactQueuedText(count: drafts.count))
+    }
+
+    // MARK: - Agent access (MCP)
+
+    package func handleAgentDraftIntake(payload: Data) async -> ContactDraftIntakeOutcome {
+        let existing = ContactDraftIntakeService.fingerprints(profiles: profiles)
+        // Drafts already sitting in the journal are not in the Apple snapshot
+        // yet; a resubmission should be rejected instead of queued twice.
+        let queued = contactDraftsByID.values
+            .filter { $0.appleContactID == nil }
+            .map { draft in
+                ContactIntakeFingerprint(
+                    displayName: draft.displayName,
+                    phoneNumbers: draft.phoneNumbers,
+                    emailAddresses: draft.emailAddresses
+                )
+            }
+        let outcome = ContactDraftIntakeService.process(payload: payload, existing: existing, queued: queued)
+        await queueImportedDrafts(outcome)
+        return outcome
+    }
+
+    package var agentAccessPendingSummary: AgentAccessPendingSummary {
+        func summaries(_ status: ContactOperationStatus) -> [AgentAccessOperationSummary] {
+            contactOperationLog
+                .filter { $0.status == status }
+                .prefix(50)
+                .map {
+                    AgentAccessOperationSummary(
+                        displayName: $0.displayName,
+                        status: $0.status.rawValue,
+                        errorMessage: $0.errorMessage
+                    )
+                }
+        }
+        return AgentAccessPendingSummary(
+            pending: summaries(.pending),
+            conflicts: summaries(.conflict),
+            failed: summaries(.failed)
+        )
+    }
+
+    package func setAgentAccessEnabled(_ enabled: Bool) async {
+        agentAccessEpoch += 1
+        isAgentAccessEnabled = enabled
+        agentAccessError = nil
+        await contactJournalStore.setSetting(enabled ? "1" : "0", forKey: "agentAccessEnabled")
+        if enabled {
+            await startAgentAccessServer()
+        } else {
+            agentAccessServer?.stop()
+            agentAccessServer = nil
+            agentAccessEndpoint = nil
+        }
+    }
+
+    package func rotateAgentAccessToken() async {
+        agentAccessToken = Self.generateAgentAccessToken()
+        await contactJournalStore.setSetting(agentAccessToken, forKey: "agentAccessToken")
+        if isAgentAccessEnabled {
+            await startAgentAccessServer()
+        }
+    }
+
+    /// Debug-only: install a caller-chosen token (used by e2e scripts so the
+    /// real journal settings are never touched) and enable the server.
+    package func useAgentAccessTokenForE2E(_ token: String) {
+        guard isE2EEnabled, !token.isEmpty else { return }
+        agentAccessToken = token
+        Task { await setAgentAccessEnabled(true) }
+    }
+
+    private static func e2eJournalURL() -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("roster-e2e-journal.sqlite3")
+        try? FileManager.default.removeItem(at: url)
+        return url
+    }
+
+    private func restoreAgentAccessState() async {
+        if agentAccessToken.isEmpty {
+            if let stored = await contactJournalStore.setting(forKey: "agentAccessToken"), !stored.isEmpty {
+                agentAccessToken = stored
+            }
+        }
+        if await contactJournalStore.setting(forKey: "agentAccessEnabled") == "1" {
+            await setAgentAccessEnabled(true)
+        }
+    }
+
+    private func startAgentAccessServer() async {
+        let epoch = agentAccessEpoch
+        agentAccessServer?.stop()
+        agentAccessServer = nil
+
+        if agentAccessToken.isEmpty {
+            agentAccessToken = Self.generateAgentAccessToken()
+            await contactJournalStore.setSetting(agentAccessToken, forKey: "agentAccessToken")
+        }
+
+        let server = AgentAccessServer(
+            handler: RosterAgentAccessBridge(model: self),
+            token: agentAccessToken
+        )
+        do {
+            try await server.start(port: AgentAccessServer.defaultPort)
+            guard epoch == agentAccessEpoch else {
+                // The user toggled (or rotated) while start was in flight; the
+                // freshly started listener belongs to a superseded attempt.
+                server.stop()
+                return
+            }
+            agentAccessServer = server
+            agentAccessEndpoint = server.endpointDescription
+        } catch {
+            guard epoch == agentAccessEpoch else { return }
+            // Keep the toggle on and surface the error: the journal still says
+            // "1", so the next launch retries automatically (e.g. after a
+            // transient port conflict with another app instance).
+            agentAccessEndpoint = nil
+            agentAccessError = agentAccessListenFailedText
+        }
+    }
+
+    private static func generateAgentAccessToken() -> String {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        let status = bytes.withUnsafeMutableBytes { buffer in
+            SecRandomCopyBytes(kSecRandomDefault, 32, buffer.baseAddress!)
+        }
+        if status != errSecSuccess {
+            // Practically unreachable; degrade to a random UUID instead of
+            // silently serving a 32-zero-byte token.
+            return UUID().uuidString
+        }
+        return bytes.map { String(format: "%02x", $0) }.joined()
+    }
+
     package func applyBatchContactEdits(
         _ draft: ContactBatchEditDraft,
         fillPolicy: ContactBatchFillPolicy,
@@ -1537,7 +1722,15 @@ package final class RosterAppModel {
                 localDateSpecsByPersonID[operation.contactID] = nil
                 contactTagAssignmentsByContactID[operation.contactID] = nil
             case .create:
-                markOperation(operation, status: .failed, error: contactCreateUnsupportedText)
+                guard let draft = operation.draft else { return }
+                let appleContactID = try await contactSyncService.createContact(profile: draft.profile)
+                var applied = operation
+                applied.appleContactID = appleContactID
+                await contactJournalStore.deleteDraft(contactID: operation.contactID)
+                contactDraftsByID[operation.contactID] = nil
+                markOperation(applied, status: .applied, error: nil)
+                toast(L10n(language: language)(.written))
+                await refreshContacts()
                 return
             case .createGroup:
                 guard let group = operation.contactGroup,
@@ -1932,6 +2125,22 @@ package final class RosterAppModel {
         case .english: "Contact restored locally"
         case .simplifiedChinese: "已从回收站恢复到本地"
         case .traditionalChinese: "已從垃圾桶恢復到本機"
+        }
+    }
+
+    private var agentAccessListenFailedText: String {
+        switch language.coreLocale {
+        case .english: "Couldn't start the agent access server. The port may be in use."
+        case .simplifiedChinese: "智能体接入服务启动失败，端口可能被占用。"
+        case .traditionalChinese: "智慧型代理人接入服務啟動失敗，連接埠可能被佔用。"
+        }
+    }
+
+    private func contactCreateSummary(for draft: LocalContactDraft) -> String {
+        switch language.coreLocale {
+        case .english: "Create contact \(draft.displayName)"
+        case .simplifiedChinese: "新建联系人 \(draft.displayName)"
+        case .traditionalChinese: "新增聯絡人 \(draft.displayName)"
         }
     }
 

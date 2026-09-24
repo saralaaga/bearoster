@@ -26,6 +26,21 @@ final class RosterApp: NSObject, NSApplicationDelegate {
         logE2E("applicationDidFinishLaunching")
         showMainWindow()
         Task { await model.refreshContacts() }
+        Task { enableAgentAccessForE2E() }
+    }
+
+    /// Debug-only: `--roster-e2e agent-import --agent-token <token>` starts the
+    /// MCP server with a script-chosen token so e2e never touches the user's
+    /// real journal settings. Shipping builds ignore this entirely.
+    private func enableAgentAccessForE2E() {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        guard Self.e2eFixture != nil,
+              let index = arguments.firstIndex(of: "--agent-token"),
+              arguments.indices.contains(arguments.index(after: index))
+        else { return }
+        model.useAgentAccessTokenForE2E(arguments[arguments.index(after: index)])
+        #endif
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -68,6 +83,9 @@ final class RosterApp: NSObject, NSApplicationDelegate {
             )
             window.title = model.l10n(.appName)
             window.minSize = contentSize
+            // AppKit 默认在关闭时额外 release 一次窗口，会把这里持有的强引用
+            // 变成悬空指针；置 false 后窗口由 self.window 持有，reopen 复用。
+            window.isReleasedWhenClosed = false
             let hostingController = NSHostingController(rootView: rootView)
             hostingController.sizingOptions = []
             window.contentViewController = hostingController
@@ -114,7 +132,7 @@ final class RosterApp: NSObject, NSApplicationDelegate {
 
         let nameIndex = arguments.index(after: index)
         switch arguments[nameIndex] {
-        case "contact-drag":
+        case "contact-drag", "agent-import":
             return RosterE2EFixtures.contactDragAndDrop
         case "store":
             let viewIndex = arguments.index(index, offsetBy: 2)

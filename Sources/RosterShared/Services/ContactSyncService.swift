@@ -52,6 +52,10 @@ package actor ContactSyncService {
         try await repository.saveContact(contactID: contactID, profile: profile)
     }
 
+    package func createContact(profile: ContactRosterProfile) async throws -> String {
+        try await repository.createContact(profile: profile)
+    }
+
     package func deleteContacts(contactIDs: [String]) async throws {
         try await repository.deleteContacts(contactIDs: contactIDs)
     }

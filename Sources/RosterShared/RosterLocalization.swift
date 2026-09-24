@@ -54,6 +54,13 @@ package struct L10n {
         package let en: String
     }
 
+    package static let agentAccess = Key(zhHans: "MCP 开关", zhHant: "MCP 開關", en: "MCP")
+    package static let agentAccessToggle = Key(zhHans: "允许外部智能体提交联系人草稿", zhHant: "允許外部智慧型代理人提交聯絡人草稿", en: "Let external agents submit contact drafts")
+    package static let agentAccessEndpoint = Key(zhHans: "接入地址", zhHant: "接入位址", en: "Endpoint")
+    package static let agentAccessTokenLabel = Key(zhHans: "访问令牌", zhHant: "存取權杖", en: "Access token")
+    package static let agentAccessCopyToken = Key(zhHans: "拷贝令牌", zhHant: "拷貝權杖", en: "Copy Token")
+    package static let agentAccessRotateToken = Key(zhHans: "轮换令牌", zhHant: "輪換權杖", en: "Rotate Token")
+    package static let agentAccessRequiresRunning = Key(zhHans: "服务随 App 启停，仅监听本机 127.0.0.1。", zhHant: "服務隨 App 啟停，僅監聽本機 127.0.0.1。", en: "Runs only while the app is open, listening on 127.0.0.1 only.")
     package static let appName = Key(zhHans: "蓝熊名册", zhHant: "藍熊名冊", en: "Bearoster")
     package static let browse = Key(zhHans: "浏览", zhHant: "瀏覽", en: "Browse")
     package static let manage = Key(zhHans: "管理", zhHant: "管理", en: "Manage")
@@ -154,7 +161,6 @@ package struct L10n {
     package static let nextRoster = Key(zhHans: "下次生日", zhHant: "下次生日", en: "Next")
     package static let unknownAge = Key(zhHans: "未知", zhHant: "未知", en: "Unknown")
     package static let needContacts = Key(zhHans: "需要访问通讯录", zhHant: "需要存取通訊錄", en: "Contacts access needed")
-    package static let permissionBody = Key(zhHans: "蓝熊名册用来读取和更新通讯录里的生日。生日直接保存在 macOS 通讯录，不会离开你的 Mac，也不需要注册或登录。", zhHant: "藍熊名冊用來讀取和更新通訊錄裡的生日。生日直接儲存在 macOS 通訊錄，不會離開你的 Mac，也不需要註冊或登入。", en: "Bearoster reads and updates birthdays in your Contacts. Nothing leaves your Mac, and there’s no account to sign in to.")
     package static let allowContacts = Key(zhHans: "允许访问通讯录", zhHant: "允許存取通訊錄", en: "Allow Contacts Access")
     package static let openSettings = Key(zhHans: "前往系统设置", zhHant: "前往系統設定", en: "Open System Settings")
     package static let permissionDenied = Key(zhHans: "请在系统设置 > 隐私与安全性 > 通讯录中开启访问权限。", zhHant: "請在系統設定 > 隱私權與安全性 > 通訊錄中開啟存取權限。", en: "Enable access in System Settings > Privacy & Security > Contacts.")
@@ -254,6 +260,13 @@ package struct L10n {
 }
 
 extension L10n.Key {
+    package static let agentAccess = L10n.agentAccess
+    package static let agentAccessToggle = L10n.agentAccessToggle
+    package static let agentAccessEndpoint = L10n.agentAccessEndpoint
+    package static let agentAccessTokenLabel = L10n.agentAccessTokenLabel
+    package static let agentAccessCopyToken = L10n.agentAccessCopyToken
+    package static let agentAccessRotateToken = L10n.agentAccessRotateToken
+    package static let agentAccessRequiresRunning = L10n.agentAccessRequiresRunning
     package static let appName = L10n.appName
     package static let browse = L10n.browse
     package static let manage = L10n.manage
@@ -354,7 +367,6 @@ extension L10n.Key {
     package static let nextRoster = L10n.nextRoster
     package static let unknownAge = L10n.unknownAge
     package static let needContacts = L10n.needContacts
-    package static let permissionBody = L10n.permissionBody
     package static let allowContacts = L10n.allowContacts
     package static let openSettings = L10n.openSettings
     package static let permissionDenied = L10n.permissionDenied

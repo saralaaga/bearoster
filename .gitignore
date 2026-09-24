@@ -29,5 +29,10 @@ DerivedData/
 kimi/
 logo-candidates/
 
+# Local agent tooling state
+.zcode/
+.zcodeignore
+.video_agent/
+
 # Release candidates (manifests + artifacts are rebuilt per commit)
 release/artifacts/

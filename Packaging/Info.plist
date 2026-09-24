@@ -28,6 +28,8 @@
   <string>Bearoster reads and writes selected contact fields directly in macOS Contacts.</string>
   <key>NSMicrophoneUsageDescription</key>
   <string>Bearoster uses the microphone only when you start voice date input.</string>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Bearoster listens on this Mac only (127.0.0.1) so your own AI agent can submit contact drafts for you to confirm. No data leaves your Mac.</string>
   <key>NSQuitAlwaysKeepsWindows</key>
   <false/>
   <key>NSSpeechRecognitionUsageDescription</key>

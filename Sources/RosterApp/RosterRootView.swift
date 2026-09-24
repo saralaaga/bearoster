@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import RosterCore
 import RosterShared
@@ -12,10 +13,20 @@ struct RootView: View {
     @State private var calendarMode = CalendarDisplayMode.month
     @State private var isSidebarCollapsed = false
     @State private var contactEditorBridge = ContactEditorBridge()
+    @State private var expandedSidebarWidth = RootView.storedSidebarWidth()
 
     private var sidebarWidth: CGFloat {
-        isSidebarCollapsed ? RosterTheme.Layout.sidebarCollapsedWidth : RosterTheme.Layout.sidebarWidth
+        isSidebarCollapsed ? RosterTheme.Layout.sidebarCollapsedWidth : expandedSidebarWidth
     }
+
+    private static func storedSidebarWidth() -> CGFloat {
+        let raw = UserDefaults.standard.double(forKey: "sidebarWidth")
+        guard raw > 0 else { return RosterTheme.Layout.sidebarWidth }
+        return min(max(raw, Self.minSidebarWidth), Self.maxSidebarWidth)
+    }
+
+    static let minSidebarWidth: CGFloat = 200
+    static let maxSidebarWidth: CGFloat = 320
 
     var body: some View {
         @Bindable var model = model
@@ -39,9 +50,14 @@ struct RootView: View {
                     .layoutPriority(3)
                     .clipped()
 
-                Rectangle()
-                    .fill(RosterTheme.separator(colorScheme))
-                    .frame(width: 0.5)
+                if isSidebarCollapsed {
+                    Rectangle()
+                        .fill(RosterTheme.separator(colorScheme))
+                        .frame(width: 0.5)
+                } else {
+                    SidebarResizeHandle(width: $expandedSidebarWidth)
+                        .layoutPriority(4)
+                }
 
                 ZStack {
                     RosterTheme.windowBackground(colorScheme)
@@ -124,6 +140,57 @@ struct RootView: View {
                     .animation(RosterTheme.Motion.toastOut)
             )
         }
+    }
+}
+
+// MARK: - Sidebar resize
+
+private struct SidebarResizeHandle: View {
+    @Binding var width: CGFloat
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var isHovering = false
+    @State private var dragStartWidth: CGFloat?
+
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(RosterTheme.separator(colorScheme))
+                .frame(width: 0.5)
+            Rectangle()
+                .fill(Color.primary.opacity(isHovering ? 0.07 : 0))
+                .frame(width: 5)
+        }
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            isHovering = hovering
+            if hovering {
+                NSCursor.resizeLeftRight.push()
+            } else {
+                NSCursor.pop()
+            }
+        }
+        // If the handle leaves the hierarchy while hovered (e.g. the sidebar
+        // collapses), onHover(false) never fires and the cursor would stay
+        // stuck as the resize shape.
+        .onDisappear {
+            guard isHovering else { return }
+            isHovering = false
+            NSCursor.pop()
+        }
+        .gesture(
+            DragGesture(minimumDistance: 2, coordinateSpace: .global)
+                .onChanged { value in
+                    if dragStartWidth == nil {
+                        dragStartWidth = width
+                    }
+                    let start = dragStartWidth ?? width
+                    width = min(max(start + value.translation.width, RootView.minSidebarWidth), RootView.maxSidebarWidth)
+                }
+                .onEnded { _ in
+                    dragStartWidth = nil
+                    UserDefaults.standard.set(Double(width), forKey: "sidebarWidth")
+                }
+        )
     }
 }
 

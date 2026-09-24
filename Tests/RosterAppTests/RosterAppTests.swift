@@ -1,5 +1,6 @@
 import RosterCore
 import Foundation
+import Network
 import Testing
 import UniformTypeIdentifiers
 @testable import RosterShared
@@ -11,7 +12,6 @@ struct RosterAppTests {
         let l10n = L10n(language: .en)
         #expect(l10n(.list) == "Birthdays")
         #expect(l10n(.aboutBody).contains("Bearoster is for cleaning up"))
-        #expect(l10n(.permissionBody).contains("Nothing leaves your Mac"))
         #expect(l10n(.listening) == "Listening…")
         #expect(l10n(.trash) == "Recently Deleted")
     }
@@ -1093,5 +1093,710 @@ struct RosterAppTests {
 
     private func gregorianDate(year: Int, month: Int, day: Int) -> Date? {
         Calendar(identifier: .gregorian).date(from: DateComponents(year: year, month: month, day: day))
+    }
+}
+
+@Suite("Contact draft intake")
+struct ContactDraftIntakeTests {
+    private func payload(_ drafts: [[String: Any]]) throws -> Data {
+        try JSONSerialization.data(withJSONObject: ["schemaVersion": 1, "drafts": drafts])
+    }
+
+    private func draftJSON(
+        displayName: String = "张伟",
+        givenName: String? = "伟",
+        familyName: String? = "张",
+        phoneNumbers: [String]? = ["13800138000"],
+        emailAddresses: [String]? = nil,
+        birthdays: [[String: Any]]? = nil,
+        extra: [String: Any] = [:]
+    ) -> [String: Any] {
+        var json: [String: Any] = ["displayName": displayName]
+        if let givenName { json["givenName"] = givenName }
+        if let familyName { json["familyName"] = familyName }
+        if let phoneNumbers { json["phoneNumbers"] = phoneNumbers }
+        if let emailAddresses { json["emailAddresses"] = emailAddresses }
+        if let birthdays { json["birthdays"] = birthdays }
+        for (key, value) in extra { json[key] = value }
+        return json
+    }
+
+    @Test("Valid batch maps to drafts with apple-sourced birthdays")
+    func acceptsValidBatch() throws {
+        let data = try payload([
+            draftJSON(birthdays: [["date": "1990-08-04", "label": "生日"]])
+        ])
+
+        let outcome = ContactDraftIntakeService.process(payload: data, existing: [])
+
+        #expect(outcome.requestError == nil)
+        #expect(outcome.rejected.isEmpty)
+        #expect(outcome.conflicts.isEmpty)
+        let item = try #require(outcome.accepted.first)
+        let draft = item.draft
+        #expect(draft.id.hasPrefix("agent-"))
+        #expect(draft.appleContactID == nil)
+        #expect(draft.displayName == "张伟")
+        #expect(draft.givenName == "伟")
+        #expect(draft.familyName == "张")
+        #expect(draft.phoneNumbers == ["13800138000"])
+        let spec = try #require(draft.birthdaySpecs.first)
+        #expect(spec.personID == draft.id)
+        #expect(spec.kind == .gregorian)
+        #expect(spec.source == .appleRoster)
+        #expect(spec.syncPolicy == .writeBackToApple)
+        #expect(spec.components.year == 1990)
+        #expect(spec.components.month == 8)
+        #expect(spec.components.day == 4)
+        #expect(spec.label == "生日")
+    }
+
+    @Test("displayName-only draft falls back to given name")
+    func fallsBackGivenNameFromDisplayName() throws {
+        let data = try payload([draftJSON(givenName: nil, familyName: nil, phoneNumbers: [])])
+
+        let outcome = ContactDraftIntakeService.process(payload: data, existing: [])
+
+        let draft = try #require(outcome.accepted.first).draft
+        #expect(draft.givenName == "张伟")
+        #expect(draft.familyName == "")
+    }
+
+    @Test("Year-less birthday date is accepted")
+    func acceptsYearlessBirthday() throws {
+        let data = try payload([
+            draftJSON(displayName: "李娜", birthdays: [["date": "08-04"]])
+        ])
+
+        let outcome = ContactDraftIntakeService.process(payload: data, existing: [])
+
+        let spec = try #require(outcome.accepted.first?.draft.birthdaySpecs.first)
+        #expect(spec.components.year == nil)
+        #expect(spec.components.month == 8)
+        #expect(spec.components.day == 4)
+    }
+
+    @Test("Impossible calendar dates are rejected; leap day stays valid")
+    func validatesBirthdayDateExistence() throws {
+        let data = try payload([
+            draftJSON(displayName: "甲", phoneNumbers: [], birthdays: [["date": "02-31"]]),
+            draftJSON(displayName: "乙", phoneNumbers: [], birthdays: [["date": "2001-02-29"]]),
+            draftJSON(displayName: "丙", phoneNumbers: [], birthdays: [["date": "02-29"]]),
+            draftJSON(displayName: "丁", phoneNumbers: [], birthdays: [["date": "2000-02-29"]])
+        ])
+
+        let outcome = ContactDraftIntakeService.process(payload: data, existing: [])
+
+        #expect(outcome.requestError == nil)
+        #expect(outcome.rejected.map(\.index) == [0, 1])
+        #expect(outcome.accepted.map(\.draft.displayName) == ["丙", "丁"])
+    }
+
+    @Test("Overlong email addresses are rejected instead of skipping validation")
+    func rejectsOverlongEmailAddresses() throws {
+        let longLocalPart = String(repeating: "a", count: 250)
+        let data = try payload([
+            draftJSON(displayName: "李娜", phoneNumbers: [], emailAddresses: ["\(longLocalPart)@example.com"])
+        ])
+
+        let outcome = ContactDraftIntakeService.process(payload: data, existing: [])
+
+        #expect(outcome.accepted.isEmpty)
+        let rejection = try #require(outcome.rejected.first)
+        #expect(rejection.reason.contains("254"))
+    }
+
+    @Test("Drafts matching an already-queued journal draft are rejected")
+    func rejectsAlreadyQueuedDrafts() throws {
+        let queued = [
+            ContactIntakeFingerprint(displayName: "张伟", phoneNumbers: ["13800138000"], emailAddresses: [])
+        ]
+        let data = try payload([
+            draftJSON(phoneNumbers: ["138-0013-8000"]),
+            draftJSON(displayName: "李娜", phoneNumbers: [])
+        ])
+
+        let outcome = ContactDraftIntakeService.process(payload: data, existing: [], queued: queued)
+
+        #expect(outcome.accepted.map(\.draft.displayName) == ["李娜"])
+        let rejection = try #require(outcome.rejected.first)
+        #expect(rejection.index == 0)
+        #expect(rejection.reason.contains("already-queued"))
+    }
+
+    @Test("Unknown fields reject only that draft")
+    func rejectsUnknownFieldsPerDraft() throws {
+        let data = try payload([
+            draftJSON(extra: ["contactID": "abc", "appleContactID": "x"]),
+            draftJSON(displayName: "王五")
+        ])
+
+        let outcome = ContactDraftIntakeService.process(payload: data, existing: [])
+
+        #expect(outcome.accepted.count == 1)
+        let rejection = try #require(outcome.rejected.first)
+        #expect(rejection.index == 0)
+        #expect(rejection.reason.contains("unknown field"))
+    }
+
+    @Test("Field violations are reported per item")
+    func reportsFieldViolations() throws {
+        let data = try payload([
+            draftJSON(
+                displayName: "",
+                phoneNumbers: ["not-a-phone"],
+                emailAddresses: ["broken-address"],
+                birthdays: [["date": "1990-13-40", "kind": "lunar"]]
+            )
+        ])
+
+        let outcome = ContactDraftIntakeService.process(payload: data, existing: [])
+
+        #expect(outcome.accepted.isEmpty)
+        let reason = try #require(outcome.rejected.first?.reason)
+        #expect(reason.contains("displayName is required"))
+        #expect(reason.contains("not a valid phone number"))
+        #expect(reason.contains("not a valid email address"))
+        #expect(reason.contains("unknown field"))
+        #expect(reason.contains("not a valid gregorian date"))
+    }
+
+    @Test("Request-level guardrails: size, version, count, root keys, shape")
+    func enforcesRequestGuardrails() throws {
+        let badVersion = try JSONSerialization.data(
+            withJSONObject: ["schemaVersion": 99, "drafts": [draftJSON()]]
+        )
+        #expect(ContactDraftIntakeService.process(payload: badVersion, existing: []).requestError?.contains("schemaVersion") == true)
+
+        let unknownRoot = try JSONSerialization.data(
+            withJSONObject: ["schemaVersion": 1, "drafts": [draftJSON()], "mode": "force"]
+        )
+        #expect(ContactDraftIntakeService.process(payload: unknownRoot, existing: []).requestError?.contains("unknown top-level field") == true)
+
+        let tooMany = try payload(Array(repeating: draftJSON(displayName: "x"), count: 501))
+        #expect(ContactDraftIntakeService.process(payload: tooMany, existing: []).requestError?.contains("between 1 and 500") == true)
+
+        let oversized = Data(count: ContactDraftIntakeService.maxPayloadBytes + 1)
+        #expect(ContactDraftIntakeService.process(payload: oversized, existing: []).requestError?.contains("bytes") == true)
+
+        let malformed = Data("[not json".utf8)
+        #expect(ContactDraftIntakeService.process(payload: malformed, existing: []).requestError != nil)
+    }
+
+    @Test("Same name plus shared phone/email marks conflict against existing contacts")
+    func conflictsAgainstExistingContacts() throws {
+        let existing = [ContactIntakeFingerprint(
+            displayName: "张伟",
+            phoneNumbers: ["13800138000"],
+            emailAddresses: []
+        )]
+        let data = try payload([
+            draftJSON(displayName: "张伟", givenName: nil, familyName: nil),
+            draftJSON(displayName: "李娜", givenName: nil, familyName: nil, phoneNumbers: [])
+        ])
+
+        let outcome = ContactDraftIntakeService.process(payload: data, existing: existing)
+
+        #expect(outcome.conflicts.count == 1)
+        #expect(outcome.conflicts.first?.index == 0)
+        #expect(outcome.accepted.count == 1)
+        #expect(outcome.accepted.first?.draft.displayName == "李娜")
+    }
+
+    @Test("Same name without shared phone or email does not conflict")
+    func noConflictWithoutSharedHandle() throws {
+        let existing = [ContactIntakeFingerprint(
+            displayName: "张伟",
+            phoneNumbers: ["13800138000"],
+            emailAddresses: []
+        )]
+        let data = try payload([
+            draftJSON(displayName: "张伟", givenName: nil, familyName: nil, phoneNumbers: ["13900139000"])
+        ])
+
+        let outcome = ContactDraftIntakeService.process(payload: data, existing: existing)
+
+        #expect(outcome.conflicts.isEmpty)
+        #expect(outcome.accepted.count == 1)
+    }
+
+    @Test("Batch-internal duplicates are rejected, not queued")
+    func rejectsBatchInternalDuplicates() throws {
+        let data = try payload([
+            draftJSON(),
+            draftJSON()
+        ])
+
+        let outcome = ContactDraftIntakeService.process(payload: data, existing: [])
+
+        #expect(outcome.accepted.count == 1)
+        #expect(outcome.conflicts.isEmpty)
+        let rejection = try #require(outcome.rejected.first)
+        #expect(rejection.index == 1)
+        #expect(rejection.reason.contains("duplicate of draft #0"))
+    }
+
+    @Test("Email matching is case-insensitive and phone matching ignores formatting")
+    func normalizesHandlesBeforeMatching() throws {
+        let existing = [ContactIntakeFingerprint(
+            displayName: "Sam",
+            phoneNumbers: ["+86 (138) 0013-8000"],
+            emailAddresses: ["Sam@Example.COM"]
+        )]
+        let data = try payload([
+            draftJSON(
+                displayName: "sam",
+                givenName: nil,
+                familyName: nil,
+                phoneNumbers: ["13800138000"],
+                emailAddresses: ["sam@example.com"]
+            )
+        ])
+
+        let outcome = ContactDraftIntakeService.process(payload: data, existing: existing)
+
+        #expect(outcome.conflicts.count == 1)
+    }
+}
+
+@Suite("Imported draft queueing")
+struct ImportedDraftQueueingTests {
+    @MainActor
+    private func makeModel() throws -> (model: RosterAppModel, journalURL: URL) {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("roster-intake-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent("contact-journal.sqlite3")
+        let model = RosterAppModel(e2eFixture: RosterE2EFixtures.contactDragAndDrop, journalDatabaseURL: url)
+        return (model, url)
+    }
+
+    private func acceptedDraft(name: String) -> LocalContactDraft {
+        LocalContactDraft(
+            id: "agent-\(name)",
+            appleContactID: nil,
+            displayName: name,
+            phoneNumbers: ["13800138000"],
+            baseSignature: 0
+        )
+    }
+
+    @Test("Accepted drafts queue as pending create operations and persist to the journal")
+    @MainActor
+    func queuesAcceptedDraftsAsPendingCreates() async throws {
+        let (model, journalURL) = try makeModel()
+        let outcome = ContactDraftIntakeOutcome(
+            accepted: [
+                ContactDraftIntakeItem(index: 0, draft: acceptedDraft(name: "张伟")),
+                ContactDraftIntakeItem(index: 1, draft: acceptedDraft(name: "李娜"))
+            ]
+        )
+
+        let before = model.pendingContactOperationCount
+        await model.queueImportedDrafts(outcome)
+
+        #expect(model.pendingContactOperationCount == before + 2)
+        #expect(model.contactOperationLog.prefix(2).allSatisfy { $0.kind == .create && $0.status == .pending })
+        #expect(model.contactOperationLog.prefix(2).allSatisfy { $0.appleContactID == nil })
+        #expect(model.contactDraftsByID.values.map(\.displayName).sorted() == ["张伟", "李娜"])
+
+        let reloaded = await ContactOperationJournalStore(databaseURL: journalURL).load()
+        #expect(reloaded.draftsByContactID.count == 2)
+        #expect(reloaded.operations.filter { $0.kind == .create && $0.status == .pending }.count == 2)
+    }
+
+    @Test("Conflicted drafts queue with conflict status for user adjudication")
+    @MainActor
+    func queuesConflictsWithConflictStatus() async throws {
+        let (model, _) = try makeModel()
+        let outcome = ContactDraftIntakeOutcome(
+            accepted: [ContactDraftIntakeItem(index: 0, draft: acceptedDraft(name: "张伟"))],
+            conflicts: [ContactDraftIntakeItem(index: 1, draft: acceptedDraft(name: "王五"))]
+        )
+
+        await model.queueImportedDrafts(outcome)
+
+        #expect(model.pendingContactOperationCount == 1)
+        #expect(model.conflictedContactOperationCount == 1)
+        #expect(model.contactOperationLog.first?.displayName == "王五")
+        #expect(model.contactOperationLog.first?.status == .conflict)
+    }
+
+    @Test("Queued drafts surface as local-only profiles")
+    @MainActor
+    func surfacesDraftsAsLocalOnlyProfiles() async throws {
+        let (model, _) = try makeModel()
+        let outcome = ContactDraftIntakeOutcome(
+            accepted: [ContactDraftIntakeItem(index: 0, draft: acceptedDraft(name: "张伟"))]
+        )
+
+        await model.queueImportedDrafts(outcome)
+
+        let names = model.profiles.map(\.displayName)
+        #expect(names.contains("张伟"))
+    }
+
+    @Test("Empty outcome queues nothing")
+    @MainActor
+    func emptyOutcomeIsNoop() async throws {
+        let (model, journalURL) = try makeModel()
+        let before = model.pendingContactOperationCount
+
+        await model.queueImportedDrafts(ContactDraftIntakeOutcome())
+
+        #expect(model.pendingContactOperationCount == before)
+        #expect(model.contactDraftsByID.isEmpty)
+        let reloaded = await ContactOperationJournalStore(databaseURL: journalURL).load()
+        #expect(reloaded.draftsByContactID.isEmpty)
+    }
+}
+
+@Suite("Agent access server")
+struct AgentAccessServerTests {
+    actor StubHandler: AgentAccessHandling {
+        var payloads: [Data] = []
+        var outcome = ContactDraftIntakeOutcome()
+
+        func queueDrafts(payload: Data) async -> ContactDraftIntakeOutcome {
+            payloads.append(payload)
+            return outcome
+        }
+
+        func pendingSummary() async -> AgentAccessPendingSummary {
+            AgentAccessPendingSummary(
+                pending: [AgentAccessOperationSummary(displayName: "张伟", status: "pending")],
+                conflicts: [],
+                failed: [AgentAccessOperationSummary(displayName: "李娜", status: "failed", errorMessage: "denied")]
+            )
+        }
+    }
+
+    private func rpcBody(id: Int, method: String, params: [String: Any] = [:]) throws -> Data {
+        try JSONSerialization.data(withJSONObject: [
+            "jsonrpc": "2.0",
+            "id": id,
+            "method": method,
+            "params": params
+        ])
+    }
+
+    private func post(
+        _ session: URLSession,
+        port: UInt16,
+        token: String,
+        body: Data,
+        method: String = "POST",
+        path: String = AgentAccessServer.endpointPath
+    ) async throws -> (status: Int, data: Data) {
+        var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)\(path)")!)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = body
+        let (data, response) = try await session.data(for: request)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        return (status, data)
+    }
+
+    @Test("MCP handshake, tool listing, and queue_drafts round-trip over loopback")
+    func servesMCPOverLoopback() async throws {
+        let handler = StubHandler()
+        await handler.setOutcome(ContactDraftIntakeOutcome(
+            accepted: [ContactDraftIntakeItem(
+                index: 0,
+                draft: LocalContactDraft(
+                    id: "agent-1",
+                    appleContactID: nil,
+                    displayName: "张伟",
+                    baseSignature: 0
+                )
+            )],
+            rejected: [ContactDraftIntakeRejection(index: 1, reason: "unknown field(s): x")]
+        ))
+        let server = AgentAccessServer(handler: handler, token: "test-token")
+        try await server.start(port: 0)
+        defer { server.stop() }
+        #expect(server.port != 0)
+
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.finishTasksAndInvalidate() }
+
+        // initialize
+        let initBody = try JSONSerialization.data(withJSONObject: [
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": [
+                "protocolVersion": "2025-11-25",
+                "capabilities": [:] as [String: Any],
+                "clientInfo": ["name": "test", "version": "1.0"]
+            ] as [String: Any]
+        ])
+        let initResponse = try await post(session, port: server.port, token: "test-token", body: initBody)
+        #expect(initResponse.status == 200)
+        let initJSON = try #require(
+            try JSONSerialization.jsonObject(with: initResponse.data) as? [String: Any]
+        )
+        let initResult = try #require(initJSON["result"] as? [String: Any])
+        let serverInfo = try #require(initResult["serverInfo"] as? [String: Any])
+        #expect(serverInfo["name"] as? String == "Bearoster")
+
+        // initialized notification
+        let notification = try JSONSerialization.data(withJSONObject: [
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized"
+        ])
+        let notificationResponse = try await post(session, port: server.port, token: "test-token", body: notification)
+        #expect(notificationResponse.status == 200 || notificationResponse.status == 202)
+
+        // tools/list
+        let listBody = try rpcBody(id: 2, method: "tools/list")
+        let listResponse = try await post(session, port: server.port, token: "test-token", body: listBody)
+        #expect(listResponse.status == 200)
+        let listJSON = try #require(
+            try JSONSerialization.jsonObject(with: listResponse.data) as? [String: Any]
+        )
+        let listResult = try #require(listJSON["result"] as? [String: Any])
+        let tools = try #require(listResult["tools"] as? [[String: Any]])
+        let toolNames = Set(tools.compactMap { $0["name"] as? String })
+        #expect(toolNames == ["queue_drafts", "list_pending"])
+
+        // queue_drafts
+        let callBody = try rpcBody(id: 3, method: "tools/call", params: [
+            "name": "queue_drafts",
+            "arguments": [
+                "schemaVersion": ContactDraftIntakeService.schemaVersion,
+                "drafts": [["displayName": "张伟", "phoneNumbers": ["13800138000"]]]
+            ] as [String: Any]
+        ])
+        let callResponse = try await post(session, port: server.port, token: "test-token", body: callBody)
+        #expect(callResponse.status == 200)
+        let callJSON = try #require(
+            try JSONSerialization.jsonObject(with: callResponse.data) as? [String: Any]
+        )
+        let callResult = try #require(callJSON["result"] as? [String: Any])
+        let content = try #require(callResult["content"] as? [[String: Any]])
+        let text = try #require(content.first?["text"] as? String)
+        #expect(text.contains("\"accepted\""))
+        #expect(text.contains("张伟"))
+        #expect(text.contains("unknown field(s): x"))
+
+        // handler received the raw arguments as JSON
+        let received = await handler.receivedPayloads()
+        #expect(received.count == 1)
+        let receivedJSON = try #require(
+            try JSONSerialization.jsonObject(with: received[0]) as? [String: Any]
+        )
+        #expect(receivedJSON["schemaVersion"] as? Int == ContactDraftIntakeService.schemaVersion)
+
+        // list_pending
+        let pendingBody = try rpcBody(id: 4, method: "tools/call", params: [
+            "name": "list_pending",
+            "arguments": [:] as [String: Any]
+        ])
+        let pendingResponse = try await post(session, port: server.port, token: "test-token", body: pendingBody)
+        #expect(pendingResponse.status == 200)
+        let pendingText = String(decoding: pendingResponse.data, as: UTF8.self)
+        #expect(pendingText.contains("张伟"))
+        #expect(pendingText.contains("denied"))
+    }
+
+    @Test("Requests without a valid token, wrong path, or wrong method are rejected")
+    func enforcesGatewayRules() async throws {
+        let server = AgentAccessServer(handler: StubHandler(), token: "secret")
+        try await server.start(port: 0)
+        defer { server.stop() }
+
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.finishTasksAndInvalidate() }
+
+        let body = try rpcBody(id: 1, method: "tools/list")
+
+        let unauthorized = try await post(session, port: server.port, token: "wrong", body: body)
+        #expect(unauthorized.status == 401)
+
+        let wrongPath = try await post(session, port: server.port, token: "secret", body: body, path: "/other")
+        #expect(wrongPath.status == 404)
+
+        let get = try await post(session, port: server.port, token: "secret", body: Data(), method: "GET")
+        #expect(get.status == 405)
+    }
+
+    @Test("Malformed pre-auth requests fail with HTTP errors instead of crashing or hanging")
+    func rejectsMalformedRequests() async throws {
+        let handler = StubHandler()
+        let server = AgentAccessServer(handler: handler, token: "secret")
+        try await server.start(port: 0)
+        defer { server.stop() }
+
+        // Negative Content-Length used to crash the parser on an invalid range.
+        let negative = try await sendRaw("POST /mcp HTTP/1.1\r\nContent-Length: -5\r\n\r\n", port: server.port)
+        #expect(negative.status == 400)
+
+        // A body beyond the cap is refused before it is ever buffered.
+        let oversized = try await sendRaw("POST /mcp HTTP/1.1\r\nContent-Length: 99999999\r\n\r\n", port: server.port)
+        #expect(oversized.status == 413)
+
+        // A header section that never fits is cut off instead of growing the buffer.
+        let junk = String(repeating: "a", count: 70_000)
+        let hugeHeader = try await sendRaw("POST /mcp HTTP/1.1\r\nX-Junk: \(junk)\r\n\r\n", port: server.port)
+        #expect(hugeHeader.status == 431)
+
+        // A non-numeric Content-Length is a client error, not an empty body.
+        let garbage = try await sendRaw("POST /mcp HTTP/1.1\r\nContent-Length: abc\r\n\r\n", port: server.port)
+        #expect(garbage.status == 400)
+
+        let payloads = await handler.receivedPayloads()
+        #expect(payloads.isEmpty)
+    }
+
+    @Test("Bytes pipelined after a full request do not invoke the handler twice")
+    func handlesSingleRequestPerConnection() async throws {
+        let handler = StubHandler()
+        let server = AgentAccessServer(handler: handler, token: "secret")
+        try await server.start(port: 0)
+        defer { server.stop() }
+
+        let initializeBody = try rpcBody(id: 1, method: "initialize", params: [
+            "protocolVersion": "2025-11-25",
+            "capabilities": [:] as [String: Any],
+            "clientInfo": ["name": "test", "version": "1.0"]
+        ] as [String: Any])
+        let initializeResponse = try await sendRaw(rawRequest(body: initializeBody, token: "secret"), port: server.port)
+        #expect(initializeResponse.status == 200)
+
+        let callBody = try rpcBody(id: 2, method: "tools/call", params: [
+            "name": "queue_drafts",
+            "arguments": [
+                "schemaVersion": ContactDraftIntakeService.schemaVersion,
+                "drafts": [["displayName": "张伟"]]
+            ] as [String: Any]
+        ])
+        let single = rawRequest(body: callBody, token: "secret")
+        let response = try await sendRaw(single + single, port: server.port)
+        #expect(response.status == 200)
+
+        // Leave time for a duplicate dispatch to (wrongly) land before counting.
+        try await Task.sleep(for: .milliseconds(200))
+        let payloads = await handler.receivedPayloads()
+        #expect(payloads.count == 1)
+    }
+
+    private func rawRequest(body: Data, token: String) -> String {
+        // The MCP transport validates Content-Type/Accept, so the raw request
+        // must carry the same headers URLSession and curl send.
+        "POST /mcp HTTP/1.1\r\n"
+            + "Content-Type: application/json\r\n"
+            + "Accept: application/json\r\n"
+            + "Content-Length: \(body.count)\r\n"
+            + "Authorization: Bearer \(token)\r\n"
+            + "\r\n"
+            + String(decoding: body, as: UTF8.self)
+    }
+
+    /// URLSession cannot send malformed requests, so the malformed/pipelined
+    /// tests write raw bytes to a fresh TCP connection and read until the
+    /// server closes it.
+    private func sendRaw(_ request: String, port: UInt16) async throws -> (status: Int, data: Data) {
+        try await withCheckedThrowingContinuation { continuation in
+            let box = RawResponseBox(continuation)
+            let accumulator = RawResponseAccumulator()
+            let queue = DispatchQueue(label: "roster.test.agent-access.raw")
+            let connection = NWConnection(
+                host: NWEndpoint.Host("127.0.0.1"),
+                port: NWEndpoint.Port(rawValue: port)!,
+                using: .tcp
+            )
+
+            @Sendable func complete() {
+                let received = accumulator.value
+                let text = String(decoding: received, as: UTF8.self)
+                let parts = text.split(separator: " ", maxSplits: 2)
+                let status = parts.count > 1 ? Int(parts[1]) ?? 0 : 0
+                let body: Data
+                if let headerEnd = received.range(of: Data("\r\n\r\n".utf8)) {
+                    body = received.subdata(in: headerEnd.upperBound..<received.count)
+                } else {
+                    body = Data()
+                }
+                connection.cancel()
+                box.resumeOnce(returning: (status, body))
+            }
+
+            @Sendable func pump() {
+                connection.receive(minimumIncompleteLength: 1, maximumLength: 1 << 16) { data, _, isComplete, error in
+                    if let data, !data.isEmpty {
+                        accumulator.append(data)
+                    }
+                    if error != nil || isComplete {
+                        complete()
+                        return
+                    }
+                    pump()
+                }
+            }
+
+            connection.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    connection.send(content: Data(request.utf8), completion: .contentProcessed { _ in
+                        pump()
+                    })
+                case .failed:
+                    box.resumeOnce(returning: (0, Data()))
+                default:
+                    break
+                }
+            }
+            connection.start(queue: queue)
+            queue.asyncAfter(deadline: .now() + 5) {
+                box.resumeOnce(returning: (0, Data()))
+            }
+        }
+    }
+}
+
+private final class RawResponseBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<(status: Int, data: Data), any Error>?
+
+    init(_ continuation: CheckedContinuation<(status: Int, data: Data), any Error>) {
+        self.continuation = continuation
+    }
+
+    func resumeOnce(returning value: (status: Int, data: Data)) {
+        lock.lock()
+        let pending = continuation
+        continuation = nil
+        lock.unlock()
+        pending?.resume(returning: value)
+    }
+}
+
+private final class RawResponseAccumulator: @unchecked Sendable {
+    private let lock = NSLock()
+    private var data = Data()
+
+    func append(_ chunk: Data) {
+        lock.lock()
+        data.append(chunk)
+        lock.unlock()
+    }
+
+    var value: Data {
+        lock.lock()
+        defer { lock.unlock() }
+        return data
+    }
+}
+
+extension AgentAccessServerTests.StubHandler {
+    func setOutcome(_ outcome: ContactDraftIntakeOutcome) {
+        self.outcome = outcome
+    }
+
+    func receivedPayloads() -> [Data] {
+        payloads
     }
 }

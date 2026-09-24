@@ -360,7 +360,7 @@ private struct SidebarContactRootItem: View {
     }
 
     private var isSelected: Bool {
-        model.selection == .contacts && model.selectedContactCollectionID == ContactCollectionIdentifier.all && (isCollapsed || !isExpanded)
+        model.selection == .contacts && model.selectedContactCollectionID == ContactCollectionIdentifier.all
     }
 }
 
@@ -498,7 +498,10 @@ private struct SidebarContactCollectionItem: View {
             depth: depth,
             hasChildren: hasChildren,
             isExpanded: isExpanded,
-            isSelected: model.selection == .contacts && model.selectedContactCollectionID == collection.id,
+            // “全部”集合的选中态由上方“通讯录”根行统一呈现，避免双高亮。
+            isSelected: model.selection == .contacts
+                && model.selectedContactCollectionID == collection.id
+                && collection.kind != .all,
             accessibilityIdentifier: "contact-group-drop-\(collection.id)",
             e2eIdentifier: "contact-group-drop-\(collection.id)",
             dropAction: dropAction,

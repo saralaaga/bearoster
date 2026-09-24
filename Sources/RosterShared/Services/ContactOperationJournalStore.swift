@@ -257,6 +257,36 @@ package actor ContactOperationJournalStore {
         }
     }
 
+    package func setting(forKey key: String) -> String? {
+        guard let database = try? openDatabase() else { return nil }
+        defer { sqlite3_close(database) }
+        guard (try? prepareSchema(database)) != nil else { return nil }
+
+        let query = "SELECT value FROM contact_journal_settings WHERE key = ? LIMIT 1"
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(database, query, -1, &statement, nil) == SQLITE_OK else {
+            sqlite3_finalize(statement)
+            return nil
+        }
+        defer { sqlite3_finalize(statement) }
+        sqlite3_bind_text(statement, 1, key, -1, contactJournalTransientDestructor)
+        guard sqlite3_step(statement) == SQLITE_ROW,
+              let text = sqlite3_column_text(statement, 0)
+        else { return nil }
+        return String(cString: text)
+    }
+
+    package func setSetting(_ value: String, forKey key: String) {
+        do {
+            let database = try openDatabase()
+            defer { sqlite3_close(database) }
+            try prepareSchema(database)
+            try saveSetting(database, key: key, value: value)
+        } catch {
+            return
+        }
+    }
+
     package func saveDraft(_ draft: LocalContactDraft) {
         do {
             let database = try openDatabase()

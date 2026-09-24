@@ -720,9 +720,9 @@ struct BulkContactSelectionView: View {
                 previewCard(selectedProfiles: selectedProfiles)
             }
             .padding(24)
-            .frame(maxWidth: 760)
             .frame(maxWidth: .infinity, alignment: .center)
         }
+        .adaptivePaneWidth(floor: 760, cap: 880)
         .background(ContactsNativeStyle.detailBackground(colorScheme))
         .task(id: selectionKey) {
             syncDraft(from: selectedProfiles)
