@@ -27,6 +27,10 @@ OUT_DIR="$ROOT/dist/mas"
 die() { echo "error: $*" >&2; exit 1; }
 
 [[ -f "$PROFILE" ]] || die "missing provisioning profile: $PROFILE"
+# 91109: App Store uploads reject com.apple.quarantine on any payload file,
+# and browser-downloaded profiles carry it. Scrub it here, before the
+# profile is copied into the bundle.
+xattr -c "$PROFILE" 2>/dev/null || true
 [[ -f "$BASE_ENTITLEMENTS" ]] || die "missing $BASE_ENTITLEMENTS"
 command -v productbuild >/dev/null || die "productbuild not found (install Xcode command line tools)"
 
@@ -78,6 +82,10 @@ ROSTER_SKIP_ZIP=1 \
   "$ROOT/scripts/build-app.sh" release > /dev/null
 
 echo "==> verifying app"
+# 91109: clear any leftover extended attributes (quarantine etc.) on the
+# staged bundle before verification and packaging; they survive into the
+# pkg payload and App Store uploads reject them.
+xattr -cr "$APP_DIR" 2>/dev/null || true
 codesign --verify --deep --strict --verbose=2 "$APP_DIR"
 codesign -d --entitlements - "$APP_DIR" 2>/dev/null \
   | grep -q 'com.apple.security.app-sandbox' \
