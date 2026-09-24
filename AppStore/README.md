@@ -40,7 +40,7 @@ scripts/capture-store-shots.sh
 
 需要你本人做的：
 
-- [ ] 部署 `website/` 后确认 `/privacy`、`/support`、`/en/privacy`、`/en/support` 返回独立法务页（main 上的新法务页已就绪；2026-09-24 复查线上仍是 catch-all 首页。须先运行 `scripts/website/configure-deploy-gate.sh` 配好 `website-production` 门，再 dispatch **Website production deploy** 并审批）
+- [ ] 部署 `website/` 后确认 `/privacy`、`/support`、`/en/privacy`、`/en/support` 返回独立法务页（本地 `npx wrangler pages deploy website --project-name=bearoster --branch=main` 部署；2026-09-24 网站门因免费版不支持 required reviewers 搁置，见 `docs/website-deploy-gate.md`）
 - [x] 在 App Store Connect 填写文案并跑完两份问卷（2026-09-24 由 agent 经 ego 浏览器完成：中英文案/关键词/URL/版权、6 张截图、隐私 Data Not Collected 已发布、年龄分级 4+、内容权利无第三方内容；余下两件小事见下）
 - [ ] ASC 版本页把 `01-calendar` 截图拖到第一位（合成拖拽驱动不了 ASC 的排序组件，顺序当前为 02,03,01,04,05,06）
 - [ ] ASC 版本页 App Review Information 填联系人姓名/电话/邮箱（个人联系方式，agent 不代填）
@@ -50,7 +50,7 @@ scripts/capture-store-shots.sh
 
 仍然是 blocked 的：
 
-- [ ] **上传构建**。受保护入口已建成（`.github/workflows/release.yml` + `app-store-release` Environment），但你须先运行 `scripts/release/configure-release-gate.sh` 和 `scripts/release/bootstrap-release-secrets.sh` 完成一次性配置，见 `docs/release-protected-executor.md`。配置完成前不要手工拿密钥跑上传脚本
+- [ ] **上传构建**。2026-09-24 决定不走 GitHub 审批门（免费版不支持 required reviewers），改为本机人工两步：用户本人跑 `scripts/build-mas-pkg.sh` 出签名 pkg，再用 Transporter 或 `xcrun altool --upload-app` 上传，见 `docs/release-protected-executor.md`。Agent 不执行签名与上传
 - [ ] 欧盟交易商状态（只有面向欧盟上架时才需要）
 
 ## 免费发布、之后再订阅

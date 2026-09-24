@@ -1,10 +1,38 @@
-# 受保护执行器与人工审批入口
+# 发布路径（2026-09-24 起：本机人工两步）
 
-状态：**方案 A（GitHub Actions Environment）已建成，等待用户完成一次性配置。配置完成前外部上传仍然 blocked。**
+状态：**当前采用本机人工发布：用户本人跑构建签名 + 本人上传。GitHub 审批门方案已建成但因免费版不支持 required reviewers 而搁置（文件保留，未激活）。**
 适用策略：`/Users/carlos/.agents/deployment-policy.md`（版本 2026-09-06）
 最后更新：2026-09-24
 
-## 这份文档解决什么问题
+## 当前发布流程
+
+人工即审批：特权步骤由用户本人在自己终端完成，密钥全程不离开本机。
+
+```bash
+# 1) 用户本人运行：从钥匙串签名身份出 MAS .pkg
+scripts/build-mas-pkg.sh            # 产物在 dist/mas/Bearoster-<版本>.pkg
+```
+
+```text
+# 2) 用户本人上传，二选一：
+#    a) Transporter App：把 pkg 拖进去，点 Deliver
+#    b) xcrun altool --upload-app --type macos -f dist/mas/Bearoster-<版本>.pkg \
+#         -u <AppleID> -p <App 专用密码>
+```
+
+之后在 App Store Connect 选 build、提交审核（可由 Agent 在浏览器代操作，账号会话属于用户）。
+
+理由（为什么这道人工门对本项目足够）：签名证书与 ASC key 本来就在本机，GitHub 门不消除本机暴露面、反而要私钥离开本机；上架前有 App Review 强制外部门；仓库单人维护，Agent 已拥有全部源码写入权，签名步骤不是信任链最薄弱环节。失去的只是「独立审批记录 + 防自批」的纵深， consciously accepted。
+
+Agent 边界不变：不执行分发证书签名、不上传构建、不持有 Apple 凭据；只做无凭据构建、测试、ASC 元数据操作。
+
+## 为什么 GitHub 门被搁置
+
+`release.yml`/`website.yml` 的审批门依赖 Environment required reviewers，2026-09-24 实测 GitHub 免费版返回 422 不支持。升级 Pro/Team 后重跑 `scripts/release/configure-release-gate.sh` + `scripts/website/configure-deploy-gate.sh` 即可激活（脚本保留未删）。届时密钥需 bootstrap 进 GitHub secrets——是否接受密钥离机由用户再决定。
+
+## 历史：审批记录 + 哈希门（本地纵深，仍然可用）
+
+代码在 `scripts/release/`。
 
 发布动作需要三件事同时成立：
 
@@ -49,7 +77,7 @@ evidence: 查看了 1.0 的商店文案与截图，本地跑通沙盒构建
 - **挡不住的**：任何能写仓库或写 `release/approvals/` 的 Agent 都能伪造一条记录。`approver:` 字段是自报的，没有密码学意义。
 - 因此这层是**纵深防御**，不是策略要求的「独立审批入口」。
 
-## 已建成：GitHub Actions Environment 入口（方案 A）
+## 已建成但搁置：GitHub Actions Environment 入口（方案 A）
 
 `.github/workflows/release.yml` 与网站部署门（`docs/website-deploy-gate.md`）同一模式：
 
