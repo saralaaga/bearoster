@@ -1,6 +1,224 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bearoster · Birthdays and contacts, tidy</title><meta name="description" content="Bearoster is a native macOS contacts app that runs entirely on your Mac: birthdays, nested tags, and safe batch editing with no network or data collection."><link rel="canonical" href="https://bearoster.com/en/"><link rel="stylesheet" href="/styles.css"></head><body>
-<header class="site"><div class="page bar"><a class="brand" href="/en/"><span class="mark" aria-hidden="true">熊</span>Bearoster</a><nav aria-label="Primary"><a href="#features">Features</a><a href="/en/privacy">Privacy</a><a href="/en/support">Support</a><a class="lang" href="/" hreflang="zh-Hans" lang="zh-Hans">中文</a></nav></div></header>
-<main><div class="page hero"><div><p class="eyebrow">macOS · Coming soon</p><h1>Birthdays remembered<span>Contacts under control</span></h1><p class="lede">Bearoster reads and writes the real Contacts data on your Mac. Gregorian, Chinese lunar, Hebrew, and Islamic birthdays stay clear—without importing, copying, or uploading them.</p><div class="actions"><a class="button" href="/en/support">Get support</a><a class="ghost" href="/en/privacy">Read the privacy policy</a></div><p class="badges"><span class="pill">Data stays local</span> <span class="pill">No uploads</span> <span class="pill">No account</span></p></div><div class="shot"><img src="/assets/01-calendar.png" width="1280" height="800" alt="Bearoster calendar view with fictional contacts"></div></div>
-<section class="page" id="features"><h2 class="section-title">Designed for things you need every year</h2><div class="grid"><div class="card"><strong>Four birthday calendars</strong><p>Gregorian, Chinese lunar, Hebrew, and Islamic dates in one place, sorted by what is coming next.</p></div><div class="card"><strong>Nested tags</strong><p>Organize contacts as “Friends / College,” then stack filters for exactly the group you need.</p></div><div class="card"><strong>Safe batch edits</strong><p>Preview every change before saving. Blank fields are filled; your existing values are not overwritten unless you ask.</p></div></div></section>
-<section class="page"><div class="privacy-panel"><div><h2>Your data never leaves your Mac</h2><p>Bearoster has no account system, data uploads, analytics, or third-party SDKs. Contacts remain in macOS Contacts; tags and edit history stay in the local app sandbox.</p></div><div class="gallery"><img src="/assets/02-birthdays.png" width="1280" height="800" alt="Birthday list"><img src="/assets/03-contacts.png" width="1280" height="800" alt="Contacts organizer"></div></div></section></main>
-<footer class="site"><div class="page foot"><span>© 2026 Bang Ni Wen Wen (Tianjin) E-Commerce Co., Ltd.</span><span><a href="/en/privacy">Privacy</a> · <a href="/en/support">Support</a></span></div></footer></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Bearoster is a native macOS app for editing contacts in bulk. Add tags, drag contacts between groups, review changes before saving, and manage birthdays across multiple calendars. Your data stays on your Mac.">
+  <title>Bearoster — Bulk Contact Management for macOS</title>
+  <link rel="canonical" href="https://bearoster.com/en/">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to main content</a>
+
+  <header class="site-header">
+    <div class="container nav-wrap">
+      <a class="brand" href="/en/" aria-label="Bearoster home">
+        <img src="/assets/logo.png" alt="" class="brand-logo" width="32" height="32">
+        <span class="brand-name">Bearoster</span>
+      </a>
+      <nav class="nav" aria-label="Main navigation">
+        <a href="/en/#features">Features</a>
+        <a href="/en/privacy">Privacy</a>
+        <a href="/en/support">Support</a>
+        <a href="/en/#faq">FAQ</a>
+      </nav>
+      <div class="nav-actions">
+        <a class="lang-toggle" href="/" hreflang="zh-Hans" lang="zh-Hans">中文</a>
+        <a class="btn btn-primary nav-cta" href="/en/support">Get support</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <div class="hero-badge">
+            <span class="badge-dot"></span>
+            <span>Native macOS app · Coming soon</span>
+          </div>
+          <h1 class="hero-title">Edit contacts in bulk.<br>Stay in control.</h1>
+          <p class="hero-lead">Bearoster lets you edit many contacts at once, organize them with tags, and drag them between groups. Changes stay in a local cache until you’ve reviewed them, so you can undo or roll back before saving to Contacts.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary btn-large" href="/en/support">Get support</a>
+            <a class="btn btn-secondary btn-large" href="#features">See features</a>
+          </div>
+          <p class="hero-meta">Requires macOS 14 or later · Coming soon to the Mac App Store · No account</p>
+        </div>
+
+        <div class="hero-visual" aria-label="Screenshot of the Bearoster app">
+          <div class="mac-window hero-shot-window">
+            <img class="app-shot" src="/assets/app-contacts.png" width="1280" height="800" alt="Bearoster contacts view with fictional contacts: sidebar groups and tags, contact list with birthday countdowns, and a detail pane.">
+          </div>
+          <div class="drag-timeline" aria-hidden="true"><span class="timeline-pending">● Pending</span><i></i><span class="timeline-conflict">● Conflict</span><i></i><span class="timeline-failed">● Failed</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="features" id="features">
+      <div class="container">
+        <div class="section-head">
+          <h2 class="section-title">Made for editing contacts in bulk</h2>
+          <p class="section-lead">Whether you have dozens of contacts or hundreds, Bearoster helps you edit fields, apply tags, change groups, and roll back mistakes.</p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="3" width="16" height="18" rx="3"/><circle cx="12" cy="9" r="2.5"/><path d="M7 17c1-3 2.8-4.4 5-4.4s4 1.4 5 4.4"/></svg>
+            </div>
+            <h3>Edit contacts in bulk</h3>
+            <p>Update names, companies, departments, job titles, phone numbers, email addresses, postal addresses, and birthdays for multiple contacts at once. Review who will be affected, then fill blank fields or replace existing values.</p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon feature-calendar" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+              <span class="calendar-badge">4</span>
+            </div>
+            <h3>Organize with tags</h3>
+            <p>Use local tags to group clients, family, colleagues, or project contacts. Nest tags into a hierarchy, filter your list, or use them to choose contacts for a bulk edit.</p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M12 2l1.5 3h3l-2.5 2 1 3.5-3-2-3 2 1-3.5L7.5 5h3z"/></svg>
+            </div>
+            <h3>Drag contacts between groups</h3>
+            <p>Drag a contact from the list to an Apple Contacts group to change its group. Select several contacts first to move the whole group at once.</p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+            </div>
+            <h3>Cache and edit history</h3>
+            <p>Edits are saved to a local cache first, along with a history of your actions. If something’s wrong, undo it or roll back. Save to Contacts only when the result looks right.</p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <h3>Review before you save</h3>
+            <p>Bearoster keeps a local record between your edits and Contacts. Preview each change, check the result, and undo anything you don’t want before writing to the system address book.</p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+            </div>
+            <h3>Birthdays in multiple calendars</h3>
+            <p>Manage birthdays in Gregorian, Lunar, Hebrew, and Islamic calendars. Upcoming dates appear in the calendar and list, with a color for each calendar.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="privacy" id="privacy">
+      <div class="container privacy-grid">
+        <div class="privacy-copy">
+          <h2 class="section-title">Your data stays on your Mac</h2>
+          <p class="section-lead">Bearoster doesn’t upload your contacts or collect usage data. The first time you open it, macOS asks you to grant Contacts access.</p>
+          <ul class="privacy-list">
+            <li>Every read and write uses the system Contacts framework</li>
+            <li>Your cache and edit history stay in your user directory</li>
+            <li>No in-app purchases, subscriptions, or ads</li>
+          </ul>
+        </div>
+        <div class="privacy-visual">
+          <div class="shield-card">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+            <div>
+              <strong>Contacts access only</strong>
+              <span>No uploads, no account, no cloud</span>
+            </div>
+          </div>
+          <div class="privacy-note">
+            <span class="lock-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </span>
+            <span>You can revoke access at any time in System Settings › Privacy &amp; Security › Contacts.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="download" id="download">
+      <div class="container download-card">
+        <div class="download-copy">
+          <h2 class="section-title">Get Bearoster</h2>
+          <p class="section-lead">Bearoster is a native macOS app written in Swift, coming soon to the Mac App Store. Once it’s live, install and update it from the store. Until then, reach out if you need help.</p>
+          <div class="download-actions">
+            <a class="btn btn-primary btn-large" href="/en/support">Get support</a>
+          </div>
+        </div>
+        <div class="download-meta">
+          <div class="meta-row">
+            <span>System requirement</span>
+            <strong>macOS 14 Sonoma+</strong>
+          </div>
+          <div class="meta-row">
+            <span>App type</span>
+            <strong>Native macOS app written in Swift</strong>
+          </div>
+          <div class="meta-row">
+            <span>Built with</span>
+            <strong>Swift 6 / SwiftUI / AppKit</strong>
+          </div>
+          <div class="meta-row">
+            <span>Languages</span>
+            <strong>Simplified Chinese, Traditional Chinese, English</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="faq" id="faq">
+      <div class="container faq-wrap">
+        <div class="section-head">
+          <h2 class="section-title">Frequently asked questions</h2>
+        </div>
+        <div class="faq-list">
+          <details class="faq-item">
+            <summary><span>Will Bearoster change my contacts right away?</span><span class="faq-chevron" aria-hidden="true"></span></summary>
+            <p>No. Your edits go into a local cache and history first. Bearoster writes them to Contacts only after you confirm, and you can undo or roll back changes before then.</p>
+          </details>
+          <details class="faq-item">
+            <summary><span>How are Lunar, Hebrew, and Islamic birthdays calculated?</span><span class="faq-chevron" aria-hidden="true"></span></summary>
+            <p>Bearoster uses Foundation’s Calendar API to convert non-Gregorian dates to their Gregorian date for the current year. It uses that date for sorting, reminders, and the calendar view.</p>
+          </details>
+          <details class="faq-item">
+            <summary><span>Will my changes sync through iCloud?</span><span class="faq-chevron" aria-hidden="true"></span></summary>
+            <p>Bearoster doesn’t manage syncing. If iCloud is enabled for Contacts, iCloud handles changes to your system contacts as usual. Bearoster handles the editing on your Mac.</p>
+          </details>
+          <details class="faq-item">
+            <summary><span>Why does Bearoster need Contacts access?</span><span class="faq-chevron" aria-hidden="true"></span></summary>
+            <p>The app needs permission to edit contacts in bulk, read groups, and save your changes. Without it, Bearoster can show only an empty state or content from its local cache.</p>
+          </details>
+          <details class="faq-item">
+            <summary><span>Will Bearoster charge later?</span><span class="faq-chevron" aria-hidden="true"></span></summary>
+            <p>The current version is free, with no subscription or in-app purchases. If paid features are added later, they’ll be clearly separated from the free version. Existing local features will remain available.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-grid">
+      <div class="footer-brand">
+        <img src="/assets/logo.png" alt="" width="24" height="24">
+        <span>Bearoster</span>
+      </div>
+      <nav class="footer-links" aria-label="Footer navigation">
+        <a href="/en/#features">Features</a>
+        <a href="https://bearoster.com/en/privacy">Privacy</a>
+        <a href="https://bearoster.com/en/support">Support</a>
+        <a href="/en/#faq">FAQ</a>
+      </nav>
+      <p class="footer-copy">© 2026 Bang Ni Wen Wen (Tianjin) E-Commerce Co., Ltd.</p>
+    </div>
+  </footer>
+</body>
+</html>
