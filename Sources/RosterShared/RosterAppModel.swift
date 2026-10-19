@@ -240,6 +240,7 @@ package final class RosterAppModel {
     package private(set) var contactWritePolicy: ContactWritePolicy = .confirmBeforeWrite
     package private(set) var contactDraftsByID: [String: LocalContactDraft] = [:]
     package private(set) var contactOperationLog: [ContactOperationLog] = []
+    #if !ROSTER_MAS
     package private(set) var isAgentAccessEnabled = false
     package private(set) var agentAccessToken = ""
     package private(set) var agentAccessEndpoint: String?
@@ -249,6 +250,12 @@ package final class RosterAppModel {
     /// resumes after a toggle change can detect it is stale and tear down
     /// instead of leaving a listener running with no handle.
     private var agentAccessEpoch = 0
+    #endif
+    #if ROSTER_MAS
+    /// Calendar-share subscription state; MAS builds only, keeping the
+    /// direct-distribution feature set (loopback agent listener) separate.
+    package private(set) var share = CalendarShareModel()
+    #endif
     package var expandedTagIDs: Set<String> = []
     package private(set) var extendedProfilesByID: [String: ContactExtendedProfile] = [:]
     package private(set) var cachedUpcomingOccurrences: [RosterOccurrence] = []
@@ -313,7 +320,12 @@ package final class RosterAppModel {
             Task { await loadContactTags() }
             Task { await loadContactJournal() }
             Task { await loadCachedContactSnapshot() }
+            #if !ROSTER_MAS
             Task { await restoreAgentAccessState() }
+            #endif
+            #if ROSTER_MAS && CALENDAR_SHARE_LIVE
+            Task { await share.restore() }
+            #endif
         }
     }
 
@@ -422,6 +434,13 @@ package final class RosterAppModel {
         if selection == .contacts || selection == .tags {
             rebuildContactProjection()
         }
+        #if ROSTER_MAS
+        // Content-diff and debounce live in the share model, so frequent
+        // rebuilds never turn into network calls.
+        if !profiles.isEmpty {
+            share.scheduleSync(records: profiles.flatMap(\.records), calendarName: l10n(.appName))
+        }
+        #endif
     }
 
     private func finishCalculationProgress(requestID: Int) {
@@ -1371,6 +1390,7 @@ package final class RosterAppModel {
         toast(contactQueuedText(count: drafts.count))
     }
 
+    #if !ROSTER_MAS
     // MARK: - Agent access (MCP)
 
     package func handleAgentDraftIntake(payload: Data) async -> ContactDraftIntakeOutcome {
@@ -1440,6 +1460,17 @@ package final class RosterAppModel {
         agentAccessToken = token
         Task { await setAgentAccessEnabled(true) }
     }
+    #endif
+
+    #if ROSTER_MAS
+    package func setCalendarShareEnabled(_ enabled: Bool) async {
+        await share.setEnabled(enabled, records: profiles.flatMap(\.records), calendarName: l10n(.appName))
+    }
+
+    package func regenerateCalendarShareLink() async {
+        await share.regenerate(records: profiles.flatMap(\.records), calendarName: l10n(.appName))
+    }
+    #endif
 
     private static func e2eJournalURL() -> URL {
         let url = FileManager.default.temporaryDirectory
@@ -1448,6 +1479,7 @@ package final class RosterAppModel {
         return url
     }
 
+    #if !ROSTER_MAS
     private func restoreAgentAccessState() async {
         if agentAccessToken.isEmpty {
             if let stored = await contactJournalStore.setting(forKey: "agentAccessToken"), !stored.isEmpty {
@@ -1505,6 +1537,7 @@ package final class RosterAppModel {
         }
         return bytes.map { String(format: "%02x", $0) }.joined()
     }
+    #endif
 
     package func applyBatchContactEdits(
         _ draft: ContactBatchEditDraft,
@@ -2128,13 +2161,15 @@ package final class RosterAppModel {
         }
     }
 
+    #if !ROSTER_MAS
     private var agentAccessListenFailedText: String {
         switch language.coreLocale {
         case .english: "Couldn't start the agent access server. The port may be in use."
         case .simplifiedChinese: "智能体接入服务启动失败，端口可能被占用。"
-        case .traditionalChinese: "智慧型代理人接入服務啟動失敗，連接埠可能被佔用。"
+        case .traditionalChinese: "智慧型代理人接入服務啟動失敗，連接埠可能被占用。"
         }
     }
+    #endif
 
     private func contactCreateSummary(for draft: LocalContactDraft) -> String {
         switch language.coreLocale {

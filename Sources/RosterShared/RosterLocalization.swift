@@ -161,7 +161,26 @@ package struct L10n {
     package static let nextRoster = Key(zhHans: "下次生日", zhHant: "下次生日", en: "Next")
     package static let unknownAge = Key(zhHans: "未知", zhHant: "未知", en: "Unknown")
     package static let needContacts = Key(zhHans: "需要访问通讯录", zhHant: "需要存取通訊錄", en: "Contacts access needed")
-    package static let allowContacts = Key(zhHans: "允许访问通讯录", zhHant: "允許存取通訊錄", en: "Allow Contacts Access")
+    // 5.1.1(iv)：触发系统通讯录授权弹窗的按钮不能含「允许」类措辞，只能用中性的「继续」。
+    package static let continueContacts = Key(zhHans: "继续", zhHant: "繼續", en: "Continue")
+    // 纯 AppKit 程序化构建的标准主菜单（App Review Guideline 4：退出与窗口重开）。
+    package static let menuAbout = Key(zhHans: "关于蓝熊名册", zhHant: "關於藍熊名冊", en: "About Bearoster")
+    package static let menuHide = Key(zhHans: "隐藏蓝熊名册", zhHant: "隱藏藍熊名冊", en: "Hide Bearoster")
+    package static let menuHideOthers = Key(zhHans: "隐藏其他", zhHant: "隱藏其他", en: "Hide Others")
+    package static let menuShowAll = Key(zhHans: "全部显示", zhHant: "全部顯示", en: "Show All")
+    package static let menuQuit = Key(zhHans: "退出蓝熊名册", zhHant: "結束藍熊名冊", en: "Quit Bearoster")
+    package static let menuFile = Key(zhHans: "文件", zhHant: "檔案", en: "File")
+    package static let menuCloseWindow = Key(zhHans: "关闭窗口", zhHant: "關閉視窗", en: "Close Window")
+    package static let menuUndo = Key(zhHans: "撤销", zhHant: "還原", en: "Undo")
+    package static let menuRedo = Key(zhHans: "重做", zhHant: "重做", en: "Redo")
+    package static let menuCut = Key(zhHans: "剪切", zhHant: "剪下", en: "Cut")
+    package static let menuCopy = Key(zhHans: "拷贝", zhHant: "拷貝", en: "Copy")
+    package static let menuPaste = Key(zhHans: "粘贴", zhHant: "貼上", en: "Paste")
+    package static let menuWindow = Key(zhHans: "窗口", zhHant: "視窗", en: "Window")
+    package static let menuMinimize = Key(zhHans: "最小化", zhHant: "縮到最小", en: "Minimize")
+    package static let menuZoom = Key(zhHans: "缩放", zhHant: "縮放", en: "Zoom")
+    package static let menuOpenBearoster = Key(zhHans: "打开蓝熊名册", zhHant: "打開藍熊名冊", en: "Open Bearoster")
+    package static let menuBringAllToFront = Key(zhHans: "前置全部窗口", zhHant: "將所有視窗置於最前", en: "Bring All to Front")
     package static let openSettings = Key(zhHans: "前往系统设置", zhHant: "前往系統設定", en: "Open System Settings")
     package static let permissionDenied = Key(zhHans: "请在系统设置 > 隐私与安全性 > 通讯录中开启访问权限。", zhHant: "請在系統設定 > 隱私權與安全性 > 通訊錄中開啟存取權限。", en: "Enable access in System Settings > Privacy & Security > Contacts.")
     package static let noRosters = Key(zhHans: "没有生日记录", zhHant: "沒有生日記錄", en: "No birthdays found")
@@ -257,6 +276,18 @@ package struct L10n {
     package static let progressReadingContacts = Key(zhHans: "读取 macOS 通讯录", zhHant: "讀取 macOS 通訊錄", en: "Reading macOS Contacts")
     package static let voiceAccessRequired = Key(zhHans: "需要麦克风和语音识别权限，可以在系统设置 > 隐私与安全性中开启。", zhHant: "需要麥克風和語音辨識權限，可以在系統設定 > 隱私權與安全性中開啟。", en: "Bearoster needs access to the microphone and speech recognition. You can turn both on in System Settings › Privacy & Security.")
     package static let voiceLanguageUnavailable = Key(zhHans: "当前语言不支持语音识别。", zhHant: "目前語言不支援語音辨識。", en: "Speech recognition isn’t available for this language.")
+    package static let share = Key(zhHans: "日历分享", zhHant: "日曆分享", en: "Calendar Sharing")
+    package static let shareEnable = Key(zhHans: "开启日历分享", zhHant: "開啟日曆分享", en: "Turn on calendar sharing")
+    package static let sharePrivacyHint = Key(zhHans: "订阅链接包含联系人的姓名和生日，任何拿到链接的人都能订阅，请只发给你信任的人。", zhHant: "訂閱連結包含聯絡人的姓名和生日，任何拿到連結的人都能訂閱，請只發給你信任的人。", en: "The link contains names and birthdays. Anyone who has it can subscribe, so only share it with people you trust.")
+    package static let shareEnableConfirmTitle = Key(zhHans: "开启日历分享？", zhHant: "開啟日曆分享？", en: "Enable Calendar Sharing?")
+    package static let shareEnableConfirm = Key(zhHans: "开启分享", zhHant: "開啟分享", en: "Enable Sharing")
+    package static let shareLink = Key(zhHans: "订阅链接", zhHant: "訂閱連結", en: "Subscribe link")
+    package static let shareCopyLink = Key(zhHans: "拷贝链接", zhHant: "拷貝連結", en: "Copy Link")
+    package static let shareRegenerate = Key(zhHans: "重新生成", zhHant: "重新生成", en: "Regenerate")
+    package static let shareRegenerateHint = Key(zhHans: "重新生成后旧链接立即失效。", zhHant: "重新生成後舊連結立即失效。", en: "Regenerating immediately invalidates the old link.")
+    package static let shareDisable = Key(zhHans: "停用并删除线上数据", zhHant: "停用並刪除線上資料", en: "Turn off and delete online data")
+    package static let shareSynced = Key(zhHans: "已同步", zhHant: "已同步", en: "Synced")
+    package static let shareSyncing = Key(zhHans: "同步中…", zhHant: "同步中…", en: "Syncing…")
 }
 
 extension L10n.Key {
@@ -367,7 +398,24 @@ extension L10n.Key {
     package static let nextRoster = L10n.nextRoster
     package static let unknownAge = L10n.unknownAge
     package static let needContacts = L10n.needContacts
-    package static let allowContacts = L10n.allowContacts
+    package static let continueContacts = L10n.continueContacts
+    package static let menuAbout = L10n.menuAbout
+    package static let menuHide = L10n.menuHide
+    package static let menuHideOthers = L10n.menuHideOthers
+    package static let menuShowAll = L10n.menuShowAll
+    package static let menuQuit = L10n.menuQuit
+    package static let menuFile = L10n.menuFile
+    package static let menuCloseWindow = L10n.menuCloseWindow
+    package static let menuUndo = L10n.menuUndo
+    package static let menuRedo = L10n.menuRedo
+    package static let menuCut = L10n.menuCut
+    package static let menuCopy = L10n.menuCopy
+    package static let menuPaste = L10n.menuPaste
+    package static let menuWindow = L10n.menuWindow
+    package static let menuMinimize = L10n.menuMinimize
+    package static let menuZoom = L10n.menuZoom
+    package static let menuOpenBearoster = L10n.menuOpenBearoster
+    package static let menuBringAllToFront = L10n.menuBringAllToFront
     package static let openSettings = L10n.openSettings
     package static let permissionDenied = L10n.permissionDenied
     package static let noRosters = L10n.noRosters
@@ -463,4 +511,16 @@ extension L10n.Key {
     package static let newContact = L10n.newContact
     package static let searchContactsPrompt = L10n.searchContactsPrompt
     package static let noContacts = L10n.noContacts
+    package static let share = L10n.share
+    package static let shareEnable = L10n.shareEnable
+    package static let sharePrivacyHint = L10n.sharePrivacyHint
+    package static let shareEnableConfirmTitle = L10n.shareEnableConfirmTitle
+    package static let shareEnableConfirm = L10n.shareEnableConfirm
+    package static let shareLink = L10n.shareLink
+    package static let shareCopyLink = L10n.shareCopyLink
+    package static let shareRegenerate = L10n.shareRegenerate
+    package static let shareRegenerateHint = L10n.shareRegenerateHint
+    package static let shareDisable = L10n.shareDisable
+    package static let shareSynced = L10n.shareSynced
+    package static let shareSyncing = L10n.shareSyncing
 }

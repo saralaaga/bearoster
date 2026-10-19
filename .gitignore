@@ -30,6 +30,7 @@ kimi/
 logo-candidates/
 
 # Local agent tooling state
+.mimosa/
 .zcode/
 .zcodeignore
 .video_agent/

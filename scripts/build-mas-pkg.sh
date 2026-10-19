@@ -79,6 +79,7 @@ ROSTER_ENTITLEMENTS="$MERGED" \
 ROSTER_EMBED_PROFILE="$PROFILE" \
 ROSTER_APP_DIR="$APP_DIR" \
 ROSTER_SKIP_ZIP=1 \
+ROSTER_MAS=1 \
   "$ROOT/scripts/build-app.sh" release > /dev/null
 
 echo "==> verifying app"
@@ -97,7 +98,9 @@ PKG="$OUT_DIR/$APP_NAME-$ROSTER_MARKETING_VERSION.pkg"
 rm -f "$PKG"
 
 echo "==> building installer package"
-productbuild --component "$APP_DIR" /Applications --sign "$INSTALLER_IDENTITY" "$PKG"
+# No secure timestamp: MAS packages don't need one, and the timestamp
+# fetch fails on this host's dead IPv6 route to timestamp.apple.com.
+productbuild --component "$APP_DIR" /Applications --sign "$INSTALLER_IDENTITY" --timestamp=none "$PKG"
 
 echo "==> verifying package"
 pkgutil --check-signature "$PKG"

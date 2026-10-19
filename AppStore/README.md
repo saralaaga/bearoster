@@ -53,9 +53,9 @@ scripts/capture-store-shots.sh
 - [ ] **上传构建**。2026-09-24 决定不走 GitHub 审批门（免费版不支持 required reviewers），改为本机人工两步：用户本人跑 `scripts/build-mas-pkg.sh` 出签名 pkg，再用 Transporter 或 `xcrun altool --upload-app` 上传，见 `docs/release-protected-executor.md`。Agent 不执行签名与上传
 - [ ] 欧盟交易商状态（只有面向欧盟上架时才需要）
 
-## 免费发布、之后再订阅
+## 免费发布
 
-当前计划是免费发布，不做 App 内购买。商店文案和描述里没有出现订阅相关内容，之后加订阅时再补。
+免费发布，不做 App 内购买；项目已开源，暂无内购计划。商店文案和描述里没有订阅相关内容。
 
 ## 待确认
 

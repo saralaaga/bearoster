@@ -9,6 +9,9 @@ struct PermissionsSettingsView: View {
     @Environment(RosterAppModel.self) private var model
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    #if ROSTER_MAS && CALENDAR_SHARE_LIVE
+    @State private var isConfirmingShareEnable = false
+    #endif
 
     var body: some View {
         @Bindable var model = model
@@ -22,7 +25,12 @@ struct PermissionsSettingsView: View {
                 }
                 preferencesSection
                 contactFieldsSection
+                #if !ROSTER_MAS
                 agentAccessSection
+                #endif
+                #if ROSTER_MAS && CALENDAR_SHARE_LIVE
+                shareSection
+                #endif
                 versionFooter
             }
             .padding(.horizontal, 42)
@@ -152,6 +160,7 @@ struct PermissionsSettingsView: View {
         }
     }
 
+    #if !ROSTER_MAS
     private var agentAccessSection: some View {
         SettingsSection(title: model.l10n(.agentAccess)) {
             VStack(spacing: 0) {
@@ -218,6 +227,104 @@ struct PermissionsSettingsView: View {
             .animation(RosterTheme.Motion.allowed(RosterTheme.Motion.sectionReveal, reduceMotion: reduceMotion), value: model.agentAccessError)
         }
     }
+    #endif
+
+    // 2026-09-30 复审期间随 CALENDAR_SHARE_LIVE 暂缓上线：IAP 商品、
+    // Worker 部署和隐私口径（Data Not Collected → 声明 Name）就绪后，
+    // build-app.sh 以 ROSTER_SHARE=1 重新打开，随 1.0.1 提交。
+    #if ROSTER_MAS && CALENDAR_SHARE_LIVE
+    private var shareSection: some View {
+        SettingsSection(title: model.l10n(.share)) {
+            VStack(spacing: 0) {
+                SettingsRow(
+                    title: model.l10n(.shareEnable),
+                    detail: ""
+                ) {
+                    Toggle("", isOn: Binding(
+                        get: { model.share.isEnabled },
+                        set: { enabled in
+                            // 首次开启先确认：订阅链接含联系人姓名和生日。
+                            if enabled && model.share.readToken.isEmpty {
+                                isConfirmingShareEnable = true
+                            } else {
+                                Task { await model.setCalendarShareEnabled(enabled) }
+                            }
+                        }
+                    ))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .frame(width: 64, alignment: .trailing)
+                }
+
+                if model.share.isEnabled {
+                    SettingsDivider()
+                    SettingsRow(title: model.l10n(.sharePrivacyHint), detail: "") {
+                        EmptyView()
+                    }
+
+                    SettingsDivider()
+
+                    SettingsRow(
+                        title: shareSyncTitle,
+                        detail: shareSyncDetail
+                    ) {
+                        EmptyView()
+                    }
+
+                    SettingsDivider()
+
+                    SettingsRow(
+                        title: model.l10n(.shareLink),
+                        detail: model.share.shareURL?.absoluteString ?? ""
+                    ) {
+                        HStack(spacing: 8) {
+                            Button(model.l10n(.shareCopyLink)) {
+                                copyShareLink()
+                            }
+                            Button(model.l10n(.shareRegenerate)) {
+                                Task { await model.regenerateCalendarShareLink() }
+                            }
+                        }
+                    }
+
+                    SettingsDivider()
+
+                    SettingsRow(title: model.l10n(.shareRegenerateHint), detail: "") {
+                        EmptyView()
+                    }
+
+                    SettingsDivider()
+
+                    SettingsRow(
+                        title: model.l10n(.shareDisable),
+                        detail: ""
+                    ) {
+                        Button(model.l10n(.shareDisable)) {
+                            Task { await model.setCalendarShareEnabled(false) }
+                        }
+                        .buttonStyle(SettingsActionButtonStyle(kind: .secondary))
+                    }
+                }
+
+                if let error = model.share.errorMessage {
+                    SettingsDivider()
+                    SettingsRow(title: error, detail: "") {
+                        EmptyView()
+                    }
+                }
+            }
+            .animation(RosterTheme.Motion.allowed(RosterTheme.Motion.sectionReveal, reduceMotion: reduceMotion), value: model.share.isEnabled)
+        }
+        .alert(model.l10n(.shareEnableConfirmTitle), isPresented: $isConfirmingShareEnable) {
+            Button(model.l10n(.shareEnableConfirm)) {
+                Task { await model.setCalendarShareEnabled(true) }
+            }
+            Button(model.l10n(.cancel), role: .cancel) { }
+        } message: {
+            Text(model.l10n(.sharePrivacyHint))
+        }
+    }
+    #endif
 
 
 }
@@ -257,7 +364,7 @@ private struct PermissionAccessPanel: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             if !isGranted && !needsSettings {
-                Button(model.l10n(.allowContacts)) {
+                Button(model.l10n(.continueContacts)) {
                     Task { await model.requestContactsAccess() }
                 }
                 .buttonStyle(SettingsActionButtonStyle(kind: .primary))
@@ -586,6 +693,25 @@ private extension PermissionsSettingsView {
     var languageDisplayName: String {
         model.language.displayName
     }
+
+    #if ROSTER_MAS
+    var shareSyncTitle: String {
+        model.share.isSyncing ? model.l10n(.shareSyncing) : model.l10n(.shareSynced)
+    }
+
+    var shareSyncDetail: String {
+        guard let syncedAt = model.share.lastSyncedAt else { return "" }
+        return syncedAt.formatted(date: .omitted, time: .shortened)
+    }
+
+    func copyShareLink() {
+        guard let url = model.share.shareURL else { return }
+        #if os(macOS)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(url.absoluteString, forType: .string)
+        #endif
+    }
+    #endif
 
     var upcomingRangeDisplay: String {
         switch model.language.coreLocale {

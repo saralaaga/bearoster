@@ -44,7 +44,19 @@ RESOURCES="$CONTENTS/Resources"
 
 export CLANG_MODULE_CACHE_PATH="$ROOT/.tmp-swift-cache"
 
-swift build --scratch-path "$ROOT/.build" -c "$CONFIG"
+# MAS builds compile out the loopback MCP server: App Store builds ship
+# without com.apple.security.network.server (RosterAppModel and the settings
+# view gate on the same flag).
+SWIFT_BUILD_ARGS=(--scratch-path "$ROOT/.build" -c "$CONFIG")
+if [[ "${ROSTER_MAS:-0}" == "1" ]]; then
+  SWIFT_BUILD_ARGS+=(-Xswiftc -DROSTER_MAS)
+  # 日历分享 2026-09-30 复审暂缓；IAP/Worker/隐私口径就绪后 ROSTER_SHARE=1 重开。
+  if [[ "${ROSTER_SHARE:-0}" == "1" ]]; then
+    SWIFT_BUILD_ARGS+=(-Xswiftc -DCALENDAR_SHARE_LIVE)
+  fi
+fi
+
+swift build "${SWIFT_BUILD_ARGS[@]}"
 
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS" "$RESOURCES"
@@ -95,7 +107,10 @@ if command -v codesign >/dev/null 2>&1; then
     if [[ -f "$ENTITLEMENTS" ]]; then
       CODESIGN_ARGS+=(--entitlements "$ENTITLEMENTS")
     fi
-    if [[ "$SIGN_IDENTITY" != "-" ]]; then
+    # App Store packages don't need a secure timestamp (a Developer ID
+    # notarization requirement); the fetch needs timestamp.apple.com, whose
+    # IPv6 route is dead on this build host.
+    if [[ "$SIGN_IDENTITY" != "-" && "${ROSTER_MAS:-0}" != "1" ]]; then
       CODESIGN_ARGS+=(--timestamp)
     fi
   fi

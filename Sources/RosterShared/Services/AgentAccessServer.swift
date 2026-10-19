@@ -1,3 +1,7 @@
+// The Mac App Store build ships without com.apple.security.network.server
+// (App Review rejects the entitlement), so the loopback MCP server compiles
+// out entirely; direct-distribution and debug builds keep the feature.
+#if !ROSTER_MAS
 import Foundation
 import MCP
 import Network
@@ -691,3 +695,4 @@ package final class RosterAgentAccessBridge: AgentAccessHandling, @unchecked Sen
         await model?.agentAccessPendingSummary ?? AgentAccessPendingSummary()
     }
 }
+#endif
