@@ -843,8 +843,8 @@ struct RosterAppTests {
 
     @Test("Contact action URLs carry current contact values")
     func contactActionURLsCarryCurrentContactValues() {
-        #expect(ContactActionURLFactory.url(for: .message, phoneNumbers: ["+86 159-6565-9550"], emailAddresses: [])?.absoluteString == "sms:+8615965659550")
-        #expect(ContactActionURLFactory.url(for: .call, phoneNumbers: ["+86 159-6565-9550"], emailAddresses: [])?.absoluteString == "tel:+8615965659550")
+        #expect(ContactActionURLFactory.url(for: .message, phoneNumbers: ["+86 138 0013 8000"], emailAddresses: [])?.absoluteString == "sms:+8613800138000")
+        #expect(ContactActionURLFactory.url(for: .call, phoneNumbers: ["+86 138 0013 8000"], emailAddresses: [])?.absoluteString == "tel:+8613800138000")
         #expect(ContactActionURLFactory.url(for: .video, phoneNumbers: [], emailAddresses: ["ada@example.com"])?.absoluteString == "facetime:ada@example.com")
         #expect(ContactActionURLFactory.url(for: .email, phoneNumbers: [], emailAddresses: ["ada@example.com"])?.absoluteString == "mailto:ada@example.com")
         #expect(ContactActionURLFactory.url(for: .email, phoneNumbers: ["159"], emailAddresses: []) == nil)

@@ -48,7 +48,7 @@ Would now run the privileged step:
   action      $ACTION
   manifest    $MANIFEST
   identity    Apple Distribution / Mac Installer Distribution (local keychain)
-  notary key  Infisical Bearoster/prod /notary
+  notary key  Infisical Bearoster/prod (see private runbook)
 
 That step is not implemented on purpose.
 EOF

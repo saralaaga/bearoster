@@ -1,7 +1,7 @@
 # 发布路径（2026-09-24 起：本机人工两步）
 
 状态：**当前采用本机人工发布：用户本人跑构建签名 + 本人上传。GitHub 审批门方案已建成但因免费版不支持 required reviewers 而搁置（文件保留，未激活）。**
-适用策略：`/Users/carlos/.agents/deployment-policy.md`（版本 2026-09-06）
+适用策略：本机部署策略文档（默认 `$HOME/.agents/deployment-policy.md`，版本 2026-09-06）
 最后更新：2026-09-24
 
 ## 当前发布流程
@@ -93,9 +93,9 @@ scripts/release/configure-release-gate.sh      # 创建 app-store-release 审批
 scripts/release/bootstrap-release-secrets.sh   # 写入六个 Environment secrets
 ```
 
-第二个脚本会把 `MAS_IDENTITIES_P12_B64`、`MAS_PROVISIONING_PROFILE_B64`、`MAS_P12_PASSWORD`、`ASC_API_KEY_ID`、`ASC_API_ISSUER_ID`、`ASC_API_KEY_P8_B64` 写进 GitHub Environment，交互式输入，不打印任何值。ASC key 的本地来源是 Infisical `Bearoster/prod` `/notary`；p12 是 `~/private_keys/p12/bearoster-mas-identities.p12`。
+第二个脚本交互式写入 GitHub Environment 所需的签名与 ASC 上传秘密，不打印任何值。秘密来源为 Infisical（Bearoster/`prod`）与签名主机本地材料；具体条目与路径见私人 runbook，不在仓库展开。
 
-**代价与边界**：Apple 私钥和 ASC key 离开本机存进 GitHub secrets，换来审批/执行身份分离。GitHub 侧凭据轮换 = 重跑 bootstrap 脚本；本机侧轮换后旧 secret 会继续有效直到被覆盖，轮换时两边都要做。
+**代价与边界**：启用该门意味着部分发布秘密会离开本机进入 GitHub Environment secrets，换来审批/执行身份分离。轮换时 GitHub 与本机两侧都要更新；细节见私人 runbook。
 
 ### 发布流程
 
@@ -114,12 +114,7 @@ scripts/release/bootstrap-release-secrets.sh   # 写入六个 Environment secret
 
 ## 密钥现状与轮换
 
-| 项目 | 位置 | 备注 |
-|---|---|---|
-| Apple Distribution + Mac Installer Distribution 私钥 | 本机登录钥匙串（可选迁到专用钥匙串） | `~/private_keys/p12/bearoster-mas-identities.p12` 是导出备份，有口令 |
-| p12 口令 | 用户的密码管理器 | **不在** Infisical 里 |
-| App Store Connect API Key（`.p8`） | Infisical `Bearoster`/`prod` `/notary` | 本机已无明文副本 |
-| Infisical `ENCRYPTION_KEY` | 用户密码管理器 | 唯一单点故障，必须有离线备份 |
+发布秘密存放在 **Infisical（Bearoster/`prod`）** 与 **签名主机 Keychain**；导出备份与口令只存在所有者的私人保管位置。仓库与公开文档不记录具体文件路径、密钥名清单或备份脚本位置——见私人 runbook。
 
 轮换时按策略要求走：先在新消费者上切换，再在 provider 侧吊销旧 key，并验证旧身份确实被拒。
 
