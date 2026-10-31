@@ -79,6 +79,10 @@ Roster keeps a local working copy for pending contact edits, history, and
 trash state. macOS Contacts remains the external system of record for data that
 the user chooses to write back.
 
+## Source
+
+Public repository: [github.com/saralaaga/bearoster](https://github.com/saralaaga/bearoster)
+
 ## License
 
 This project is released under the [MIT License](LICENSE).
