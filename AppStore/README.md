@@ -40,7 +40,7 @@ scripts/capture-store-shots.sh
 
 需要你本人做的：
 
-- [ ] 部署 `website/` 后确认 `/privacy`、`/support`、`/en/privacy`、`/en/support` 返回独立法务页（本地 `npx wrangler pages deploy website --project-name=bearoster --branch=main` 部署；2026-09-24 网站门因免费版不支持 required reviewers 搁置，见 `docs/website-deploy-gate.md`）
+- [x] 法务页已上线：`/privacy`、`/support`、`/en/privacy`、`/en/support`（bearoster.com；后续改文案仍走本机 `wrangler pages deploy`，见 `docs/website-deploy-gate.md`）
 - [x] 在 App Store Connect 填写文案并跑完两份问卷（2026-09-24 由 agent 经 ego 浏览器完成：中英文案/关键词/URL/版权、6 张截图、隐私 Data Not Collected 已发布、年龄分级 4+、内容权利无第三方内容；余下两件小事见下）
 - [ ] ASC 版本页把 `01-calendar` 截图拖到第一位（合成拖拽驱动不了 ASC 的排序组件，顺序当前为 02,03,01,04,05,06）
 - [ ] ASC 版本页 App Review Information 填联系人姓名/电话/邮箱（个人联系方式，agent 不代填）
@@ -51,6 +51,14 @@ scripts/capture-store-shots.sh
 
 - [ ] **上传构建**。2026-09-24 决定不走 GitHub 审批门（免费版不支持 required reviewers），改为本机人工两步：用户本人跑 `scripts/build-mas-pkg.sh` 出签名 pkg，再用 Transporter 或 `xcrun altool --upload-app` 上传，见 `docs/release-protected-executor.md`。Agent 不执行签名与上传
 - [ ] 欧盟交易商状态（只有面向欧盟上架时才需要）
+
+
+## 2026-10-31 MAS 启动备注
+
+- **Calendar Share**：默认关闭。MAS 构建仅加 `-DROSTER_MAS`；须显式 `ROSTER_SHARE=1` 才会定义 `CALENDAR_SHARE_LIVE`。首次上架**不要**开启。
+- **本地已有** `dist/mas/Bearoster-1.0.pkg`（约 2026-09-26）视为**过期**：其后已有 MAS 审核准备 / 分享停放 / 开源卫生等多笔提交；`Packaging/VERSION` 现为 marketing `1.0`、build `9`。上传前请本人重新跑 `scripts/build-mas-pkg.sh`。
+- **本机签名材料就绪（仅状态探测，未读密钥内容）**：Keychain 可见 Apple Distribution + 3rd Party Mac Developer Installer；`$HOME/private_keys/profile/Bearoster_Mac_App_Store.provisionprofile` 文件存在；Transporter.app 可用。
+- Agent **不**执行签名或上传；上传后可在用户已登录的 ASC 会话协助选 build / 提交审核。个人审核联系电话/邮箱仍须本人填写；截图排序（`01-calendar` 置顶）仍须本人在 ASC 拖拽。
 
 ## 免费发布
 
