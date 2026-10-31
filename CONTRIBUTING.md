@@ -31,6 +31,8 @@ ROSTER_CODESIGN_IDENTITY=- scripts/build-app.sh debug
 
 Release / Mac App Store 签名与上传属于受保护发布路径：普通贡献与 Agent **不要**持有或提交签名私钥、描述文件或 ASC API 密钥。详见仓库 `AGENTS.md` 中的部署与签名约束（高层门禁；具体密钥位置不在公开文档展开）。
 
+**公开克隆不需要任何签名材料。** `swift test` 与 `scripts/build-app.sh`（可用 `ROSTER_CODESIGN_IDENTITY=-`）即可本地验证。仓库中少数维护者脚本（如 `scripts/build-mas-pkg.sh`、`scripts/release/bootstrap-release-secrets.sh`）把 `$HOME/private_keys/...` 当作本机默认路径，可用 `ROSTER_MAS_P12` / `ROSTER_MAS_PROFILE` 等环境变量覆盖；这些路径只存在于维护者机器，**不是**公开贡献的前置条件，也没有密钥文件被提交到仓库。
+
 ## 测试
 
 全量测试：
