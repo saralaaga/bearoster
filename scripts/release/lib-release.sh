@@ -77,7 +77,7 @@ blocked_no_channel() {
 
 BLOCKED: no verified independent human approval channel.
 
-Per /Users/carlos/.agents/deployment-policy.md, a project script cannot be the
+Per the local deployment policy ($HOME/.agents/deployment-policy.md by default), a project script cannot be the
 enforcement boundary, and an ordinary Agent must not hold Apple management
 credentials. Until one of the entrypoints in
 docs/release-protected-executor.md is built and verified, the privileged
