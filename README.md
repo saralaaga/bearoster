@@ -78,3 +78,12 @@ RosterCore
 Roster keeps a local working copy for pending contact edits, history, and
 trash state. macOS Contacts remains the external system of record for data that
 the user chooses to write back.
+
+## License
+
+This project is released under the [MIT License](LICENSE).
+Copyright © 2026 Bang Ni Wen Wen (Tianjin) E-Commerce Co., Ltd.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md)（中文贡献指南：构建、测试、PR / Issue 约定与隐私注意）。
