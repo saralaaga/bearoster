@@ -1,6 +1,9 @@
 # Bearoster website
 
 Static, dependency-free site for `https://bearoster.com`.
+Public source repository: https://github.com/saralaaga/bearoster
+Site nav/footer and the download section link there (zh: 源码 / en: Source).
+
 
 - Chinese home: `/`
 - English home: `/en/`
