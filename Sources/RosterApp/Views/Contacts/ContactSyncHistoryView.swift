@@ -63,9 +63,9 @@ struct ContactSyncHistoryView: View {
             .padding(.horizontal, 32)
             .padding(.top, 30)
             .padding(.bottom, 60)
-            .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
         }
+        .adaptivePaneWidth(floor: 760, cap: 880)
         .background(ContactsNativeStyle.detailBackground(colorScheme))
     }
 

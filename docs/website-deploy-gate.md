@@ -1,11 +1,24 @@
-# Website deployment gate
+# Website deployment
 
-`bearoster.com` is a production resource. Agents may edit and verify `website/`,
-but deployment must run through `.github/workflows/website.yml`. That workflow
-uses GitHub environment protection, not chat approval or a local script, as its
-human gate.
+`bearoster.com` is a production resource. The GitHub-environment approval gate
+(`website.yml` + `configure-deploy-gate.sh`) was shelved in 2026-09 because the
+free GitHub plan returned 422 for required-reviewers protection rules. The gate
+was **re-enabled in 2026-11**: the `website-production` environment now has a
+required reviewer and the deployment secrets configured, so automatic
+deployment is live. The bootstrap setup below is kept for reference.
 
-## One-time setup
+Deploy path — a push to `main` that touches `website/**` or
+`.github/workflows/website.yml` starts **Website production deploy**
+automatically. The workflow verifies the static site, waits for the
+`website-production` environment approval, deploys the checked-out `website/`
+tree to Pages project `bearoster` on production branch `main`, and then fetches
+all four legal URLs to check their required content.
+
+Rollback is a Cloudflare Pages deployment rollback to the previous production
+deployment, followed by HTTP checks of all four legal URLs. If rollback is
+unavailable, revert the site commit on `main` and redeploy.
+
+## Shelved: GitHub environment gate (one-time setup if plan is upgraded)
 
 Run these commands yourself:
 

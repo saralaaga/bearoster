@@ -1,10 +1,38 @@
-# 受保护执行器与人工审批入口
+# 发布路径（2026-09-24 起：本机人工两步）
 
-状态：**部分建成。外部上传/提交仍然 blocked。**
-适用策略：`/Users/carlos/.agents/deployment-policy.md`（版本 2026-09-06）
-最后更新：2026-09-11
+状态：**当前采用本机人工发布：用户本人跑构建签名 + 本人上传。GitHub 审批门方案已建成但因免费版不支持 required reviewers 而搁置（文件保留，未激活）。**
+适用策略：本机部署策略文档（默认 `$HOME/.agents/deployment-policy.md`，版本 2026-09-06）
+最后更新：2026-09-24
 
-## 这份文档解决什么问题
+## 当前发布流程
+
+人工即审批：特权步骤由用户本人在自己终端完成，密钥全程不离开本机。
+
+```bash
+# 1) 用户本人运行：从钥匙串签名身份出 MAS .pkg
+scripts/build-mas-pkg.sh            # 产物在 dist/mas/Bearoster-<版本>.pkg
+```
+
+```text
+# 2) 用户本人上传，二选一：
+#    a) Transporter App：把 pkg 拖进去，点 Deliver
+#    b) xcrun altool --upload-app --type macos -f dist/mas/Bearoster-<版本>.pkg \
+#         -u <AppleID> -p <App 专用密码>
+```
+
+之后在 App Store Connect 选 build、提交审核（可由 Agent 在浏览器代操作，账号会话属于用户）。
+
+理由（为什么这道人工门对本项目足够）：签名证书与 ASC key 本来就在本机，GitHub 门不消除本机暴露面、反而要私钥离开本机；上架前有 App Review 强制外部门；仓库单人维护，Agent 已拥有全部源码写入权，签名步骤不是信任链最薄弱环节。失去的只是「独立审批记录 + 防自批」的纵深， consciously accepted。
+
+Agent 边界不变：不执行分发证书签名、不上传构建、不持有 Apple 凭据；只做无凭据构建、测试、ASC 元数据操作。
+
+## 为什么 GitHub 门被搁置
+
+`release.yml`/`website.yml` 的审批门依赖 Environment required reviewers，2026-09-24 实测 GitHub 免费版返回 422 不支持。升级 Pro/Team 后重跑 `scripts/release/configure-release-gate.sh` + `scripts/website/configure-deploy-gate.sh` 即可激活（脚本保留未删）。届时密钥需 bootstrap 进 GitHub secrets——是否接受密钥离机由用户再决定。
+
+## 历史：审批记录 + 哈希门（本地纵深，仍然可用）
+
+代码在 `scripts/release/`。
 
 发布动作需要三件事同时成立：
 
@@ -49,36 +77,44 @@ evidence: 查看了 1.0 的商店文案与截图，本地跑通沙盒构建
 - **挡不住的**：任何能写仓库或写 `release/approvals/` 的 Agent 都能伪造一条记录。`approver:` 字段是自报的，没有密码学意义。
 - 因此这层是**纵深防御**，不是策略要求的「独立审批入口」。
 
-## 还没建成：真正的强制边界
+## 已建成但搁置：GitHub Actions Environment 入口（方案 A）
 
-策略要求入口具备「普通 Agent 无法授予自己更大身份、无法自批」的性质，且由 OS/IAM/CI 强制，而不是靠脚本自觉。两个可选方案：
+`.github/workflows/release.yml` 与网站部署门（`docs/website-deploy-gate.md`）同一模式：
 
-### 方案 A（推荐）：GitHub Actions Environment + Required Reviewers
+- **candidate job（无任何秘密）**：校验 dispatch 的版本号与 `Packaging/VERSION` 一致，跑全量测试，用 `build-release-artifact.sh direct` 出 ad-hoc 候选产物 + manifest，作为 workflow artifact 上传。这是审批人看到并被绑定到的产物。
+- **sign-and-upload job（`environment: app-store-release`）**：只有你在 GitHub 上点 Approve 后才运行。从 Environment secrets 导入 Apple Distribution / Installer 身份与描述文件，跑 `scripts/build-mas-pkg.sh` 出签名 `.pkg`，再用 ASC API key 通过 `xcrun altool --upload-app` 上传 App Store Connect。结束即删除专用钥匙串。
 
-- 新建 workflow `release.yml`，用 `environment: app-store-release`。
-- 在该 Environment 上设置 **Required reviewers**（必须是你本人，不能是机器人账号）。
-- Apple 凭据只存在于该 Environment 的 secrets 里，workflow 用 `id-token` / Environment secrets 读取。
-- Agent 可以改 workflow 文件、可以 push，但**无法自我批准**待执行的 deployment——GitHub 会拦住，直到你点 Approve。
-- 构建与签名分离：普通 CI job 只构建、上传候选产物；签名/notarize/上传放在需要 Environment 审批的 job 里。
+Environment 限制为 `main` 分支 + 你本人是唯一 required reviewer。Agent 可以改 workflow、可以 push，但无法代替你点 Approve。
 
-这条路的代价：Apple Distribution 私钥和 notary key 要存进 GitHub secrets。密钥离开本机，换来的是真正的双人（人 + 机器）分离。
+### 一次性配置（只能你本人做）
 
-### 方案 B：本机独立审批器 + 独立钥匙串
+```bash
+scripts/release/configure-release-gate.sh      # 创建 app-store-release 审批门
+scripts/release/bootstrap-release-secrets.sh   # 写入六个 Environment secrets
+```
 
-- 单独的、Agent 无写权限的用户账号或机器，持有专用钥匙串，`setup-signing-keychain.sh` 已经把私钥搬进需交互解锁的钥匙串，是这条路的第一步。
-- 需要额外解决：Agent 能以同一用户身份访问宿主 Keychain。没有 OS 级用户/机器隔离就不成立。
-- 成本比方案 A 高，隔离强度取决于你怎么配。
+第二个脚本交互式写入 GitHub Environment 所需的签名与 ASC 上传秘密，不打印任何值。秘密来源为 Infisical（Bearoster/`prod`）与签名主机本地材料；具体条目与路径见私人 runbook，不在仓库展开。
 
-**在 A 或 B 任一建成并验证之前，`execute-release.sh` 会一直返回 blocked（退出码 3），这是设计如此。**
+**代价与边界**：启用该门意味着部分发布秘密会离开本机进入 GitHub Environment secrets，换来审批/执行身份分离。轮换时 GitHub 与本机两侧都要更新；细节见私人 runbook。
+
+### 发布流程
+
+1. `main` 上确认 `Packaging/VERSION` 是要发的版本（build number 递增过）。
+2. GitHub → Actions → **App Store release** → Run workflow，输入版本号。
+3. candidate job 出产物后，GitHub 请求你审批 deployment；你核对版本与候选 manifest 后 Approve。
+4. sign-and-upload job 签名并上传；之后在 App Store Connect 里选 build 并提交审核（提交审核这一步仍由你在网页上完成）。
+
+回滚：上传只是把 build 送进 ASC，不会自动发布；发错版本就在 ASC 丢弃该 build，修 VERSION 后重新走流程。
+
+### 方案 B（未采用）
+
+本机独立审批器 + 独立钥匙串。没有 OS 级用户/机器隔离就不成立（Agent 能以同一用户身份访问宿主 Keychain），成本更高，作为备选记录。
+
+**本地 `execute-release.sh` 仍按设计停在特权步骤前（退出码 3）。本地路径不再扩展；外部执行一律走上面的 GitHub 入口。**
 
 ## 密钥现状与轮换
 
-| 项目 | 位置 | 备注 |
-|---|---|---|
-| Apple Distribution + Mac Installer Distribution 私钥 | 本机登录钥匙串（可选迁到专用钥匙串） | `~/private_keys/p12/bearoster-mas-identities.p12` 是导出备份，有口令 |
-| p12 口令 | 用户的密码管理器 | **不在** Infisical 里 |
-| App Store Connect API Key（`.p8`） | Infisical `Bearoster`/`prod` `/notary` | 本机已无明文副本 |
-| Infisical `ENCRYPTION_KEY` | 用户密码管理器 | 唯一单点故障，必须有离线备份 |
+发布秘密存放在 **Infisical（Bearoster/`prod`）** 与 **签名主机 Keychain**；导出备份与口令只存在所有者的私人保管位置。仓库与公开文档不记录具体文件路径、密钥名清单或备份脚本位置——见私人 runbook。
 
 轮换时按策略要求走：先在新消费者上切换，再在 provider 侧吊销旧 key，并验证旧身份确实被拒。
 

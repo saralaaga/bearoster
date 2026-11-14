@@ -251,3 +251,101 @@ struct RosterCoreTests {
         Calendar(identifier: .gregorian).date(from: DateComponents(year: year, month: month, day: day))
     }
 }
+
+@Suite("Contacts create mapping")
+struct ContactsCreateMappingTests {
+    private func record(
+        _ kind: RosterCalendarKind,
+        month: Int,
+        day: Int,
+        source: RosterDateSpecSource,
+        calendar: Calendar.Identifier = .gregorian
+    ) -> RosterRecord {
+        RosterRecord(
+            contactID: "new-1",
+            contactName: "Test",
+            organizationName: "",
+            kind: kind,
+            components: DateComponents(
+                calendar: Calendar(identifier: calendar),
+                year: 1990,
+                month: month,
+                day: day
+            ),
+            source: source,
+            syncPolicy: .writeBackToApple
+        )
+    }
+
+    @Test("Draft profile maps onto a fresh mutable contact")
+    func mapsDraftProfileFields() {
+        let profile = ContactRosterProfile(
+            id: "draft-1",
+            displayName: "张伟",
+            organizationName: "示例公司",
+            records: [],
+            givenName: "伟",
+            familyName: "张",
+            nickname: "小伟",
+            departmentName: "工程部",
+            jobTitle: "工程师",
+            phoneNumbers: ["13800138000"],
+            emailAddresses: ["wei@example.com"],
+            postalAddresses: ["北京市海淀区"]
+        )
+
+        let contact = ContactsRepository.mutableContact(from: profile)
+
+        #expect(contact.givenName == "伟")
+        #expect(contact.familyName == "张")
+        #expect(contact.nickname == "小伟")
+        #expect(contact.organizationName == "示例公司")
+        #expect(contact.departmentName == "工程部")
+        #expect(contact.jobTitle == "工程师")
+        #expect(contact.phoneNumbers.map { $0.value.stringValue } == ["13800138000"])
+        #expect(contact.emailAddresses.map { String($0.value) } == ["wei@example.com"])
+        #expect(contact.postalAddresses.map { $0.value.street } == ["北京市海淀区"])
+        #expect(contact.birthday == nil)
+        #expect(contact.nonGregorianBirthday == nil)
+    }
+
+    @Test("Apple-sourced birthdays write into both birthday fields; local-only specs are skipped")
+    func appliesBirthdaysBySource() throws {
+        let gregorian = record(.gregorian, month: 8, day: 4, source: .appleRoster)
+        let lunar = record(.chinese, month: 7, day: 8, source: .appleNonGregorianRoster, calendar: .chinese)
+        let localOnly = record(.gregorian, month: 12, day: 1, source: .local)
+        let profile = ContactRosterProfile(
+            id: "draft-2",
+            displayName: "郭峰",
+            organizationName: "",
+            records: [gregorian, lunar, localOnly]
+        )
+
+        let contact = ContactsRepository.mutableContact(from: profile)
+
+        let birthday = try #require(contact.birthday)
+        #expect(birthday.month == 8)
+        #expect(birthday.day == 4)
+
+        let alternate = try #require(contact.nonGregorianBirthday)
+        #expect(alternate.month == 7)
+        #expect(alternate.day == 8)
+        #expect(alternate.calendar?.identifier == .chinese)
+    }
+
+    @Test("Profile without apple records keeps birthday fields empty")
+    func skipsLocalOnlyBirthdays() {
+        let localOnly = record(.gregorian, month: 3, day: 3, source: .local)
+        let profile = ContactRosterProfile(
+            id: "draft-3",
+            displayName: "本地",
+            organizationName: "",
+            records: [localOnly]
+        )
+
+        let contact = ContactsRepository.mutableContact(from: profile)
+
+        #expect(contact.birthday == nil)
+        #expect(contact.nonGregorianBirthday == nil)
+    }
+}

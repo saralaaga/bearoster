@@ -1,0 +1,23 @@
+{
+  // bearoster.com 的日历订阅中转 Worker。KV namespace id 部署前需替换：
+  //   npx wrangler kv namespace create SHARES
+  // 自定义域名路由走 bearoster.com/c/*（主站是同 zone 的 Pages 静态项目，
+  // Worker 路由优先于 Pages；若实际验证发现冲突，退路是改绑
+  // share.bearoster.com 子域名）。
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  "name": "bearoster-share",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-01",
+  "kv_namespaces": [
+    {
+      "binding": "SHARES",
+      "id": "REPLACE_WITH_KV_NAMESPACE_ID"
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "bearoster.com/c/*",
+      "zone_name": "bearoster.com"
+    }
+  ]
+}

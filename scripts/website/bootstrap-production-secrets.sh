@@ -7,16 +7,38 @@ set -euo pipefail
 
 REPO="saralaaga/bearoster"
 ENVIRONMENT="website-production"
-PROJECT_ID="c84d1d9c-75c1-4d1e-8bea-46fffb02a665"
+# Infisical project id is local config — never commit it. Prefer env, else
+# optional untracked .infisical.json workspaceId (gitignored).
 INFISICAL_ENV="prod"
 TOKEN_NAME="${1:-CLOUDFLARE_API_TOKEN}"
 ACCOUNT_NAME="${2:-CLOUDFLARE_ACCOUNT_ID}"
 
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
+resolve_project_id() {
+  if [ -n "${INFISICAL_PROJECT_ID:-}" ]; then
+    printf '%s' "$INFISICAL_PROJECT_ID"
+    return
+  fi
+  if [ -n "${PROJECT_ID:-}" ]; then
+    printf '%s' "$PROJECT_ID"
+    return
+  fi
+  local root cfg
+  root="$(cd "$(dirname "$0")/../.." && pwd)"
+  cfg="$root/.infisical.json"
+  if [ -f "$cfg" ] && command -v python3 >/dev/null; then
+    python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("workspaceId",""))' "$cfg"
+    return
+  fi
+  return 1
+}
+
 [ -t 0 ] || die "human entrypoint only; refusing to run without an interactive terminal"
 command -v infisical >/dev/null || die "infisical CLI is required"
 command -v gh >/dev/null || die "gh CLI is required"
+PROJECT_ID="$(resolve_project_id)" || die "set INFISICAL_PROJECT_ID (or PROJECT_ID), or keep a local gitignored .infisical.json with workspaceId"
+[[ "$PROJECT_ID" =~ ^[0-9a-fA-F-]{36}$ ]] || die "INFISICAL_PROJECT_ID does not look like a UUID"
 
 for name in "$TOKEN_NAME" "$ACCOUNT_NAME"; do
   infisical secrets get "$name" \

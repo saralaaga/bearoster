@@ -10,7 +10,7 @@ Bearoster is a macOS contacts tool that runs entirely on your Mac, for organizin
 
 ## What We Collect
 
-We collect nothing. Bearoster has no account system and does not require registration or sign-in. The app contains no network requests, third-party SDKs, analytics, or crash reporting. We do not receive, store, or otherwise process any of your personal information.
+We collect nothing. Bearoster has no account system and does not require registration or sign-in. The app contains no third-party SDKs, analytics, or crash reporting. We do not receive, store, or otherwise process any of your personal information.
 
 ## How Data Is Used
 

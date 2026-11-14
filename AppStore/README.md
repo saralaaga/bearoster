@@ -40,22 +40,21 @@ scripts/capture-store-shots.sh
 
 需要你本人做的：
 
-- [ ] 部署 `website/` 后确认 `/privacy`、`/support`、`/en/privacy`、`/en/support` 返回独立法务页（当前线上 catch-all 返回首页，不合要求；部署须走受保护入口）
-- [ ] 在 App Store Connect 填写文案并跑完两份问卷
-- [ ] 在 Cloudflare Email Routing 把 `support@bearoster.com` 转发到 `saralaagarwal1990@gmail.com`，完成后确认 MX 已生效（2026-09-20 检查尚无 MX 记录）
-- [ ] App 隐私问卷选「不收集数据」
-- [ ] 年龄分级问卷按 `questionnaires/age-rating.md` 填，预期 4+
-- [ ] 备份 Infisical `ENCRYPTION_KEY`（`~/infisical/backup-infisical.sh`）
-- [ ] p12 口令存进密码管理器
+- [ ] 部署 `website/` 后确认 `/privacy`、`/support`、`/en/privacy`、`/en/support` 返回独立法务页（本地 `npx wrangler pages deploy website --project-name=bearoster --branch=main` 部署；2026-09-24 网站门因免费版不支持 required reviewers 搁置，见 `docs/website-deploy-gate.md`）
+- [x] 在 App Store Connect 填写文案并跑完两份问卷（2026-09-24 由 agent 经 ego 浏览器完成：中英文案/关键词/URL/版权、6 张截图、隐私 Data Not Collected 已发布、年龄分级 4+、内容权利无第三方内容；余下两件小事见下）
+- [ ] ASC 版本页把 `01-calendar` 截图拖到第一位（合成拖拽驱动不了 ASC 的排序组件，顺序当前为 02,03,01,04,05,06）
+- [ ] ASC 版本页 App Review Information 填联系人姓名/电话/邮箱（个人联系方式，agent 不代填）
+- [x] Cloudflare Email Routing：`support@bearoster.com` 已配置转发到所有者收件箱（2026-09-24；不在仓库记录私人地址）
+- [ ] 完成私人发布清单中的密钥备份与轮换项（见本地 runbook；仓库不存放密钥位置细节）
 
 仍然是 blocked 的：
 
-- [ ] **上传构建**。`docs/release-protected-executor.md` 里列了让这一步可执行需要建的东西，没建成之前不要手工拿密钥跑上传脚本
+- [ ] **上传构建**。2026-09-24 决定不走 GitHub 审批门（免费版不支持 required reviewers），改为本机人工两步：用户本人跑 `scripts/build-mas-pkg.sh` 出签名 pkg，再用 Transporter 或 `xcrun altool --upload-app` 上传，见 `docs/release-protected-executor.md`。Agent 不执行签名与上传
 - [ ] 欧盟交易商状态（只有面向欧盟上架时才需要）
 
-## 免费发布、之后再订阅
+## 免费发布
 
-当前计划是免费发布，不做 App 内购买。商店文案和描述里没有出现订阅相关内容，之后加订阅时再补。
+免费发布，不做 App 内购买；项目已开源，暂无内购计划。商店文案和描述里没有订阅相关内容。
 
 ## 待确认
 

@@ -29,5 +29,14 @@ DerivedData/
 kimi/
 logo-candidates/
 
+# Local agent tooling state
+.mimosa/
+.zcode/
+.zcodeignore
+.video_agent/
+
 # Release candidates (manifests + artifacts are rebuilt per commit)
 release/artifacts/
+
+# Local Infisical link (workspaceId); create via infisical init / private copy
+.infisical.json

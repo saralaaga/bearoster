@@ -12,7 +12,7 @@ Bearoster needs to read and update contact information in macOS Contacts to mana
 
 ### Will my data be uploaded to the cloud?
 
-No. Bearoster runs entirely on your Mac and makes no network requests. Your contacts, tags, and edit history never leave this Mac.
+No. Bearoster runs entirely on your Mac. Your contacts, tags, and edit history never leave this Mac.
 
 ### Where do birthdays get written?
 

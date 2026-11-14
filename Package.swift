@@ -15,6 +15,9 @@ let package = Package(
         .executable(name: "Bearoster", targets: ["RosterApp"]),
         .executable(name: "RosterIOS", targets: ["RosterIOSApp"])
     ],
+    dependencies: [
+        .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.11.0")
+    ],
     targets: [
         .target(
             name: "RosterCore",
@@ -24,7 +27,10 @@ let package = Package(
         ),
         .target(
             name: "RosterShared",
-            dependencies: ["RosterCore"],
+            dependencies: [
+                "RosterCore",
+                .product(name: "MCP", package: "swift-sdk")
+            ],
             linkerSettings: [
                 .linkedFramework("SwiftUI"),
                 .linkedFramework("Speech"),

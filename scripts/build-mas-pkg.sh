@@ -27,6 +27,10 @@ OUT_DIR="$ROOT/dist/mas"
 die() { echo "error: $*" >&2; exit 1; }
 
 [[ -f "$PROFILE" ]] || die "missing provisioning profile: $PROFILE"
+# 91109: App Store uploads reject com.apple.quarantine on any payload file,
+# and browser-downloaded profiles carry it. Scrub it here, before the
+# profile is copied into the bundle.
+xattr -c "$PROFILE" 2>/dev/null || true
 [[ -f "$BASE_ENTITLEMENTS" ]] || die "missing $BASE_ENTITLEMENTS"
 command -v productbuild >/dev/null || die "productbuild not found (install Xcode command line tools)"
 
@@ -75,9 +79,14 @@ ROSTER_ENTITLEMENTS="$MERGED" \
 ROSTER_EMBED_PROFILE="$PROFILE" \
 ROSTER_APP_DIR="$APP_DIR" \
 ROSTER_SKIP_ZIP=1 \
+ROSTER_MAS=1 \
   "$ROOT/scripts/build-app.sh" release > /dev/null
 
 echo "==> verifying app"
+# 91109: clear any leftover extended attributes (quarantine etc.) on the
+# staged bundle before verification and packaging; they survive into the
+# pkg payload and App Store uploads reject them.
+xattr -cr "$APP_DIR" 2>/dev/null || true
 codesign --verify --deep --strict --verbose=2 "$APP_DIR"
 codesign -d --entitlements - "$APP_DIR" 2>/dev/null \
   | grep -q 'com.apple.security.app-sandbox' \
@@ -89,7 +98,9 @@ PKG="$OUT_DIR/$APP_NAME-$ROSTER_MARKETING_VERSION.pkg"
 rm -f "$PKG"
 
 echo "==> building installer package"
-productbuild --component "$APP_DIR" /Applications --sign "$INSTALLER_IDENTITY" "$PKG"
+# No secure timestamp: MAS packages don't need one, and the timestamp
+# fetch fails on this host's dead IPv6 route to timestamp.apple.com.
+productbuild --component "$APP_DIR" /Applications --sign "$INSTALLER_IDENTITY" --timestamp=none "$PKG"
 
 echo "==> verifying package"
 pkgutil --check-signature "$PKG"

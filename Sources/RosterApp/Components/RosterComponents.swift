@@ -196,3 +196,30 @@ struct CalculationProgressView: View {
         .accessibilityLabel(model.l10n(.calculatingRosters))
     }
 }
+
+// MARK: - Adaptive pane width
+
+/// Caps a centered content column at a fraction of the available pane width
+/// instead of a fixed point value, so wide windows get wider (but bounded)
+/// content columns. Apply outside scroll views.
+private struct AdaptivePaneWidthModifier: ViewModifier {
+    let floor: CGFloat
+    let cap: CGFloat
+    var ratio: CGFloat
+
+    func body(content: Content) -> some View {
+        GeometryReader { proxy in
+            content
+                .frame(maxWidth: min(cap, max(floor, proxy.size.width * ratio)))
+                .frame(maxWidth: .infinity)
+        }
+    }
+}
+
+extension View {
+    /// `floor` keeps the column at least as wide as the previous fixed width,
+    /// `ratio` grows it with the pane, `cap` bounds the growth for readability.
+    func adaptivePaneWidth(floor: CGFloat, cap: CGFloat, ratio: CGFloat = 0.9) -> some View {
+        modifier(AdaptivePaneWidthModifier(floor: floor, cap: cap, ratio: ratio))
+    }
+}

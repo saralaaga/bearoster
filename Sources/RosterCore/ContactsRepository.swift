@@ -119,6 +119,19 @@ public final class ContactsRepository: @unchecked Sendable {
         }
     }
 
+    public func createContact(profile: ContactRosterProfile) async throws -> String {
+        let store = store
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    continuation.resume(returning: try Self.createContactSync(store: store, profile: profile))
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
     public func addContacts(contactIDs: [String], toGroupID groupID: String) async throws {
         let store = store
         try await withCheckedThrowingContinuation { continuation in
@@ -268,7 +281,32 @@ public final class ContactsRepository: @unchecked Sendable {
 
         let contact = try store.unifiedContact(withIdentifier: contactID, keysToFetch: editKeys)
         guard let mutable = contact.mutableCopy() as? CNMutableContact else { return }
+        apply(profile: profile, to: mutable)
 
+        let saveRequest = CNSaveRequest()
+        saveRequest.update(mutable)
+        try store.execute(saveRequest)
+    }
+
+    private static func createContactSync(store: CNContactStore, profile: ContactRosterProfile) throws -> String {
+        guard canReadContacts else {
+            throw ContactsRepositoryError.permissionDenied
+        }
+
+        let contact = mutableContact(from: profile)
+        let saveRequest = CNSaveRequest()
+        saveRequest.add(contact, toContainerWithIdentifier: nil)
+        try store.execute(saveRequest)
+        return contact.identifier
+    }
+
+    static func mutableContact(from profile: ContactRosterProfile) -> CNMutableContact {
+        let contact = CNMutableContact()
+        apply(profile: profile, to: contact)
+        return contact
+    }
+
+    private static func apply(profile: ContactRosterProfile, to mutable: CNMutableContact) {
         mutable.givenName = profile.givenName
         mutable.familyName = profile.familyName
         mutable.nickname = profile.nickname
@@ -291,10 +329,6 @@ public final class ContactsRepository: @unchecked Sendable {
         }
 
         applyBirthdays(from: profile.records, to: mutable)
-
-        let saveRequest = CNSaveRequest()
-        saveRequest.update(mutable)
-        try store.execute(saveRequest)
     }
 
     private static func deleteContactsSync(store: CNContactStore, contactIDs: [String]) throws {

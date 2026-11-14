@@ -1,5 +1,5 @@
 {
-  "workspaceId": "c84d1d9c-75c1-4d1e-8bea-46fffb02a665",
+  "workspaceId": "REPLACE_WITH_INFISICAL_WORKSPACE_ID",
   "defaultEnvironment": "prod",
   "gitBranchToEnvironmentMapping": null,
   "domain": "http://localhost/api"

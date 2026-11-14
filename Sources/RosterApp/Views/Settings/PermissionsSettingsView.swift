@@ -9,6 +9,9 @@ struct PermissionsSettingsView: View {
     @Environment(RosterAppModel.self) private var model
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    #if ROSTER_MAS && CALENDAR_SHARE_LIVE
+    @State private var isConfirmingShareEnable = false
+    #endif
 
     var body: some View {
         @Bindable var model = model
@@ -22,12 +25,19 @@ struct PermissionsSettingsView: View {
                 }
                 preferencesSection
                 contactFieldsSection
+                #if !ROSTER_MAS
+                agentAccessSection
+                #endif
+                #if ROSTER_MAS && CALENDAR_SHARE_LIVE
+                shareSection
+                #endif
+                versionFooter
             }
             .padding(.horizontal, 42)
             .padding(.vertical, 32)
-            .frame(maxWidth: SettingsLayout.contentWidth, alignment: .leading)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .adaptivePaneWidth(floor: 860, cap: 1040)
         .background(RosterTheme.windowBackground(colorScheme))
         .animation(RosterTheme.Motion.allowed(RosterTheme.Motion.sectionReveal, reduceMotion: reduceMotion), value: permissionIsGranted)
     }
@@ -36,6 +46,18 @@ struct PermissionsSettingsView: View {
         SettingsSection(title: model.l10n(.contacts)) {
             PermissionAccessPanel()
         }
+    }
+
+    private var versionFooter: some View {
+        HStack(spacing: 6) {
+            Text(model.l10n(.version))
+            Text(SettingsVersionDisplay.current)
+                .monospacedDigit()
+        }
+        .font(.system(size: 12, weight: .medium))
+        .foregroundStyle(RosterTheme.inkSecondary)
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.top, 4)
     }
 
     private var permissionIsGranted: Bool {
@@ -138,6 +160,172 @@ struct PermissionsSettingsView: View {
         }
     }
 
+    #if !ROSTER_MAS
+    private var agentAccessSection: some View {
+        SettingsSection(title: model.l10n(.agentAccess)) {
+            VStack(spacing: 0) {
+                SettingsRow(
+                    title: model.l10n(.agentAccessToggle),
+                    detail: ""
+                ) {
+                    Toggle("", isOn: Binding(
+                        get: { model.isAgentAccessEnabled },
+                        set: { enabled in Task { await model.setAgentAccessEnabled(enabled) } }
+                    ))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .frame(width: 64, alignment: .trailing)
+                }
+
+                // The error renders outside the toggle gate: a failed start
+                // keeps the toggle on (the journal keeps retrying on next
+                // launch), so the row must be visible in that state.
+                if let error = model.agentAccessError {
+                    SettingsDivider()
+                    SettingsRow(title: error, detail: "") {
+                        EmptyView()
+                    }
+                } else if model.isAgentAccessEnabled, let endpoint = model.agentAccessEndpoint {
+                    SettingsDivider()
+                    SettingsRow(
+                        title: model.l10n(.agentAccessEndpoint),
+                        detail: endpoint
+                    ) {
+                        EmptyView()
+                    }
+
+                    SettingsDivider()
+
+                    SettingsRow(
+                        title: model.l10n(.agentAccessTokenLabel),
+                        detail: String(model.agentAccessToken.prefix(8)) + "…"
+                    ) {
+                        HStack(spacing: 8) {
+                            Button(model.l10n(.agentAccessCopyToken)) {
+                                #if os(macOS)
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(model.agentAccessToken, forType: .string)
+                                #endif
+                            }
+                            Button(model.l10n(.agentAccessRotateToken)) {
+                                Task { await model.rotateAgentAccessToken() }
+                            }
+                        }
+                    }
+
+                    SettingsDivider()
+
+                    SettingsRow(
+                        title: model.l10n(.agentAccessRequiresRunning),
+                        detail: ""
+                    ) {
+                        EmptyView()
+                    }
+                }
+            }
+            .animation(RosterTheme.Motion.allowed(RosterTheme.Motion.sectionReveal, reduceMotion: reduceMotion), value: model.isAgentAccessEnabled)
+            .animation(RosterTheme.Motion.allowed(RosterTheme.Motion.sectionReveal, reduceMotion: reduceMotion), value: model.agentAccessError)
+        }
+    }
+    #endif
+
+    // 2026-09-30 复审期间随 CALENDAR_SHARE_LIVE 暂缓上线：IAP 商品、
+    // Worker 部署和隐私口径（Data Not Collected → 声明 Name）就绪后，
+    // build-app.sh 以 ROSTER_SHARE=1 重新打开，随 1.0.1 提交。
+    #if ROSTER_MAS && CALENDAR_SHARE_LIVE
+    private var shareSection: some View {
+        SettingsSection(title: model.l10n(.share)) {
+            VStack(spacing: 0) {
+                SettingsRow(
+                    title: model.l10n(.shareEnable),
+                    detail: ""
+                ) {
+                    Toggle("", isOn: Binding(
+                        get: { model.share.isEnabled },
+                        set: { enabled in
+                            // 首次开启先确认：订阅链接含联系人姓名和生日。
+                            if enabled && model.share.readToken.isEmpty {
+                                isConfirmingShareEnable = true
+                            } else {
+                                Task { await model.setCalendarShareEnabled(enabled) }
+                            }
+                        }
+                    ))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .frame(width: 64, alignment: .trailing)
+                }
+
+                if model.share.isEnabled {
+                    SettingsDivider()
+                    SettingsRow(title: model.l10n(.sharePrivacyHint), detail: "") {
+                        EmptyView()
+                    }
+
+                    SettingsDivider()
+
+                    SettingsRow(
+                        title: shareSyncTitle,
+                        detail: shareSyncDetail
+                    ) {
+                        EmptyView()
+                    }
+
+                    SettingsDivider()
+
+                    SettingsRow(
+                        title: model.l10n(.shareLink),
+                        detail: model.share.shareURL?.absoluteString ?? ""
+                    ) {
+                        HStack(spacing: 8) {
+                            Button(model.l10n(.shareCopyLink)) {
+                                copyShareLink()
+                            }
+                            Button(model.l10n(.shareRegenerate)) {
+                                Task { await model.regenerateCalendarShareLink() }
+                            }
+                        }
+                    }
+
+                    SettingsDivider()
+
+                    SettingsRow(title: model.l10n(.shareRegenerateHint), detail: "") {
+                        EmptyView()
+                    }
+
+                    SettingsDivider()
+
+                    SettingsRow(
+                        title: model.l10n(.shareDisable),
+                        detail: ""
+                    ) {
+                        Button(model.l10n(.shareDisable)) {
+                            Task { await model.setCalendarShareEnabled(false) }
+                        }
+                        .buttonStyle(SettingsActionButtonStyle(kind: .secondary))
+                    }
+                }
+
+                if let error = model.share.errorMessage {
+                    SettingsDivider()
+                    SettingsRow(title: error, detail: "") {
+                        EmptyView()
+                    }
+                }
+            }
+            .animation(RosterTheme.Motion.allowed(RosterTheme.Motion.sectionReveal, reduceMotion: reduceMotion), value: model.share.isEnabled)
+        }
+        .alert(model.l10n(.shareEnableConfirmTitle), isPresented: $isConfirmingShareEnable) {
+            Button(model.l10n(.shareEnableConfirm)) {
+                Task { await model.setCalendarShareEnabled(true) }
+            }
+            Button(model.l10n(.cancel), role: .cancel) { }
+        } message: {
+            Text(model.l10n(.sharePrivacyHint))
+        }
+    }
+    #endif
+
 
 }
 
@@ -154,71 +342,42 @@ private struct PermissionAccessPanel: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 14) {
-                statusIcon
+        HStack(alignment: .center, spacing: 14) {
+            statusIcon
 
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 8) {
-                        Text(isGranted ? model.l10n(.permissionGranted) : model.l10n(.needContacts))
-                            .font(.system(size: 15, weight: .semibold))
-                        SettingsStatusPill(
-                            title: isGranted ? model.l10n(.permissionGranted) : model.l10n(.needContacts),
-                            color: isGranted ? RosterTheme.brandSecondary : RosterTheme.mustard
-                        )
-                    }
-
-                    Text(model.l10n(.permissionBody))
-                        .font(.system(size: 12.5, weight: .medium))
-                        .foregroundStyle(RosterTheme.inkSecondary)
-                        .lineSpacing(3)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    if needsSettings {
-                        Text(model.l10n(.permissionDenied))
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.red)
-                            .padding(.top, 2)
-                    }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Text(isGranted ? model.l10n(.permissionGranted) : model.l10n(.needContacts))
+                        .font(.system(size: 15, weight: .semibold))
+                    SettingsStatusPill(
+                        title: isGranted ? model.l10n(.permissionGranted) : model.l10n(.needContacts),
+                        color: isGranted ? RosterTheme.brandSecondary : RosterTheme.mustard
+                    )
                 }
-                .layoutPriority(1)
+
+                if needsSettings {
+                    Text(model.l10n(.permissionDenied))
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.red)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 10) {
-                if !isGranted && !needsSettings {
-                    Button(model.l10n(.allowContacts)) {
-                        Task { await model.requestContactsAccess() }
-                    }
-                    .buttonStyle(SettingsActionButtonStyle(kind: .primary))
+            if !isGranted && !needsSettings {
+                Button(model.l10n(.continueContacts)) {
+                    Task { await model.requestContactsAccess() }
                 }
-
+                .buttonStyle(SettingsActionButtonStyle(kind: .primary))
+            } else if needsSettings {
                 Button(model.l10n(.openSettings)) {
                     model.openContactsSettings()
                 }
-                .buttonStyle(SettingsActionButtonStyle(kind: isGranted ? .regular : .secondary))
-
-                Spacer(minLength: 0)
-
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(model.l10n(.version))
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(RosterTheme.inkSecondary)
-                    Text(versionDisplay)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .monospacedDigit()
-                }
+                .buttonStyle(SettingsActionButtonStyle(kind: .secondary))
             }
         }
-        .padding(18)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
         .background(RosterTheme.cardBackground(colorScheme))
-    }
-
-    private var versionDisplay: String {
-        let info = Bundle.main.infoDictionary
-        let shortVersion = info?["CFBundleShortVersionString"] as? String ?? "?"
-        let buildNumber = info?["CFBundleVersion"] as? String ?? "?"
-        return "\(shortVersion) (\(buildNumber))"
     }
 
     private var statusIcon: some View {
@@ -408,6 +567,15 @@ private struct SettingsSection<Content: View>: View {
     }
 }
 
+enum SettingsVersionDisplay {
+    static var current: String {
+        let info = Bundle.main.infoDictionary
+        let shortVersion = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let buildNumber = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(shortVersion) (\(buildNumber))"
+    }
+}
+
 private struct SettingsRow<Accessory: View>: View {
     let title: String
     let detail: String
@@ -427,21 +595,16 @@ private struct SettingsRow<Accessory: View>: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .layoutPriority(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             accessory
-                .frame(
-                    alignment: .trailing
-                )
+                .fixedSize(horizontal: true, vertical: false)
+                .frame(alignment: .trailing)
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
-}
-
-private enum SettingsLayout {
-    static let contentWidth: CGFloat = 860
 }
 
 private struct SettingsDivider: View {
@@ -530,6 +693,25 @@ private extension PermissionsSettingsView {
     var languageDisplayName: String {
         model.language.displayName
     }
+
+    #if ROSTER_MAS
+    var shareSyncTitle: String {
+        model.share.isSyncing ? model.l10n(.shareSyncing) : model.l10n(.shareSynced)
+    }
+
+    var shareSyncDetail: String {
+        guard let syncedAt = model.share.lastSyncedAt else { return "" }
+        return syncedAt.formatted(date: .omitted, time: .shortened)
+    }
+
+    func copyShareLink() {
+        guard let url = model.share.shareURL else { return }
+        #if os(macOS)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(url.absoluteString, forType: .string)
+        #endif
+    }
+    #endif
 
     var upcomingRangeDisplay: String {
         switch model.language.coreLocale {
