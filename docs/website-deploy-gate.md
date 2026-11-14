@@ -1,22 +1,18 @@
-# Website deployment (2026-09-24: local wrangler, gate shelved)
+# Website deployment
 
 `bearoster.com` is a production resource. The GitHub-environment approval gate
-(`website.yml` + `configure-deploy-gate.sh`) is **shelved**: the free GitHub
-plan returns 422 for required-reviewers protection rules, so the gate cannot
-be activated without upgrading. The files are kept unconfigured.
+(`website.yml` + `configure-deploy-gate.sh`) was shelved in 2026-09 because the
+free GitHub plan returned 422 for required-reviewers protection rules. The gate
+was **re-enabled in 2026-11**: the `website-production` environment now has a
+required reviewer and the deployment secrets configured, so automatic
+deployment is live. The bootstrap setup below is kept for reference.
 
-Current path — deploy from `main` with the local wrangler login (human-run or
-explicitly user-authorized), then verify:
-
-```bash
-scripts/website/verify-static-site.sh
-npx wrangler pages deploy website --project-name=bearoster --branch=main --commit-dirty=true
-scripts/website/verify-production.sh
-```
-
-Rollback is a Cloudflare Pages deployment rollback to the previous production
-deployment, followed by HTTP checks of all four legal URLs. If rollback is
-unavailable, revert the site commit on `main` and redeploy.
+Deploy path — a push to `main` that touches `website/**` or
+`.github/workflows/website.yml` starts **Website production deploy**
+automatically. The workflow verifies the static site, waits for the
+`website-production` environment approval, deploys the checked-out `website/`
+tree to Pages project `bearoster` on production branch `main`, and then fetches
+all four legal URLs to check their required content.
 
 ## Shelved: GitHub environment gate (one-time setup if plan is upgraded)
 
@@ -44,10 +40,15 @@ copy while you are present at the terminal. Choose the shortest practical
 Cloudflare token expiry; after it expires, deployment fails safely until you run
 the bootstrap again with a fresh token.
 
-## Deploy and roll back (shelved path)
+## Deploy and roll back
 
-After the site branch is merged, dispatch **Website production deploy** from
-`main`. GitHub asks for approval before running `wrangler pages deploy
-website`. The target is hard-coded to Pages project `bearoster`, production
-branch `main`, and the checked-out `website/` tree. The workflow finishes by
-fetching all four legal URLs and checking their required content.
+After the site branch is merged, changing `website/` or the deploy workflow on
+`main` starts **Website production deploy** automatically. GitHub asks for
+approval before running `wrangler pages deploy website`. The target is
+hard-coded to Pages project `bearoster`, production branch `main`, and the
+checked-out `website/` tree. The workflow finishes by fetching all four legal
+URLs and checking their required content.
+
+Rollback is a Cloudflare Pages deployment rollback to the previous production
+deployment, followed by HTTP checks of all four legal URLs. If rollback is
+unavailable, revert the site commit on `main` and approve a new deployment.
