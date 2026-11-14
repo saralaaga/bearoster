@@ -14,10 +14,6 @@ automatically. The workflow verifies the static site, waits for the
 tree to Pages project `bearoster` on production branch `main`, and then fetches
 all four legal URLs to check their required content.
 
-Rollback is a Cloudflare Pages deployment rollback to the previous production
-deployment, followed by HTTP checks of all four legal URLs. If rollback is
-unavailable, revert the site commit on `main` and redeploy.
-
 ## Shelved: GitHub environment gate (one-time setup if plan is upgraded)
 
 Run these commands yourself:
