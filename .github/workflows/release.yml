@@ -17,7 +17,7 @@ concurrency:
 jobs:
   # Unprivileged job: no secrets, builds the candidate the reviewer approves.
   candidate:
-    runs-on: macos-15
+    runs-on: bearoster
     steps:
       - uses: actions/checkout@v4
       - name: Match version input to the checked-out tree
@@ -45,7 +45,7 @@ jobs:
   # deployment in GitHub. Holds the signing identities and the ASC API key.
   sign-and-upload:
     needs: candidate
-    runs-on: macos-15
+    runs-on: bearoster
     environment: app-store-release
     steps:
       - uses: actions/checkout@v4
