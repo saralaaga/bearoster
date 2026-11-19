@@ -19,6 +19,11 @@ jobs:
   candidate:
     runs-on: bearoster
     steps:
+      - name: Prepare isolated CI home
+        run: |
+          ISOLATED_HOME="$RUNNER_TEMP/bearoster-release-home"
+          mkdir -p "$ISOLATED_HOME"
+          echo "HOME=$ISOLATED_HOME" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
       - name: Match version input to the checked-out tree
         env:
