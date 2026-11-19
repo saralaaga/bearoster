@@ -17,8 +17,13 @@ concurrency:
 jobs:
   # Unprivileged job: no secrets, builds the candidate the reviewer approves.
   candidate:
-    runs-on: macos-15
+    runs-on: bearoster
     steps:
+      - name: Prepare isolated CI home
+        run: |
+          ISOLATED_HOME="$RUNNER_TEMP/bearoster-release-home"
+          mkdir -p "$ISOLATED_HOME"
+          echo "HOME=$ISOLATED_HOME" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
       - name: Match version input to the checked-out tree
         env:
@@ -45,7 +50,7 @@ jobs:
   # deployment in GitHub. Holds the signing identities and the ASC API key.
   sign-and-upload:
     needs: candidate
-    runs-on: macos-15
+    runs-on: bearoster
     environment: app-store-release
     steps:
       - uses: actions/checkout@v4
